@@ -1,0 +1,10 @@
+{
+  "profiles": {
+    "Disposio (Package)": {
+      "commandName": "MsixPackage"
+    },
+    "Disposio (Unpackaged)": {
+      "commandName": "Project"
+    }
+  }
+}
