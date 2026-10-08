@@ -58,6 +58,7 @@ namespace Disposio.Views
             }
         }
 
+        // Update the Theme Color for the page resources based on the selected theme (light or dark)
         private void ApplyTheme(bool isLight)
         {
             try
@@ -66,7 +67,7 @@ namespace Disposio.Views
                     panelDark.Color = isLight ? Windows.UI.Color.FromArgb(0xFF, 0xF3, 0xF3, 0xF3) : Windows.UI.Color.FromArgb(0xFF, 0x1B, 0x1E, 0x23);
 
                 if (this.Resources["PanelBrush"] is SolidColorBrush panel)
-                    panel.Color = isLight ? Windows.UI.Color.FromArgb(0xFF, 0xFF, 0xFF, 0xFF) : Windows.UI.Color.FromArgb(0xFF, 0x26, 0x29, 0x2D);
+                    panel.Color = isLight ? Windows.UI.Color.FromArgb(0xFF, 0xFA, 0xFA, 0xFA) : Windows.UI.Color.FromArgb(0xFF, 0x26, 0x29, 0x2D);
 
                 if (this.Resources["TextMain"] is SolidColorBrush textMain)
                     textMain.Color = isLight ? Windows.UI.Color.FromArgb(0xFF, 0x1A, 0x1F, 0x2A) : Windows.UI.Color.FromArgb(0xFF, 0xE6, 0xE9, 0xF0);
@@ -79,8 +80,8 @@ namespace Disposio.Views
                 {
                     if (bg.GradientStops.Count >= 2)
                     {
-                        bg.GradientStops[0].Color = isLight ? Windows.UI.Color.FromArgb(0xFF, 0xFF, 0xFF, 0xFF) : Windows.UI.Color.FromArgb(0xFF, 0x0B, 0x0D, 0x12);
-                        bg.GradientStops[1].Color = isLight ? Windows.UI.Color.FromArgb(0xFF, 0xF3, 0xF3, 0xF3) : Windows.UI.Color.FromArgb(0xFF, 0x13, 0x16, 0x1A);
+                        bg.GradientStops[0].Color = isLight ? Windows.UI.Color.FromArgb(0xFF, 0xF2, 0xF2, 0xF2) : Windows.UI.Color.FromArgb(0xFF, 0x0B, 0x0D, 0x12);
+                        bg.GradientStops[1].Color = isLight ? Windows.UI.Color.FromArgb(0xFF, 0xF0, 0xF0, 0xF0) : Windows.UI.Color.FromArgb(0xFF, 0x13, 0x16, 0x1A);
                     }
                 }
 
@@ -90,6 +91,13 @@ namespace Disposio.Views
 
                 if (this.Resources["InputBorder"] is SolidColorBrush inputBorder)
                     inputBorder.Color = isLight ? Windows.UI.Color.FromArgb(0xFF, 0xD1, 0xD5, 0xDB) : Windows.UI.Color.FromArgb(0xFF, 0x2F, 0x31, 0x3A);
+
+                // speech bubble colors
+                if (this.Resources["SpeechBubbleBackground"] is SolidColorBrush speechBg)
+                    speechBg.Color = isLight ? Windows.UI.Color.FromArgb(0xFF, 0xFF, 0xFF, 0xFF) : Windows.UI.Color.FromArgb(0xFF, 0x22, 0x24, 0x29);
+
+                if (this.Resources["SpeechBorderBrush"] is SolidColorBrush speechBorder)
+                    speechBorder.Color = isLight ? Windows.UI.Color.FromArgb(0xFF, 0xD1, 0xD5, 0xDB) : Windows.UI.Color.FromArgb(0xFF, 0x2F, 0x31, 0x3A);
 
                 // adjust button background if it uses PrimaryBrush (keep primary color)
                 if (this.Resources["ButtonTextOnPrimary"] is SolidColorBrush btnText)

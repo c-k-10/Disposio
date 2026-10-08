@@ -19,6 +19,8 @@
         <SolidColorBrush x:Key="InputBackground" Color="#FF222426" />
         <SolidColorBrush x:Key="InputBorder" Color="#FF2F313A" />
         <SolidColorBrush x:Key="ButtonTextOnPrimary" Color="#FFFFFFFF" />
+        <SolidColorBrush x:Key="SpeechBubbleBackground" Color="#FF222429" />
+        <SolidColorBrush x:Key="SpeechBorderBrush" Color="#FF2F313A" />
     </Page.Resources>
 
     <Grid Background="{StaticResource AppBackground}">
@@ -44,34 +46,35 @@
                             <!-- header: title + controls -->
                             <Grid Grid.Row="0">
                                 <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="*" />
+                                    <!-- Linke Spalte bekommt eine Mindestbreite -->
+                                    <ColumnDefinition MinWidth="200" Width="*" />
                                     <ColumnDefinition Width="Auto" />
                                 </Grid.ColumnDefinitions>
-                                <StackPanel Orientation="Vertical">
-                                    <TextBlock Text="DISPOSIO" FontSize="28" FontWeight="Bold" Foreground="{StaticResource PrimaryBrush}" />
-                                    <TextBlock Text="UNTERNEHMENSPORTAL" FontSize="12" Foreground="{StaticResource TextMuted}" Margin="0,8,0,0" />
-                                </StackPanel>
 
-                                <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center" Spacing="50">
-                                    <ComboBox x:Name="ColorCombo" Width="120" SelectionChanged="ColorCombo_SelectionChanged">
-                                        <ComboBoxItem Tag="#FF004D">Pink‑Rot</ComboBoxItem>
-                                        <ComboBoxItem Tag="#7B2CBF">Lila</ComboBoxItem>
-                                        <ComboBoxItem Tag="#007BFF">Blau</ComboBoxItem>
-                                        <ComboBoxItem Tag="#00C853">Grün</ComboBoxItem>
-                                        <ComboBoxItem Tag="#FF9100">Orange</ComboBoxItem>
-                                    </ComboBox>
-                                    <ToggleSwitch x:Name="ModeSwitch" Toggled="ModeSwitch_Toggled"/>
-                                </StackPanel>
+                                <!-- Linker Bereich -->
+                                <StackPanel Orientation="Vertical">
+                                    <TextBlock Text="DISPOSIO"
+                                       FontSize="28"
+                                       FontWeight="Bold"
+                                       Foreground="{StaticResource PrimaryBrush}" />
+                                    <TextBlock Text="UNTERNEHMENSPORTAL"
+                                       FontSize="12"
+                                       Foreground="{StaticResource TextMuted}"
+                                       Margin="0,8,0,0" />          
+                                    </StackPanel>
+
+                                <!-- Rechter Bereich -->
+                                <!-- color selector and mode toggle moved to right panel -->
                             </Grid>
+
 
                             <!-- title -->
                             <StackPanel Grid.Row="1" Margin="0,18,0,8">
                                 <TextBlock Text="Willkommen zurück" FontSize="22" FontWeight="SemiBold" Foreground="{StaticResource TextMain}" />
-                                <TextBlock Text="Melden Sie sich mit Ihren Unternehmensdaten an." FontSize="13" Foreground="{StaticResource TextMuted}" Margin="0,6,0,0" />
                             </StackPanel>
 
                             <!-- form -->
-                            <StackPanel Grid.Row="2" Spacing="10">
+                            <StackPanel Grid.Row="2" Spacing="10" Margin="0 30 0 0">
                                 <TextBlock Text="Unternehmenskennung *" Foreground="{StaticResource TextMain}" FontSize="12" />
                                 <TextBox x:Name="CompanyBox" PlaceholderText="z. B. nordlog" Background="{StaticResource InputBackground}" Foreground="{StaticResource TextMain}" BorderBrush="{StaticResource InputBorder}" CornerRadius="8" Height="40"/>
 
@@ -100,17 +103,56 @@
 
                     <!-- right panel -->
                     <Grid Grid.Column="1" Background="{StaticResource PanelBrush}" CornerRadius="0,12,12,0">
-                        <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
-                            <!-- speech bubble -->
-                            <Grid HorizontalAlignment="Left" Margin="-40,0,0,0">
-                                <Border Background="{StaticResource PanelBrush}" CornerRadius="8" Padding="12" HorizontalAlignment="Left">
-                                    <TextBlock Text="Passwort vergessen?" Foreground="{StaticResource TextMain}"/>
-                                </Border>
-                                <Polygon Points="0,18 10,12 10,24" Fill="{StaticResource PanelBrush}" HorizontalAlignment="Left" Margin="120,18,0,0"/>
-                            </Grid>
+                        <StackPanel Orientation="Horizontal"
+                            HorizontalAlignment="Left"
+                            VerticalAlignment="Top"
+                            Margin="18,18,0,0"
+                            Spacing="250">
+                            <ComboBox x:Name="ColorCombo"
+                                  Width="120"
+                                  SelectionChanged="ColorCombo_SelectionChanged">
+                                <ComboBoxItem Tag="#FF004D" IsSelected="True">Rot</ComboBoxItem>
+                                <ComboBoxItem Tag="#7B2CBF">Lila</ComboBoxItem>
+                                <ComboBoxItem Tag="#007BFF">Blau</ComboBoxItem>
+                                <ComboBoxItem Tag="#00C853">Grün</ComboBoxItem>
+                                <ComboBoxItem Tag="#FF9100">Orange</ComboBoxItem>
+                            </ComboBox>
 
-                            <Image Source="ms-appx:///Assets/miseur_kofferfell.png" Width="360" Height="360" Stretch="Uniform"/>
+                            <ToggleSwitch x:Name="ModeSwitch"
+                                  Toggled="ModeSwitch_Toggled"
+                                  OffContent="Dark Mode"
+                                  OnContent="Light Mode"/>
                         </StackPanel>
+
+                        <Grid HorizontalAlignment="Center" VerticalAlignment="Center">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+
+                            <!-- speech bubble in left column, aligned to mascot head by translate transform -->
+                            <Grid HorizontalAlignment="Left" VerticalAlignment="Center" Margin="-70,0,0,0">
+                                <Grid HorizontalAlignment="Left" RenderTransformOrigin="0.5,0.5">
+                                    <Grid.RenderTransform>
+                                        <TranslateTransform Y="-80" />
+                                    </Grid.RenderTransform>
+
+                                    <Border Background="{StaticResource SpeechBubbleBackground}"
+                BorderBrush="{StaticResource SpeechBorderBrush}"
+                BorderThickness="1"
+                CornerRadius="12"
+                Padding="12,10"
+                HorizontalAlignment="Left">
+                                        <TextBlock Text="Passwort vergessen?"
+                       Foreground="{StaticResource TextMain}"
+                       FontSize="13"/>
+                                    </Border>
+
+                                </Grid>
+                            </Grid>
+                            <!-- mascot image in right column, keep centered -->
+                            <Image Source="ms-appx:///Assets/miseur_kofferfell.png" Width="360" Height="360" Stretch="Uniform" HorizontalAlignment="Right" VerticalAlignment="Center" />
+                        </Grid>
                     </Grid>
                 </Grid>
             </Border>
