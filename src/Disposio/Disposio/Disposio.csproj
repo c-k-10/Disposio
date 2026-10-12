@@ -18,9 +18,8 @@
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </Content>
   </ItemGroup>
-  <ItemGroup>
-    <None Remove="LoginPage.xaml" />
-  </ItemGroup>
+  <!-- LoginPage moved into Views\LoginPage folder.
+       Removed explicit Remove entries; rely on SDK implicit Page items. -->
 
   <ItemGroup>
     <Content Include="Assets\SplashScreen.scale-200.png" />
@@ -57,12 +56,8 @@
     <Folder Include="Themes\" />
     <Folder Include="Services\" />
     <Folder Include="ViewModels\" />
-    <Folder Include="Views\" />
   </ItemGroup>
   <ItemGroup>
-    <Page Update="LoginPage.xaml">
-      <Generator>MSBuild:Compile</Generator>
-    </Page>
   </ItemGroup>
 
   <!--

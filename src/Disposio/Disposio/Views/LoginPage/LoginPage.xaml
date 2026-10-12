@@ -16,9 +16,9 @@
         <SolidColorBrush x:Key="PanelDarkBrush" Color="#1B1E23" />
         <SolidColorBrush x:Key="TextMain" Color="#E6E9F0" />
         <SolidColorBrush x:Key="TextMuted" Color="#9CA3AF" />
+        <SolidColorBrush x:Key="ButtonTextOnPrimary" Color="#FFFFFFFF" />
         <SolidColorBrush x:Key="InputBackground" Color="#FF222426" />
         <SolidColorBrush x:Key="InputBorder" Color="#FF2F313A" />
-        <SolidColorBrush x:Key="ButtonTextOnPrimary" Color="#FFFFFFFF" />
         <SolidColorBrush x:Key="SpeechBubbleBackground" Color="#FF222429" />
         <SolidColorBrush x:Key="SpeechBorderBrush" Color="#FF2F313A" />
     </Page.Resources>
@@ -43,38 +43,20 @@
                                 <RowDefinition Height="Auto" />
                             </Grid.RowDefinitions>
 
-                            <!-- header: title + controls -->
-                            <Grid Grid.Row="0">
-                                <Grid.ColumnDefinitions>
-                                    <!-- Linke Spalte bekommt eine Mindestbreite -->
-                                    <ColumnDefinition MinWidth="200" Width="*" />
-                                    <ColumnDefinition Width="Auto" />
-                                </Grid.ColumnDefinitions>
-
-                                <!-- Linker Bereich -->
-                                <StackPanel Orientation="Vertical">
-                                    <TextBlock Text="DISPOSIO"
-                                       FontSize="28"
-                                       FontWeight="Bold"
-                                       Foreground="{StaticResource PrimaryBrush}" />
-                                    <TextBlock Text="UNTERNEHMENSPORTAL"
-                                       FontSize="12"
-                                       Foreground="{StaticResource TextMuted}"
-                                       Margin="0,8,0,0" />          
-                                    </StackPanel>
-
-                                <!-- Rechter Bereich -->
-                                <!-- color selector and mode toggle moved to right panel -->
-                            </Grid>
-
+                            <!-- header: title -->
+                            <StackPanel Grid.Row="0" Orientation="Vertical">
+                                <TextBlock Text="DISPOSIO" FontSize="28" FontWeight="Bold" Foreground="{StaticResource PrimaryBrush}" />
+                                <TextBlock Text="UNTERNEHMENSPORTAL" FontSize="12" Foreground="{StaticResource TextMuted}" Margin="0,8,0,0" />
+                            </StackPanel>
 
                             <!-- title -->
                             <StackPanel Grid.Row="1" Margin="0,18,0,8">
                                 <TextBlock Text="Willkommen zurück" FontSize="22" FontWeight="SemiBold" Foreground="{StaticResource TextMain}" />
+                                <TextBlock Text="Melden Sie sich mit Ihren Unternehmensdaten an." FontSize="13" Foreground="{StaticResource TextMuted}" Margin="0,6,0,0" />
                             </StackPanel>
 
                             <!-- form -->
-                            <StackPanel Grid.Row="2" Spacing="10" Margin="0 30 0 0">
+                            <StackPanel Grid.Row="2" Spacing="10">
                                 <TextBlock Text="Unternehmenskennung *" Foreground="{StaticResource TextMain}" FontSize="12" />
                                 <TextBox x:Name="CompanyBox" PlaceholderText="z. B. nordlog" Background="{StaticResource InputBackground}" Foreground="{StaticResource TextMain}" BorderBrush="{StaticResource InputBorder}" CornerRadius="8" Height="40"/>
 
@@ -103,25 +85,16 @@
 
                     <!-- right panel -->
                     <Grid Grid.Column="1" Background="{StaticResource PanelBrush}" CornerRadius="0,12,12,0">
-                        <StackPanel Orientation="Horizontal"
-                            HorizontalAlignment="Left"
-                            VerticalAlignment="Top"
-                            Margin="18,18,0,0"
-                            Spacing="250">
-                            <ComboBox x:Name="ColorCombo"
-                                  Width="120"
-                                  SelectionChanged="ColorCombo_SelectionChanged">
-                                <ComboBoxItem Tag="#FF004D" IsSelected="True">Rot</ComboBoxItem>
+                        <!-- top-right controls: color selector and light/dark toggle -->
+                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,18,18,0" Spacing="10">
+                            <ComboBox x:Name="ColorCombo" Width="120" SelectionChanged="ColorCombo_SelectionChanged">
+                                <ComboBoxItem Tag="#FF004D">Pink‑Rot</ComboBoxItem>
                                 <ComboBoxItem Tag="#7B2CBF">Lila</ComboBoxItem>
                                 <ComboBoxItem Tag="#007BFF">Blau</ComboBoxItem>
                                 <ComboBoxItem Tag="#00C853">Grün</ComboBoxItem>
                                 <ComboBoxItem Tag="#FF9100">Orange</ComboBoxItem>
                             </ComboBox>
-
-                            <ToggleSwitch x:Name="ModeSwitch"
-                                  Toggled="ModeSwitch_Toggled"
-                                  OffContent="Dark Mode"
-                                  OnContent="Light Mode"/>
+                            <ToggleSwitch x:Name="ModeSwitch" Toggled="ModeSwitch_Toggled" OffContent="Dark Mode" OnContent="Light Mode"/>
                         </StackPanel>
 
                         <Grid HorizontalAlignment="Center" VerticalAlignment="Center">
@@ -131,27 +104,24 @@
                             </Grid.ColumnDefinitions>
 
                             <!-- speech bubble in left column, aligned to mascot head by translate transform -->
-                            <Grid HorizontalAlignment="Left" VerticalAlignment="Center" Margin="-70,0,0,0">
-                                <Grid HorizontalAlignment="Left" RenderTransformOrigin="0.5,0.5">
+                            <Grid Grid.Column="0" HorizontalAlignment="Right" VerticalAlignment="Center" Margin="0,0,20,0">
+                                <Grid HorizontalAlignment="Right" RenderTransformOrigin="0.5,0.5">
                                     <Grid.RenderTransform>
                                         <TranslateTransform Y="-80" />
                                     </Grid.RenderTransform>
-
-                                    <Border Background="{StaticResource SpeechBubbleBackground}"
-                BorderBrush="{StaticResource SpeechBorderBrush}"
-                BorderThickness="1"
-                CornerRadius="12"
-                Padding="12,10"
-                HorizontalAlignment="Left">
-                                        <TextBlock Text="Passwort vergessen?"
-                       Foreground="{StaticResource TextMain}"
-                       FontSize="13"/>
+                                    <Border Background="{StaticResource SpeechBubbleBackground}" BorderBrush="{StaticResource SpeechBorderBrush}" BorderThickness="1" CornerRadius="12" Padding="12,10" HorizontalAlignment="Right" >
+                                        <TextBlock Text="Passwort vergessen?" Foreground="{StaticResource TextMain}" FontSize="13"/>
                                     </Border>
-
+                                    <Rectangle x:Name="SpeechTail" Width="18" Height="18" Fill="{StaticResource SpeechBubbleBackground}" Stroke="{StaticResource SpeechBorderBrush}" StrokeThickness="1" HorizontalAlignment="Right" Margin="-6,18,0,0" RenderTransformOrigin="0.5,0.5">
+                                        <Rectangle.RenderTransform>
+                                            <RotateTransform Angle="45"/>
+                                        </Rectangle.RenderTransform>
+                                    </Rectangle>
                                 </Grid>
                             </Grid>
+
                             <!-- mascot image in right column, keep centered -->
-                            <Image Source="ms-appx:///Assets/miseur_kofferfell.png" Width="360" Height="360" Stretch="Uniform" HorizontalAlignment="Right" VerticalAlignment="Center" />
+                            <Image Grid.Column="1" Source="ms-appx:///Assets/miseur_kofferfell.png" Width="360" Height="360" Stretch="Uniform" HorizontalAlignment="Center" VerticalAlignment="Center" />
                         </Grid>
                     </Grid>
                 </Grid>
