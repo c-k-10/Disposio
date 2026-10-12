@@ -28,7 +28,7 @@
     <AppXManifest Include="C:\Wirtschaftinformatik\PROJEKT_DISPOSIO\Disposio\src\Disposio\Disposio\bin\x64\Debug\net8.0-windows10.0.19041.0\win-x64\AppxManifest.xml">
       <PackagePath>AppxManifest.xml</PackagePath>
       <ReRegisterAppIfChanged>true</ReRegisterAppIfChanged>
-      <Modified>2026-10-12T07:00:37.124</Modified>
+      <Modified>2026-10-12T08:09:47.955</Modified>
     </AppXManifest>
   </ItemGroup>
   <ItemGroup>
@@ -42,11 +42,11 @@
     </AppxPackagedFile>
     <AppxPackagedFile Include="C:\Wirtschaftinformatik\PROJEKT_DISPOSIO\Disposio\src\Disposio\Disposio\obj\x64\Debug\net8.0-windows10.0.19041.0\win-x64\apphost.exe">
       <PackagePath>Disposio.exe</PackagePath>
-      <Modified>2026-10-12T07:00:35.849</Modified>
+      <Modified>2026-10-12T08:09:47.676</Modified>
     </AppxPackagedFile>
     <AppxPackagedFile Include="C:\Wirtschaftinformatik\PROJEKT_DISPOSIO\Disposio\src\Disposio\Disposio\obj\x64\Debug\net8.0-windows10.0.19041.0\win-x64\Disposio.dll">
       <PackagePath>Disposio.dll</PackagePath>
-      <Modified>2026-10-12T07:00:35.830</Modified>
+      <Modified>2026-10-12T08:09:47.669</Modified>
     </AppxPackagedFile>
     <AppxPackagedFile Include="C:\Users\C K\.nuget\packages\microsoft.netcore.app.runtime.win-x64\8.0.31\runtimes\win-x64\lib\net8.0\Microsoft.CSharp.dll">
       <PackagePath>Microsoft.CSharp.dll</PackagePath>
@@ -994,7 +994,7 @@
     </AppxPackagedFile>
     <AppxPackagedFile Include="C:\Wirtschaftinformatik\PROJEKT_DISPOSIO\Disposio\src\Disposio\Disposio\bin\x64\Debug\net8.0-windows10.0.19041.0\win-x64\resources.pri">
       <PackagePath>resources.pri</PackagePath>
-      <Modified>2026-10-12T07:00:36.812</Modified>
+      <Modified>2026-10-12T08:09:47.816</Modified>
     </AppxPackagedFile>
   </ItemGroup>
   <ItemGroup>

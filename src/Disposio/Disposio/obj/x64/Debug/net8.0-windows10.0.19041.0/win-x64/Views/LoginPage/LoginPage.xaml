@@ -58,23 +58,24 @@
                             <!-- form -->
                             <StackPanel Grid.Row="2" Spacing="10">
                                 <TextBlock Text="Unternehmenskennung *" Foreground="{StaticResource TextMain}" FontSize="12" />
-                                <TextBox x:ConnectionId='6' x:Name="CompanyBox" PlaceholderText="z. B. nordlog" Background="{StaticResource InputBackground}" Foreground="{StaticResource TextMain}" BorderBrush="{StaticResource InputBorder}" CornerRadius="8" Height="40"/>
+                                <TextBox x:ConnectionId='5' x:Name="CompanyBox" PlaceholderText="z. B. nordlog" Background="{StaticResource InputBackground}" Foreground="{StaticResource TextMain}" BorderBrush="{StaticResource InputBorder}" CornerRadius="8" Height="40"/>
 
                                 <TextBlock Text="E‑Mail‑Adresse *" Foreground="{StaticResource TextMain}" FontSize="12" Margin="0,8,0,0" />
-                                <TextBox x:ConnectionId='7' x:Name="EmailBox" PlaceholderText="demo@beispiel.invalid" Background="{StaticResource InputBackground}" Foreground="{StaticResource TextMain}" BorderBrush="{StaticResource InputBorder}" CornerRadius="8" Height="40"/>
+                                <TextBox x:ConnectionId='6' x:Name="EmailBox" PlaceholderText="demo@beispiel.invalid" Background="{StaticResource InputBackground}" Foreground="{StaticResource TextMain}" BorderBrush="{StaticResource InputBorder}" CornerRadius="8" Height="40"/>
 
                                 <TextBlock Text="Passwort *" Foreground="{StaticResource TextMain}" FontSize="12" Margin="0,8,0,0" />
-                                <PasswordBox x:ConnectionId='8' x:Name="PasswordBox" PlaceholderText="••••••••" Background="{StaticResource InputBackground}" Foreground="{StaticResource TextMain}" BorderBrush="{StaticResource InputBorder}" CornerRadius="8" Height="40"/>
+                                <PasswordBox x:ConnectionId='7' x:Name="PasswordBox" PlaceholderText="••••••••" Background="{StaticResource InputBackground}" Foreground="{StaticResource TextMain}" BorderBrush="{StaticResource InputBorder}" CornerRadius="8" Height="40"/>
 
                                 <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="0,8,0,0">
                                     <CheckBox Content="Angemeldet bleiben" Foreground="{StaticResource TextMuted}"/>
                                 </StackPanel>
+
                             </StackPanel>
 
                             <!-- footer button -->
                             <StackPanel Grid.Row="3" Margin="0,16,0,0">
                                 <Border CornerRadius="10" Background="{StaticResource PrimaryBrush}" Height="52">
-                                    <Button x:ConnectionId='5' x:Name="LoginButton" Content="Anmelden" Background="Transparent" Foreground="{StaticResource ButtonTextOnPrimary}" FontWeight="SemiBold"                          />
+                                    <Button x:ConnectionId='4' x:Name="LoginButton" Content="Anmelden" Background="Transparent" Foreground="{StaticResource ButtonTextOnPrimary}" FontWeight="SemiBold"                          />
                                 </Border>
                             </StackPanel>
                         </Grid>
@@ -85,17 +86,23 @@
 
                     <!-- right panel -->
                     <Grid Grid.Column="1" Background="{StaticResource PanelBrush}" CornerRadius="0,12,12,0">
-                        <!-- top-right controls: color selector and light/dark toggle -->
-                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,18,18,0" Spacing="10">
-                            <ComboBox x:ConnectionId='3' x:Name="ColorCombo" Width="120"                                               >
-                                <ComboBoxItem Tag="#FF004D">Pink‑Rot</ComboBoxItem>
+                        <!-- top controls: color selector (links) und mode toggle (rechts) -->
+                        <Grid HorizontalAlignment="Stretch" VerticalAlignment="Top" Margin="0,18,0,0">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+
+                            <ComboBox x:ConnectionId='2' x:Name="ColorCombo" Width="120"                                                Grid.Column="0" HorizontalAlignment="Left" Margin="18,0,0,0">
+                                <ComboBoxItem Tag="#FF004D" IsSelected="True">Pink‑Rot</ComboBoxItem>
                                 <ComboBoxItem Tag="#7B2CBF">Lila</ComboBoxItem>
                                 <ComboBoxItem Tag="#007BFF">Blau</ComboBoxItem>
                                 <ComboBoxItem Tag="#00C853">Grün</ComboBoxItem>
                                 <ComboBoxItem Tag="#FF9100">Orange</ComboBoxItem>
                             </ComboBox>
-                            <ToggleSwitch x:ConnectionId='4' x:Name="ModeSwitch"                              OffContent="Dark Mode" OnContent="Light Mode"/>
-                        </StackPanel>
+
+                            <ToggleSwitch x:ConnectionId='3' x:Name="ModeSwitch"                              OffContent="Dark Mode" OnContent="Light Mode" Grid.Column="1" HorizontalAlignment="Right" Margin="0,0,0,0"/>
+                        </Grid>
 
                         <Grid HorizontalAlignment="Center" VerticalAlignment="Center">
                             <Grid.ColumnDefinitions>
@@ -104,24 +111,19 @@
                             </Grid.ColumnDefinitions>
 
                             <!-- speech bubble in left column, aligned to mascot head by translate transform -->
-                            <Grid Grid.Column="0" HorizontalAlignment="Right" VerticalAlignment="Center" Margin="0,0,20,0">
-                                <Grid HorizontalAlignment="Right" RenderTransformOrigin="0.5,0.5">
+                            <Grid Grid.Column="0" HorizontalAlignment="Left" VerticalAlignment="Center" Margin="20,0,0,0">
+                                <Grid RenderTransformOrigin="0.5,0.5">
                                     <Grid.RenderTransform>
                                         <TranslateTransform Y="-80" />
                                     </Grid.RenderTransform>
-                                    <Border Background="{StaticResource SpeechBubbleBackground}" BorderBrush="{StaticResource SpeechBorderBrush}" BorderThickness="1" CornerRadius="12" Padding="12,10" HorizontalAlignment="Right" >
+                                    <Border Background="{StaticResource SpeechBubbleBackground}" BorderBrush="{StaticResource SpeechBorderBrush}" BorderThickness="1" CornerRadius="12" Padding="12,10" Margin="-100,0,0,0" HorizontalAlignment="Left">
                                         <TextBlock Text="Passwort vergessen?" Foreground="{StaticResource TextMain}" FontSize="13"/>
                                     </Border>
-                                    <Rectangle x:ConnectionId='2' x:Name="SpeechTail" Width="18" Height="18" Fill="{StaticResource SpeechBubbleBackground}" Stroke="{StaticResource SpeechBorderBrush}" StrokeThickness="1" HorizontalAlignment="Right" Margin="-6,18,0,0" RenderTransformOrigin="0.5,0.5">
-                                        <Rectangle.RenderTransform>
-                                            <RotateTransform Angle="45"/>
-                                        </Rectangle.RenderTransform>
-                                    </Rectangle>
                                 </Grid>
                             </Grid>
 
                             <!-- mascot image in right column, keep centered -->
-                            <Image Grid.Column="1" Source="ms-appx:///Assets/miseur_kofferfell.png" Width="360" Height="360" Stretch="Uniform" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                            <Image Grid.Column="0" Source="ms-appx:///Assets/miseur_kofferfell.png" Width="360" Height="360" Stretch="Uniform" HorizontalAlignment="Center" VerticalAlignment="Center" />
                         </Grid>
                     </Grid>
                 </Grid>
