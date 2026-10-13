@@ -37,6 +37,8 @@ public sealed class UnternehmenRepository : IUnternehmenRepository
 
     public async Task<IReadOnlyList<Unternehmen>> LoadAsync(CancellationToken cancellationToken = default)
     {
+        // Rechteprüfung gehört auch an den Datenzugriff: Eine geöffnete Seite allein reicht nicht.
+        await AuthService.DashboardZugriffPruefenAsync(cancellationToken);
         // await wartet auf die Datenbank, ohne den UI-Thread zu blockieren. Das Fenster bleibt bedienbar.
         var rows = await _client.Value.QueryAsync(
             $"SELECT {Columns} FROM public.unternehmen u ORDER BY lower(u.firmenname), u.unternehmen_id",
@@ -53,6 +55,7 @@ public sealed class UnternehmenRepository : IUnternehmenRepository
     public async Task<Unternehmen> CreateAsync(UnternehmenEntwurf entwurf,
         CancellationToken cancellationToken = default)
     {
+        await AuthService.DashboardZugriffPruefenAsync(cancellationToken);
         var eingaben = ValidateAndTrim(entwurf);
 
         // $1 bis $10 sind Platzhalter. Eingaben werden als Parameter übertragen und NICHT in SQL eingesetzt.
@@ -89,6 +92,7 @@ public sealed class UnternehmenRepository : IUnternehmenRepository
     public async Task<Unternehmen> UpdateAsync(long id, DateTime version, UnternehmenEntwurf entwurf,
         CancellationToken cancellationToken = default)
     {
+        await AuthService.DashboardZugriffPruefenAsync(cancellationToken);
         var eingaben = ValidateAndTrim(entwurf);
         if (id <= 0)
         {

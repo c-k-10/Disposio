@@ -1,57 +1,51 @@
-﻿using System;
+using System;
 using Npgsql;
 
 namespace Disposio.Services
 {
     internal class Database
     {
-        // Hinweis: Connection-String nicht hardcodieren in produktiven Projekten. Hier steht er historisch im Repo.
-        private readonly string _connectionString =
-            "Host=ep-curly-queen-b2qa2c1e-pooler.c-6.eu-central-1.aws.neon.tech; Database=neondb; Username=neondb_owner; Password=npg_4pc0hjEnJIwk; SSL Mode=VerifyFull; Channel Binding=Require;";
+        internal const string ConnectionStringEnvironmentVariable = "DISPOSIO_CONNECTION_STRING";
+
+        // Eine gemeinsame lokale Konfiguration für HTTPS und direkte PostgreSQL-Verbindungen.
+        // Zugangsdaten werden weder im Quellcode noch in Fehlermeldungen gespeichert.
+        private readonly string _connectionString = ReadConnectionString().ConnectionString;
+
+        private static NpgsqlConnectionStringBuilder ReadConnectionString()
+        {
+            var value = Environment.GetEnvironmentVariable(ConnectionStringEnvironmentVariable);
+            if (string.IsNullOrWhiteSpace(value))
+                throw new InvalidOperationException("Die lokale Datenbankkonfiguration DISPOSIO_CONNECTION_STRING fehlt.");
+
+            NpgsqlConnectionStringBuilder settings;
+            try
+            {
+                // Der offizielle Parser unterstützt auch Aliase und korrekt zitierte Sonderzeichen.
+                settings = new NpgsqlConnectionStringBuilder(value);
+            }
+            catch (Exception exception) when (exception is ArgumentException or FormatException or OverflowException)
+            {
+                // Parserfehler können Teile der Eingabe enthalten: keine Details weitergeben.
+                throw new InvalidOperationException("Die lokale Datenbankkonfiguration ist ungültig.");
+            }
+
+            if (string.IsNullOrWhiteSpace(settings.Host) || string.IsNullOrWhiteSpace(settings.Database) ||
+                string.IsNullOrWhiteSpace(settings.Username) || string.IsNullOrEmpty(settings.Password))
+                throw new InvalidOperationException("Die lokale Datenbankkonfiguration benötigt Host, Database, Username und Password.");
+
+            return settings;
+        }
 
         internal static DatabaseSettings GetSettings()
         {
-            // Connection-String in diesem Beispiel: Semikolon-getrennte Schlüssel=Wert Paare.
-            var db = new Database();
-            var cs = db._connectionString ?? string.Empty;
-            var parts = cs.Split(';', StringSplitOptions.RemoveEmptyEntries);
-            var dict = new System.Collections.Generic.Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-            foreach (var part in parts)
-            {
-                var idx = part.IndexOf('=');
-                if (idx <= 0) continue;
-                var key = part.Substring(0, idx).Trim();
-                var value = part.Substring(idx + 1).Trim();
-                dict[key] = value;
-            }
-
-            dict.TryGetValue("Host", out var host);
-            dict.TryGetValue("Database", out var database);
-            dict.TryGetValue("Username", out var username);
-            dict.TryGetValue("Password", out var password);
-            // Port kann optional sein; PostgreSQL-Default ist 5432
-            if (!dict.TryGetValue("Port", out var port) || string.IsNullOrEmpty(port))
-            {
-                // Falls Host mit Port angegeben ist (host:port), trennen
-                if (!string.IsNullOrEmpty(host) && host.Contains(':'))
-                {
-                    var idx = host.LastIndexOf(':');
-                    port = host[(idx + 1)..];
-                    host = host[..idx];
-                }
-                else
-                {
-                    port = "5432";
-                }
-            }
-
+            var settings = ReadConnectionString();
             return new DatabaseSettings
             {
-                Host = host,
-                Database = database,
-                Username = username,
-                Password = password,
-                Port = port
+                Host = settings.Host,
+                Database = settings.Database,
+                Username = settings.Username,
+                Password = settings.Password,
+                Port = settings.Port.ToString(System.Globalization.CultureInfo.InvariantCulture)
             };
         }
 

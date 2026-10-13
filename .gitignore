@@ -1,2 +1,6 @@
-﻿
+# Visual Studio local workspace
 .vs/
+
+# .NET build output (all projects and configurations)
+[Bb][Ii][Nn]/
+[Oo][Bb][Jj]/
