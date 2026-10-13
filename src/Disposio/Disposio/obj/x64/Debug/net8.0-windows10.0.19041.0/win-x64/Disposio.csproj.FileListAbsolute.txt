@@ -565,3 +565,4 @@ C:\Users\nikla\Desktop\WIV\Prog\Disposio\Kot\src\Disposio\Disposio\obj\x64\Debug
 C:\Users\nikla\Desktop\WIV\Prog\Disposio\Kot\src\Disposio\Disposio\obj\x64\Debug\net8.0-windows10.0.19041.0\win-x64\MultipleQualifiersPerDimensionFound.txt
 C:\Users\nikla\Desktop\WIV\Prog\Disposio\Kot\src\Disposio\Disposio\obj\x64\Debug\net8.0-windows10.0.19041.0\win-x64\ProjectArchitectures.txt
 C:\Users\nikla\Desktop\WIV\Prog\Disposio\Kot\src\Disposio\Disposio\obj\x64\Debug\net8.0-windows10.0.19041.0\win-x64\.winmd_cache\$Microsoft.Web.WebView2.Core.winmd_639039823460000000.json
+C:\Users\nikla\Desktop\WIV\Prog\Disposio\Kot\src\Disposio\Disposio\bin\x64\Debug\net8.0-windows10.0.19041.0\win-x64\BCrypt-Net-Next.dll

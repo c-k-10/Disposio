@@ -13,6 +13,7 @@ using System.Runtime.InteropServices.WindowsRuntime;
 using Windows.Foundation;
 using Windows.Foundation.Collections;
 using Windows.UI;
+using Disposio.Services;
 
 // To learn more about WinUI, the WinUI project structure,
 // and more about our project templates, see: http://aka.ms/winui-project-info.
@@ -147,15 +148,28 @@ namespace Disposio.Views
                 return;
             }
 
-            // The existing demo login opens the customer dashboard.
-            // A backend authentication service can be connected here later.
+            AngemeldeterBenutzer? user;
+            try { user = await AuthService.LoginAsync(company, email, pwd); }
+            catch { user = null; }
+
+            var resultDlg = new ContentDialog
+            {
+                Title = user is null ? "Fehler" : "Erfolgreich",
+                Content = user is null ? "Firma, E-Mail oder Passwort falsch." : $"Willkommen, {user.Vorname}!",
+                CloseButtonText = "OK",
+                XamlRoot = this.XamlRoot
+            };
+            await resultDlg.ShowAsync();
+            if (user is null)
+                return;
+
             var appearance = new DashboardAppearance
             {
                 AccentHex = (ColorCombo.SelectedItem as ComboBoxItem)?.Tag as string ?? "#FF004D",
                 IsLight = ModeSwitch.IsOn
             };
-            Frame?.Navigate(typeof(DashboardAnsicht), appearance);
-            Frame?.BackStack.Clear();
+            if (Frame is Frame frame && frame.Navigate(typeof(DashboardAnsicht), appearance))
+                frame.BackStack.Clear();
         }
     }
 }

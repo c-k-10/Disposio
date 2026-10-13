@@ -46,16 +46,18 @@
     <ProjectCapability Include="Msix" />
   </ItemGroup>
   <ItemGroup>
+    <PackageReference Include="BCrypt.Net-Next" Version="4.2.0" />
     <PackageReference Include="CommunityToolkit.WinUI.UI.Controls.DataGrid" Version="7.1.2" />
     <PackageReference Include="Microsoft.Windows.SDK.BuildTools" Version="10.0.28000.2705" />
     <PackageReference Include="Microsoft.WindowsAppSDK" Version="2.5.1" />
     <PackageReference Include="Npgsql" Version="10.0.3" />
+    <!-- Ensure logging abstractions available for transitive restores -->
+    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="8.0.0" />
   </ItemGroup>
   <ItemGroup>
     <Folder Include="Models\" />
     <Folder Include="Helpers\" />
     <Folder Include="Themes\" />
-    <Folder Include="Services\" />
     <Folder Include="ViewModels\" />
     <Folder Include="Views\DashboardAnsicht\" />
   </ItemGroup>
