@@ -197,10 +197,12 @@
                     <TextBlock Text="Kunden" FontSize="18" FontWeight="SemiBold"
                                Foreground="{StaticResource TextBrush}" />
                 </Border>
-                <StackPanel Orientation="Horizontal" Margin="0,28,0,0">
-                    <TextBlock Text="MegakrasseAdmin ·" FontSize="14" VerticalAlignment="Center"
+                <StackPanel Margin="0,28,0,0" Spacing="6">
+                    <TextBlock x:Name="AccountNameText" FontSize="14" TextWrapping="Wrap"
+                               Foreground="{StaticResource TextBrush}" />
+                    <TextBlock x:Name="AccountRoleText" FontSize="14" TextWrapping="Wrap"
                                Foreground="{StaticResource MutedTextBrush}" />
-                    <HyperlinkButton Content="Abmelden" Click="Logout_Click" Padding="4,0"
+                    <HyperlinkButton Content="Abmelden" Click="Logout_Click" Padding="0" HorizontalAlignment="Left"
                                      Foreground="{StaticResource MutedTextBrush}" FontSize="14" />
                 </StackPanel>
             </StackPanel>
@@ -250,14 +252,18 @@
                     </StackPanel>
                 </Grid>
 
-                <StackPanel x:Name="CompactAccount" Visibility="Collapsed" Orientation="Horizontal" Spacing="12">
-                    <TextBlock Text="DISPOSIO" FontWeight="Bold" Foreground="{StaticResource AccentBrush}"
-                               VerticalAlignment="Center" />
-                    <TextBlock Text="Admin-Bereich" Foreground="{StaticResource MutedTextBrush}"
-                               VerticalAlignment="Center" />
-                    <HyperlinkButton Content="Abmelden" Click="Logout_Click" Padding="4,0"
-                                     Foreground="{StaticResource MutedTextBrush}" />
-                </StackPanel>
+                <Grid x:Name="CompactAccount" Visibility="Collapsed" ColumnSpacing="12">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <StackPanel Spacing="4">
+                        <TextBlock Text="DISPOSIO" FontWeight="Bold" Foreground="{StaticResource AccentBrush}" />
+                        <TextBlock x:Name="CompactAccountText" TextWrapping="Wrap" Foreground="{StaticResource MutedTextBrush}" />
+                    </StackPanel>
+                    <HyperlinkButton Grid.Column="1" Content="Abmelden" Click="Logout_Click" Padding="4,0"
+                                     Foreground="{StaticResource MutedTextBrush}" VerticalAlignment="Center" />
+                </Grid>
 
                 <!-- Der Status erklärt Laden/Fehler. Erneut laden holt den aktuellen Stand aus Neon. -->
                 <Grid ColumnSpacing="16">

@@ -22,15 +22,24 @@ namespace Disposio.Views
 {
     public sealed partial class LoginPage : Page
     {
+        private bool _isSigningIn;
+
         public LoginPage()
         {
             this.InitializeComponent();
+            UpdateAccountType();
         }
 
         protected override void OnNavigatedTo(NavigationEventArgs e)
         {
             base.OnNavigatedTo(e);
-            if (e.Parameter is DashboardAppearance appearance)
+            DashboardAppearance? appearance = e.Parameter as DashboardAppearance;
+            if (e.Parameter is LoginNavigationParameter parameter)
+            {
+                appearance = parameter.Appearance;
+                ShowLoginStatus(parameter.Hinweis);
+            }
+            if (appearance is not null)
             {
                 foreach (ComboBoxItem item in ColorCombo.Items)
                 {
@@ -44,6 +53,28 @@ namespace Disposio.Views
                 RequestedTheme = appearance.IsLight ? ElementTheme.Light : ElementTheme.Dark;
                 ApplyTheme(appearance.IsLight);
             }
+        }
+
+        private bool IsPlatformAccount => AccountTypeCombo.SelectedItem is ComboBoxItem { Tag: "Plattform" };
+
+        private void AccountTypeCombo_SelectionChanged(object sender, SelectionChangedEventArgs e) => UpdateAccountType();
+
+        private void UpdateAccountType()
+        {
+            // SelectionChanged kann schon beim Aufbau der XAML-Datei ausgelöst werden.
+            // Nach InitializeComponent sind alle Felder vorhanden; vorher warten wir ab.
+            if (CompanyField is null || PasswordBox is null || LoginStatusText is null)
+                return;
+
+            CompanyField.Visibility = IsPlatformAccount ? Visibility.Collapsed : Visibility.Visible;
+            PasswordBox.Password = "";
+            LoginStatusText.Visibility = Visibility.Collapsed;
+        }
+
+        private void ShowLoginStatus(string message)
+        {
+            LoginStatusText.Text = message;
+            LoginStatusText.Visibility = Visibility.Visible;
         }
 
         private void ColorCombo_SelectionChanged(object sender, SelectionChangedEventArgs e)
@@ -130,84 +161,88 @@ namespace Disposio.Views
 
         private async void LoginButton_Click(object sender, RoutedEventArgs e)
         {
-            var button = sender as Microsoft.UI.Xaml.Controls.Button;
-            if (button == null) return;
+            // await lässt das Fenster weiter reagieren. Deshalb sperren wir vor dem Warten
+            // alle Login-Eingaben: Ein Doppelklick darf keine zweite Anmeldung starten.
+            if (_isSigningIn)
+                return;
 
-            // Button deaktivieren, um Reentranz und gleichzeitige ContentDialog-Aufrufe zu verhindern
-            button.IsEnabled = false;
+            _isSigningIn = true;
+            LoginButton.IsEnabled = AccountTypeCombo.IsEnabled = CompanyBox.IsEnabled =
+                EmailBox.IsEnabled = PasswordBox.IsEnabled = false;
+            LoginButton.Content = "Anmeldung läuft …";
+            LoginStatusText.Visibility = Visibility.Collapsed;
             try
             {
-                var company = (this.FindName("CompanyBox") as TextBox)?.Text?.Trim();
-                var email = (this.FindName("EmailBox") as TextBox)?.Text?.Trim();
-                var pwd = (this.FindName("PasswordBox") as PasswordBox)?.Password;
-
-                if (string.IsNullOrEmpty(company) || string.IsNullOrEmpty(email) || string.IsNullOrEmpty(pwd))
+                // Eine leere Firmenkennung bedeutet ausdrücklich „Plattformkonto“.
+                // AuthService prüft trotzdem Passwort und Rolle; die Auswahl selbst erteilt keine Rechte.
+                string company = IsPlatformAccount ? "" : CompanyBox.Text.Trim();
+                string email = EmailBox.Text.Trim();
+                string password = PasswordBox.Password;
+                if ((!IsPlatformAccount && company.Length == 0) || email.Length == 0 || password.Length == 0)
                 {
-                    var dlg = new ContentDialog
-                    {
-                        XamlRoot = this.XamlRoot,
-                        RequestedTheme = this.RequestedTheme,
-                        Title = "Fehler",
-                        Content = "Bitte alle Pflichtfelder ausfüllen.",
-                        CloseButtonText = "OK"
-                    };
-                    await dlg.ShowAsync();
+                    ShowLoginStatus("Bitte alle Pflichtfelder ausfüllen.");
                     return;
                 }
 
-                AngemeldeterBenutzer? user = null;
+                AngemeldeterBenutzer? user;
                 try
                 {
-                    user = await AuthService.LoginAsync(company, email, pwd);
+                    user = await AuthService.LoginAsync(company, email, password);
                 }
-                catch
+                catch (Exception)
                 {
-                    user = null;
+                    // Eine unterbrochene Verbindung ist etwas anderes als falsche Zugangsdaten.
+                    // Technische Details und Passwörter werden hier niemals angezeigt.
+                    ShowLoginStatus("Die Anmeldung ist gerade nicht möglich. Prüfe die Verbindung und versuche es erneut.");
+                    return;
                 }
 
                 if (user == null)
                 {
-                    var err = new ContentDialog
-                    {
-                        XamlRoot = this.XamlRoot,
-                        RequestedTheme = this.RequestedTheme,
-                        Title = "Anmeldung fehlgeschlagen",
-                        Content = "Firma, E-Mail oder Passwort ist ungültig.",
-                        CloseButtonText = "OK"
-                    };
-                    await err.ShowAsync();
+                    // Die Meldung verrät nicht, ob ein bestimmtes Konto existiert.
+                    ShowLoginStatus("Die Zugangsdaten oder der gewählte Kontotyp sind ungültig.");
                     return;
                 }
 
-                // Bei erfolgreicher Anmeldung zum Dashboard navigieren
+                if (!user.IstMegakrasserAdmin)
+                {
+                    ShowLoginStatus("Die Anmeldung war erfolgreich. Das Verwaltungsdashboard ist nur für MegakrassenAdmins verfügbar. Die Firmenansicht ist noch nicht angebunden.");
+                    return;
+                }
+
                 try
                 {
-                    var accent = (this.FindName("ColorCombo") as ComboBox)?.SelectedItem as ComboBoxItem;
+                    // Nur ein geprüfter Plattformadministrator startet eine Sitzung für diese
+                    // globale Ansicht. Das Dashboard und das Repository prüfen den Zugriff erneut.
+                    BenutzerSitzung.Starten(user);
+                    var accent = ColorCombo.SelectedItem as ComboBoxItem;
                     var accentHex = accent?.Tag as string ?? "#FF004D";
-                    var appearance = new DashboardAppearance { AccentHex = accentHex, IsLight = (this.FindName("ModeSwitch") as ToggleSwitch)?.IsOn ?? true };
+                    var appearance = new DashboardAppearance { AccentHex = accentHex, IsLight = ModeSwitch.IsOn };
 
-                    Frame?.Navigate(typeof(DashboardAnsicht), appearance);
+                    if (Frame is not Frame frame || !frame.Navigate(typeof(DashboardAnsicht), appearance))
+                        throw new InvalidOperationException();
                     // BackStack löschen, damit Zurück nicht zur LoginPage führt
-                    Frame?.BackStack?.Clear();
+                    frame.BackStack.Clear();
                 }
-                catch
+                catch (Exception)
                 {
-                    var dlg = new ContentDialog
-                    {
-                        XamlRoot = this.XamlRoot,
-                        RequestedTheme = this.RequestedTheme,
-                        Title = "Fehler",
-                        Content = "Navigation zum Dashboard ist fehlgeschlagen.",
-                        CloseButtonText = "OK"
-                    };
-                    await dlg.ShowAsync();
+                    BenutzerSitzung.Abmelden();
+                    ShowLoginStatus("Das Dashboard konnte nicht geöffnet werden. Bitte melde dich erneut an.");
                 }
             }
             finally
             {
-                // Button reaktivieren; mögliche Ausnahmen (z.B. Seite navigiert) ignorieren
-                try { button.IsEnabled = true; } catch { }
+                // Das Passwort wird nur für diesen Versuch gelesen und nie als Einstellung
+                // gespeichert. Nach Erfolg oder Fehler löschen wir das sichtbare Eingabefeld.
+                PasswordBox.Password = "";
+                _isSigningIn = false;
+                LoginButton.IsEnabled = AccountTypeCombo.IsEnabled = CompanyBox.IsEnabled =
+                    EmailBox.IsEnabled = PasswordBox.IsEnabled = true;
+                LoginButton.Content = "Anmelden";
             }
         }
     }
+
+    // Übergabe beim Abmelden: Farbe/Thema bleiben erhalten, der Hinweis enthält keine Kontodaten.
+    internal sealed record LoginNavigationParameter(DashboardAppearance Appearance, string Hinweis);
 }

@@ -36,6 +36,7 @@ namespace Disposio.Views
         private bool _canEditCustomers;
         private bool _isInitialized;
         private bool _dialogOpen;
+        private bool _returningToLogin;
         private bool _isLight;
         private string _accentHex = "#7B2CBF";
 
@@ -62,6 +63,9 @@ namespace Disposio.Views
 
         private async void Dashboard_Loaded(object sender, RoutedEventArgs e)
         {
+            if (!EnsureDashboardAccess())
+                return;
+
             if (!_hasDataLoaded)
                 await LoadCustomersAsync();
         }
@@ -70,6 +74,9 @@ namespace Disposio.Views
 
         private async Task LoadCustomersAsync()
         {
+            if (!EnsureDashboardAccess())
+                return;
+
             if (_isLoading || _dialogOpen || !IsLoaded)
                 return;
 
@@ -104,6 +111,12 @@ namespace Disposio.Views
             {
                 // Beim Verlassen der Seite brauchen wir das Ladeergebnis nicht mehr.
             }
+            catch (UnauthorizedAccessException)
+            {
+                // Die Rolle kann während einer Sitzung entzogen werden. Das Repository
+                // prüft sie vor jeder Abfrage erneut; die Ansicht beendet dann die Sitzung.
+                ReturnToLogin("Dein Zugriff ist nicht mehr verfügbar. Bitte melde dich erneut an.");
+            }
             catch (Exception)
             {
                 // Keine technischen Fehlermeldungen oder Zugangsdaten im Fenster ausgeben.
@@ -128,9 +141,10 @@ namespace Disposio.Views
         {
             // Bei fehlgeschlagenem Laden sind Anlegen/Bearbeiten gesperrt, damit keine
             // unvollständige oder veraltete Liste als aktuelle Datenbasis benutzt wird.
-            CreateCustomerButton.IsEnabled = _canEditCustomers && !_isLoading && !_dialogOpen;
-            KundenItems.IsEnabled = _canEditCustomers && !_isLoading && !_dialogOpen;
-            ReloadCustomersButton.IsEnabled = !_isLoading && !_dialogOpen;
+            bool accessAllowed = BenutzerSitzung.DashboardZugriffErlaubt && !_returningToLogin;
+            CreateCustomerButton.IsEnabled = accessAllowed && _canEditCustomers && !_isLoading && !_dialogOpen;
+            KundenItems.IsEnabled = accessAllowed && _canEditCustomers && !_isLoading && !_dialogOpen;
+            ReloadCustomersButton.IsEnabled = accessAllowed && !_isLoading && !_dialogOpen;
         }
 
         protected override void OnNavigatedTo(NavigationEventArgs e)
@@ -147,6 +161,63 @@ namespace Disposio.Views
                 _isInitialized = true;
                 ApplyAppearance();
             }
+            UpdateAccountDisplay();
+            EnsureDashboardAccess();
+        }
+
+        private void UpdateAccountDisplay()
+        {
+            if (BenutzerSitzung.IstEntwicklungsansicht)
+            {
+                // Eine Debug-Vorschau ist kein angemeldetes Benutzerkonto und wird klar benannt.
+                AccountNameText.Text = "Entwicklungsansicht";
+                AccountRoleText.Text = "Dashboard-Vorschau";
+            }
+            else
+            {
+                AngemeldeterBenutzer? user = BenutzerSitzung.AktuellerBenutzer;
+                AccountNameText.Text = user is null ? "" : $"{user.Vorname} {user.Nachname}".Trim();
+                AccountRoleText.Text = user?.IstMegakrasserAdmin == true ? "MegakrassenAdmin" : "";
+            }
+            CompactAccountText.Text = string.Join(" · ", new[] { AccountNameText.Text, AccountRoleText.Text }
+                .Where(value => !string.IsNullOrWhiteSpace(value)));
+        }
+
+        private bool EnsureDashboardAccess()
+        {
+            // Eine direkte Navigation zur Seite reicht nicht als Berechtigung. Erst eine
+            // erfolgreiche Admin-Anmeldung (oder die ausdrückliche Debug-Vorschau) erlaubt Zugriff.
+            if (!_returningToLogin && BenutzerSitzung.DashboardZugriffErlaubt)
+                return true;
+
+            if (!_returningToLogin)
+            {
+                _returningToLogin = true;
+                _canEditCustomers = false;
+                UpdateDataActions();
+                // OnNavigatedTo läuft innerhalb einer Navigation. Wir wechseln erst nach
+                // diesem Ereignis zurück, damit WinUI keine verschachtelte Navigation ausführt.
+                DispatcherQueue.TryEnqueue(() => ReturnToLogin("Bitte melde dich als MegakrassenAdmin an."));
+            }
+            return false;
+        }
+
+        private void ReturnToLogin(string? message = null)
+        {
+            _returningToLogin = true;
+            _canEditCustomers = false;
+            _loadCancellation?.Cancel();
+            BenutzerSitzung.Abmelden();
+            UpdateDataActions();
+            // Beim Abmelden verschwinden auch die geladenen Kundendaten aus dieser Anzeige.
+            Kunden.Clear();
+            _hasDataLoaded = false;
+            UpdateStatistics();
+            UpdateAccountDisplay();
+            var appearance = new DashboardAppearance { AccentHex = _accentHex, IsLight = _isLight };
+            object parameter = message is null ? appearance : new LoginNavigationParameter(appearance, message);
+            if (Frame is Frame frame && ReferenceEquals(frame.Content, this) && frame.Navigate(typeof(LoginPage), parameter))
+                frame.BackStack.Clear();
         }
 
         private void SetAppearanceControls()
@@ -297,11 +368,15 @@ namespace Disposio.Views
 
         private async Task EditCustomerAsync(Kunde? customer)
         {
+            if (!EnsureDashboardAccess())
+                return;
+
             if (_dialogOpen || _isLoading || !_canEditCustomers || XamlRoot is null)
                 return;
 
             _dialogOpen = true;
             UpdateDataActions();
+            bool accessRevoked = false;
             try
             {
                 var companyBox = CreateTextBox(customer?.Firmenname ?? "");
@@ -513,6 +588,14 @@ namespace Disposio.Views
                         isSaving = false;
                         dialog.Hide();
                     }
+                    catch (UnauthorizedAccessException)
+                    {
+                        // Erst den Dialog schließen, dann zur Anmeldung navigieren. Ein offener
+                        // ContentDialog darf nicht an einer bereits verlassenen Seite hängen bleiben.
+                        accessRevoked = true;
+                        isSaving = false;
+                        dialog.Hide();
+                    }
                     catch (UnternehmenKennungVergebenException)
                     {
                         // Die lokale Liste kann eine parallele Anlage eines Kollegen noch nicht
@@ -571,6 +654,8 @@ namespace Disposio.Views
             {
                 _dialogOpen = false;
                 UpdateDataActions();
+                if (accessRevoked)
+                    ReturnToLogin("Dein Zugriff ist nicht mehr verfügbar. Bitte melde dich erneut an.");
             }
         }
 
@@ -639,6 +724,9 @@ namespace Disposio.Views
 
         private async void LoginCustomer_Click(object sender, RoutedEventArgs e)
         {
+            if (!EnsureDashboardAccess())
+                return;
+
             if (_dialogOpen || XamlRoot is null || sender is not Button { DataContext: Kunde customer })
                 return;
 
@@ -664,9 +752,8 @@ namespace Disposio.Views
 
         private void Logout_Click(object sender, RoutedEventArgs e)
         {
-            if (!_dialogOpen && Frame is Frame frame && frame.Navigate(typeof(LoginPage),
-                new DashboardAppearance { AccentHex = _accentHex, IsLight = _isLight }))
-                frame.BackStack.Clear();
+            if (!_dialogOpen)
+                ReturnToLogin();
         }
 
     }
