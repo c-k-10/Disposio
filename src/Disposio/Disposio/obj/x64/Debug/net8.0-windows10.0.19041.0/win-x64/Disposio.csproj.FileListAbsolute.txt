@@ -268,14 +268,10 @@ C:\Wirtschaftinformatik\PROJEKT_DISPOSIO\Disposio\src\Disposio\Disposio\obj\x64\
 C:\Wirtschaftinformatik\PROJEKT_DISPOSIO\Disposio\src\Disposio\Disposio\obj\x64\Debug\net8.0-windows10.0.19041.0\win-x64\MultipleQualifiersPerDimensionFound.txt
 C:\Wirtschaftinformatik\PROJEKT_DISPOSIO\Disposio\src\Disposio\Disposio\obj\x64\Debug\net8.0-windows10.0.19041.0\win-x64\ProjectArchitectures.txt
 C:\Wirtschaftinformatik\PROJEKT_DISPOSIO\Disposio\src\Disposio\Disposio\obj\x64\Debug\net8.0-windows10.0.19041.0\win-x64\.winmd_cache\$Microsoft.Web.WebView2.Core.winmd_639039823460000000.json
-C:\Wirtschaftinformatik\PROJEKT_DISPOSIO\Disposio\src\Disposio\Disposio\bin\x64\Debug\net8.0-windows10.0.19041.0\win-x64\Views\LoginPage.xbf
-C:\Wirtschaftinformatik\PROJEKT_DISPOSIO\Disposio\src\Disposio\Disposio\obj\x64\Debug\net8.0-windows10.0.19041.0\win-x64\Views\LoginPage.g.i.cs
-C:\Wirtschaftinformatik\PROJEKT_DISPOSIO\Disposio\src\Disposio\Disposio\obj\x64\Debug\net8.0-windows10.0.19041.0\win-x64\Views\LoginPage.g.cs
-C:\Wirtschaftinformatik\PROJEKT_DISPOSIO\Disposio\src\Disposio\Disposio\obj\x64\Debug\net8.0-windows10.0.19041.0\win-x64\Views\LoginPage.xaml
-C:\Wirtschaftinformatik\PROJEKT_DISPOSIO\Disposio\src\Disposio\Disposio\obj\x64\Debug\net8.0-windows10.0.19041.0\win-x64\Views\LoginPage.xbf
 C:\Wirtschaftinformatik\PROJEKT_DISPOSIO\Disposio\src\Disposio\Disposio\bin\x64\Debug\net8.0-windows10.0.19041.0\win-x64\CommunityToolkit.WinUI.UI.Controls.DataGrid.dll
 C:\Wirtschaftinformatik\PROJEKT_DISPOSIO\Disposio\src\Disposio\Disposio\obj\x64\Debug\net8.0-windows10.0.19041.0\win-x64\CommunityToolkit.WinUI.UI.Controls.DataGrid.pri.xml
 C:\Wirtschaftinformatik\PROJEKT_DISPOSIO\Disposio\src\Disposio\Disposio\bin\x64\Debug\net8.0-windows10.0.19041.0\win-x64\Assets\miseur_kofferfell.png
+<<<<<<< HEAD
 C:\Users\laska\source\repos\Disposio\src\Disposio\Disposio\bin\x64\Debug\net8.0-windows10.0.19041.0\win-x64\Disposio.exe
 C:\Users\laska\source\repos\Disposio\src\Disposio\Disposio\bin\x64\Debug\net8.0-windows10.0.19041.0\win-x64\Assets\miseur_kofferfell.png
 C:\Users\laska\source\repos\Disposio\src\Disposio\Disposio\bin\x64\Debug\net8.0-windows10.0.19041.0\win-x64\App.xbf
@@ -554,3 +550,14 @@ C:\Users\laska\source\repos\Disposio\src\Disposio\Disposio\obj\x64\Debug\net8.0-
 C:\Users\laska\source\repos\Disposio\src\Disposio\Disposio\obj\x64\Debug\net8.0-windows10.0.19041.0\win-x64\MultipleQualifiersPerDimensionFound.txt
 C:\Users\laska\source\repos\Disposio\src\Disposio\Disposio\obj\x64\Debug\net8.0-windows10.0.19041.0\win-x64\ProjectArchitectures.txt
 C:\Users\laska\source\repos\Disposio\src\Disposio\Disposio\obj\x64\Debug\net8.0-windows10.0.19041.0\win-x64\.winmd_cache\$Microsoft.Web.WebView2.Core.winmd_639039823460000000.json
+=======
+C:\Wirtschaftinformatik\PROJEKT_DISPOSIO\Disposio\src\Disposio\Disposio\bin\x64\Debug\net8.0-windows10.0.19041.0\win-x64\Views\LoginPage\LoginPage.xbf
+C:\Wirtschaftinformatik\PROJEKT_DISPOSIO\Disposio\src\Disposio\Disposio\obj\x64\Debug\net8.0-windows10.0.19041.0\win-x64\Views\LoginPage\LoginPage.g.i.cs
+C:\Wirtschaftinformatik\PROJEKT_DISPOSIO\Disposio\src\Disposio\Disposio\obj\x64\Debug\net8.0-windows10.0.19041.0\win-x64\Views\LoginPage\LoginPage.g.cs
+C:\Wirtschaftinformatik\PROJEKT_DISPOSIO\Disposio\src\Disposio\Disposio\obj\x64\Debug\net8.0-windows10.0.19041.0\win-x64\Views\LoginPage\LoginPage.xaml
+C:\Wirtschaftinformatik\PROJEKT_DISPOSIO\Disposio\src\Disposio\Disposio\obj\x64\Debug\net8.0-windows10.0.19041.0\win-x64\Views\LoginPage\LoginPage.xbf
+>>>>>>> ec17eea1bceb020b26dc9395f7b2429ce12066d7
+C:\Users\laska\source\repos\Disposio\src\Disposio\Disposio\obj\x64\Debug\net8.0-windows10.0.19041.0\win-x64\Views\LoginPage\LoginPage.g.i.cs
+C:\Users\laska\source\repos\Disposio\src\Disposio\Disposio\obj\x64\Debug\net8.0-windows10.0.19041.0\win-x64\Views\LoginPage\LoginPage.g.cs
+C:\Users\laska\source\repos\Disposio\src\Disposio\Disposio\obj\x64\Debug\net8.0-windows10.0.19041.0\win-x64\Views\LoginPage\LoginPage.xaml
+C:\Users\laska\source\repos\Disposio\src\Disposio\Disposio\obj\x64\Debug\net8.0-windows10.0.19041.0\win-x64\Views\LoginPage\LoginPage.xbf
