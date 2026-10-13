@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Net.Http;
 using System.Text;
 using System.Text.Json;
+using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -33,7 +34,7 @@ internal sealed class NeonSqlClient
         var database = settings.Database
             ?? throw new InvalidOperationException("In der Datenbankverbindung fehlt der Datenbankname.");
         var firstDot = host.IndexOf('.');
-        if (firstDot < 0 || !host.EndsWith(".neon.tech", StringComparison.OrdinalIgnoreCase))
+        if (firstDot < 0 || !Regex.IsMatch(host, @"\A(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+neon\.tech\z", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant))
         {
             throw new InvalidOperationException("Der HTTPS-Datenzugriff benötigt einen Neon-Datenbankhost.");
         }
