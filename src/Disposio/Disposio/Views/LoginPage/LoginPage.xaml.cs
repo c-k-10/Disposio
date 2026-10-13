@@ -147,10 +147,8 @@ namespace Disposio.Views
                 await dlg.ShowAsync();
                 return;
             }
-
-            // Versuche Login über AuthService; bei Erfolg zur Dashboard-Ansicht navigieren,
-            // ansonsten Fehlermeldung anzeigen.
-            AngemeldeterBenutzer? user = null;
+            // Anmeldung prüfen
+            AngemeldeterBenutzer? user;
             try
             {
                 user = await AuthService.LoginAsync(company, email, pwd);
@@ -160,21 +158,31 @@ namespace Disposio.Views
                 user = null;
             }
 
-            if (user is null)
+            if (user == null)
             {
-                var errorDlg = new ContentDialog
+                var failDlg = new ContentDialog
                 {
                     XamlRoot = this.XamlRoot,
                     RequestedTheme = this.RequestedTheme,
-                    Title = "Fehler",
-                    Content = "Firma, E-Mail oder Passwort falsch.",
+                    Title = "Anmeldung fehlgeschlagen",
+                    Content = "Firma, E-Mail oder Passwort ungültig.",
                     CloseButtonText = "OK"
                 };
-                await errorDlg.ShowAsync();
+                await failDlg.ShowAsync();
                 return;
             }
 
-            // Bei erfolgreichem Login: Dashboard öffnen
+            var successDlg = new ContentDialog
+            {
+                XamlRoot = this.XamlRoot,
+                RequestedTheme = this.RequestedTheme,
+                Title = "Erfolgreich angemeldet",
+                Content = $"Willkommen {user.Vorname} {user.Nachname}",
+                CloseButtonText = "OK"
+            };
+            await successDlg.ShowAsync();
+
+            // Nach erfolgreicher Anmeldung zur Dashboard-Ansicht navigieren
             var appearance = new DashboardAppearance
             {
                 AccentHex = (ColorCombo.SelectedItem as ComboBoxItem)?.Tag as string ?? "#FF004D",
