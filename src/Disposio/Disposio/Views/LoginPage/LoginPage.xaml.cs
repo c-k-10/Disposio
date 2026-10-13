@@ -160,9 +160,18 @@ namespace Disposio.Views
                 {
                     user = await AuthService.LoginAsync(company, email, pwd);
                 }
-                catch
+                catch (Exception ex)
                 {
                     user = null;
+                    var dbg = new ContentDialog
+                    {
+                        XamlRoot = this.XamlRoot,
+                        RequestedTheme = this.RequestedTheme,
+                        Title = "Technischer Fehler",
+                        Content = ex.GetType().Name + ": " + ex.Message,
+                        CloseButtonText = "OK"
+                    };
+                    await dbg.ShowAsync();
                 }
 
                 if (user == null)

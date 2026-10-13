@@ -19,7 +19,7 @@ namespace Disposio.Services
                 SELECT b.benutzer_id, b.vorname, b.nachname, b.sprache, b.unternehmen_id, b.passwort_hash
                 FROM benutzer b
                 JOIN unternehmen u ON u.unternehmen_id = b.unternehmen_id
-                WHERE lower(u.name) = lower(@firma)
+                WHERE lower(u.firmenname) = lower(@firma)
                   AND lower(b.email) = lower(@email)
                   AND b.aktiv = true";
 
