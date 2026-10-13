@@ -586,6 +586,9 @@
     <AppxPackagedFile Include="C:\Users\laska\.nuget\packages\microsoft.windows.sdk.net.ref\10.0.19041.57\lib\net8.0\WinRT.Runtime.dll">
       <PackagePath>WinRT.Runtime.dll</PackagePath>
     </AppxPackagedFile>
+    <AppxPackagedFile Include="C:\Users\laska\.nuget\packages\bcrypt.net-next\4.2.0\lib\netstandard2.1\BCrypt-Net-Next.dll">
+      <PackagePath>BCrypt-Net-Next.dll</PackagePath>
+    </AppxPackagedFile>
     <AppxPackagedFile Include="C:\Users\laska\.nuget\packages\communitytoolkit.winui.ui.controls.datagrid\7.1.2\lib\net5.0-windows10.0.18362\CommunityToolkit.WinUI.UI.Controls.DataGrid.dll">
       <PackagePath>CommunityToolkit.WinUI.UI.Controls.DataGrid.dll</PackagePath>
     </AppxPackagedFile>

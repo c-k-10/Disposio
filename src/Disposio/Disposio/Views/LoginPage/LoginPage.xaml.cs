@@ -147,29 +147,49 @@ namespace Disposio.Views
                 await dlg.ShowAsync();
                 return;
             }
-
+            // Anmeldung prüfen
             AngemeldeterBenutzer? user;
-            try { user = await AuthService.LoginAsync(company, email, pwd); }
-            catch { user = null; }
-
-            var resultDlg = new ContentDialog
+            try
             {
-                Title = user is null ? "Fehler" : "Erfolgreich",
-                Content = user is null ? "Firma, E-Mail oder Passwort falsch." : $"Willkommen, {user.Vorname}!",
-                CloseButtonText = "OK",
-                XamlRoot = this.XamlRoot
-            };
-            await resultDlg.ShowAsync();
-            if (user is null)
-                return;
+                user = await AuthService.LoginAsync(company, email, pwd);
+            }
+            catch
+            {
+                user = null;
+            }
 
+            if (user == null)
+            {
+                var failDlg = new ContentDialog
+                {
+                    XamlRoot = this.XamlRoot,
+                    RequestedTheme = this.RequestedTheme,
+                    Title = "Anmeldung fehlgeschlagen",
+                    Content = "Firma, E-Mail oder Passwort ungültig.",
+                    CloseButtonText = "OK"
+                };
+                await failDlg.ShowAsync();
+                return;
+            }
+
+            var successDlg = new ContentDialog
+            {
+                XamlRoot = this.XamlRoot,
+                RequestedTheme = this.RequestedTheme,
+                Title = "Erfolgreich angemeldet",
+                Content = $"Willkommen {user.Vorname} {user.Nachname}",
+                CloseButtonText = "OK"
+            };
+            await successDlg.ShowAsync();
+
+            // Nach erfolgreicher Anmeldung zur Dashboard-Ansicht navigieren
             var appearance = new DashboardAppearance
             {
                 AccentHex = (ColorCombo.SelectedItem as ComboBoxItem)?.Tag as string ?? "#FF004D",
                 IsLight = ModeSwitch.IsOn
             };
-            if (Frame is Frame frame && frame.Navigate(typeof(DashboardAnsicht), appearance))
-                frame.BackStack.Clear();
+            Frame?.Navigate(typeof(DashboardAnsicht), appearance);
+            Frame?.BackStack.Clear();
         }
     }
 }

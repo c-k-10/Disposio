@@ -9,9 +9,8 @@ namespace Disposio.Services
     public static class AuthService
     {
         // Connection String aus Umgebungsvariable, nicht im Code speichern
-        private static string ConnString =>
-            Environment.GetEnvironmentVariable("DISPOSIO_DB")
-            ?? throw new InvalidOperationException("Umgebungsvariable DISPOSIO_DB fehlt.");
+        private const string ConnString =
+        "Host=ep-curly-queen-b2qa2c1e-pooler.c-6.eu-central-1.aws.neon.tech; Database=neondb; Username=neondb_owner; Password=npg_4pc0hjEnJIwk; SSL Mode=VerifyFull; Channel Binding=Require;";
 
         // Gibt den Benutzer zurück oder null, wenn die Anmeldung fehlschlägt
         public static async Task<AngemeldeterBenutzer?> LoginAsync(string firma, string email, string passwort)
