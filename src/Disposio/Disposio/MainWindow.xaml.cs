@@ -31,6 +31,8 @@ namespace Disposio
         public MainWindow(bool openDashboard)
         {
             this.InitializeComponent();
+            // Ein Frame ist der Bereich, in dem WinUI zwischen Seiten navigiert.
+            // Je nach Startprofil laden wir das Dashboard direkt oder die normale Login-Seite.
             var runtimeFrame = new Frame();
             runtimeFrame.Navigate(openDashboard ? typeof(LoginPage) : typeof(DashboardAnsicht));
             this.Content = runtimeFrame;
