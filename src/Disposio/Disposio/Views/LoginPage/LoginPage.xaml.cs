@@ -147,8 +147,8 @@ namespace Disposio.Views
                 await dlg.ShowAsync();
                 return;
             }
-            // Anmeldung prüfen
-            AngemeldeterBenutzer? user;
+
+            AngemeldeterBenutzer? user = null;
             try
             {
                 user = await AuthService.LoginAsync(company, email, pwd);
@@ -160,36 +160,41 @@ namespace Disposio.Views
 
             if (user == null)
             {
-                var failDlg = new ContentDialog
+                var err = new ContentDialog
                 {
                     XamlRoot = this.XamlRoot,
                     RequestedTheme = this.RequestedTheme,
                     Title = "Anmeldung fehlgeschlagen",
-                    Content = "Firma, E-Mail oder Passwort ungültig.",
+                    Content = "Firma, E-Mail oder Passwort ist ungültig.",
                     CloseButtonText = "OK"
                 };
-                await failDlg.ShowAsync();
+                await err.ShowAsync();
                 return;
             }
 
-            var successDlg = new ContentDialog
+            // Bei erfolgreicher Anmeldung zum Dashboard navigieren
+            try
             {
-                XamlRoot = this.XamlRoot,
-                RequestedTheme = this.RequestedTheme,
-                Title = "Erfolgreich angemeldet",
-                Content = $"Willkommen {user.Vorname} {user.Nachname}",
-                CloseButtonText = "OK"
-            };
-            await successDlg.ShowAsync();
+                var accent = (this.FindName("ColorCombo") as ComboBox)?.SelectedItem as ComboBoxItem;
+                var accentHex = accent?.Tag as string ?? "#FF004D";
+                var appearance = new DashboardAppearance { AccentHex = accentHex, IsLight = (this.FindName("ModeSwitch") as ToggleSwitch)?.IsOn ?? true };
 
-            // Nach erfolgreicher Anmeldung zur Dashboard-Ansicht navigieren
-            var appearance = new DashboardAppearance
+                Frame?.Navigate(typeof(DashboardAnsicht), appearance);
+                // BackStack löschen, damit Zurück nicht zur LoginPage führt
+                Frame?.BackStack?.Clear();
+            }
+            catch
             {
-                AccentHex = (ColorCombo.SelectedItem as ComboBoxItem)?.Tag as string ?? "#FF004D",
-                IsLight = ModeSwitch.IsOn
-            };
-            Frame?.Navigate(typeof(DashboardAnsicht), appearance);
-            Frame?.BackStack.Clear();
+                var dlg = new ContentDialog
+                {
+                    XamlRoot = this.XamlRoot,
+                    RequestedTheme = this.RequestedTheme,
+                    Title = "Fehler",
+                    Content = "Navigation zum Dashboard ist fehlgeschlagen.",
+                    CloseButtonText = "OK"
+                };
+                await dlg.ShowAsync();
+            }
         }
     }
 }
