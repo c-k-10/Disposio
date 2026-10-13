@@ -52,6 +52,10 @@
           "framework": "net8.0-windows10.0.19041",
           "targetAlias": "net8.0-windows10.0.19041.0",
           "dependencies": {
+            "BCrypt.Net-Next": {
+              "target": "Package",
+              "version": "[4.2.0, )"
+            },
             "CommunityToolkit.WinUI.UI.Controls.DataGrid": {
               "target": "Package",
               "version": "[7.1.2, )"

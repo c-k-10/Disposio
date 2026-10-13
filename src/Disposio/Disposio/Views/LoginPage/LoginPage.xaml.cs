@@ -13,6 +13,7 @@ using System.Runtime.InteropServices.WindowsRuntime;
 using Windows.Foundation;
 using Windows.Foundation.Collections;
 using Windows.UI;
+using Disposio.Services;
 
 // To learn more about WinUI, the WinUI project structure,
 // and more about our project templates, see: http://aka.ms/winui-project-info.
@@ -126,14 +127,18 @@ namespace Disposio.Views
                 return;
             }
 
-            var successDlg = new ContentDialog
-            {
-                Title = "Erfolgreich",
-                Content = $"Login erfolgreich für: {company}",
-                CloseButtonText = "OK"
-            };
+            AngemeldeterBenutzer? user;
+            try { user = await AuthService.LoginAsync(company, email, pwd); }
+            catch { user = null; }
 
-            await successDlg.ShowAsync();
+            var resultDlg = new ContentDialog
+            {
+                Title = user is null ? "Fehler" : "Erfolgreich",
+                Content = user is null ? "Firma, E-Mail oder Passwort falsch." : $"Willkommen, {user.Vorname}!",
+                CloseButtonText = "OK",
+                XamlRoot = this.XamlRoot
+            };
+            await resultDlg.ShowAsync();
         }
     }
 }

@@ -2,6 +2,15 @@
   "version": 4,
   "targets": {
     "net8.0-windows10.0.19041.0": {
+      "BCrypt.Net-Next/4.2.0": {
+        "type": "package",
+        "compile": {
+          "lib/netstandard2.1/BCrypt-Net-Next.dll": {}
+        },
+        "runtime": {
+          "lib/netstandard2.1/BCrypt-Net-Next.dll": {}
+        }
+      },
       "CommunityToolkit.WinUI.UI.Controls.DataGrid/7.1.2": {
         "type": "package",
         "dependencies": {
@@ -533,6 +542,15 @@
       }
     },
     "net8.0-windows10.0.19041.0/win-arm64": {
+      "BCrypt.Net-Next/4.2.0": {
+        "type": "package",
+        "compile": {
+          "lib/netstandard2.1/BCrypt-Net-Next.dll": {}
+        },
+        "runtime": {
+          "lib/netstandard2.1/BCrypt-Net-Next.dll": {}
+        }
+      },
       "CommunityToolkit.WinUI.UI.Controls.DataGrid/7.1.2": {
         "type": "package",
         "dependencies": {
@@ -990,6 +1008,15 @@
       }
     },
     "net8.0-windows10.0.19041.0/win-x64": {
+      "BCrypt.Net-Next/4.2.0": {
+        "type": "package",
+        "compile": {
+          "lib/netstandard2.1/BCrypt-Net-Next.dll": {}
+        },
+        "runtime": {
+          "lib/netstandard2.1/BCrypt-Net-Next.dll": {}
+        }
+      },
       "CommunityToolkit.WinUI.UI.Controls.DataGrid/7.1.2": {
         "type": "package",
         "dependencies": {
@@ -1447,6 +1474,15 @@
       }
     },
     "net8.0-windows10.0.19041.0/win-x86": {
+      "BCrypt.Net-Next/4.2.0": {
+        "type": "package",
+        "compile": {
+          "lib/netstandard2.1/BCrypt-Net-Next.dll": {}
+        },
+        "runtime": {
+          "lib/netstandard2.1/BCrypt-Net-Next.dll": {}
+        }
+      },
       "CommunityToolkit.WinUI.UI.Controls.DataGrid/7.1.2": {
         "type": "package",
         "dependencies": {
@@ -1900,6 +1936,31 @@
     }
   },
   "libraries": {
+    "BCrypt.Net-Next/4.2.0": {
+      "sha512": "gwLD2KfCuwQesP17aVh4h6lpiMPEVt5Lbpndo0ej903hNUUTtyxt3ARdDjmuydBRTAUICc7OVKVbaOvc6SQYXA==",
+      "type": "package",
+      "path": "bcrypt.net-next/4.2.0",
+      "files": [
+        ".nupkg.metadata",
+        ".signature.p7s",
+        "bcrypt.net-next.4.2.0.nupkg.sha512",
+        "bcrypt.net-next.nuspec",
+        "ico.png",
+        "lib/net10.0/BCrypt-Net-Next.dll",
+        "lib/net10.0/BCrypt.Net-Next.xml",
+        "lib/net462/BCrypt-Net-Next.dll",
+        "lib/net462/BCrypt.Net-Next.xml",
+        "lib/net472/BCrypt-Net-Next.dll",
+        "lib/net472/BCrypt.Net-Next.xml",
+        "lib/net48/BCrypt-Net-Next.dll",
+        "lib/net48/BCrypt.Net-Next.xml",
+        "lib/netstandard2.0/BCrypt-Net-Next.dll",
+        "lib/netstandard2.0/BCrypt.Net-Next.xml",
+        "lib/netstandard2.1/BCrypt-Net-Next.dll",
+        "lib/netstandard2.1/BCrypt.Net-Next.xml",
+        "readme.md"
+      ]
+    },
     "CommunityToolkit.WinUI.UI.Controls.DataGrid/7.1.2": {
       "sha512": "F73oYdYza8zhDwGHdXCZJJMeiDJ6nR97WPe180o7jOX3U90ZIqvU/GtYZdN3/x8DOS48t5GQG70LqxfyIGeaxw==",
       "type": "package",
@@ -4073,6 +4134,7 @@
   },
   "projectFileDependencyGroups": {
     "net8.0-windows10.0.19041.0": [
+      "BCrypt.Net-Next >= 4.2.0",
       "CommunityToolkit.WinUI.UI.Controls.DataGrid >= 7.1.2",
       "Microsoft.Windows.SDK.BuildTools >= 10.0.28000.2705",
       "Microsoft.WindowsAppSDK >= 2.5.1",
@@ -4131,6 +4193,10 @@
         "framework": "net8.0-windows10.0.19041",
         "targetAlias": "net8.0-windows10.0.19041.0",
         "dependencies": {
+          "BCrypt.Net-Next": {
+            "target": "Package",
+            "version": "[4.2.0, )"
+          },
           "CommunityToolkit.WinUI.UI.Controls.DataGrid": {
             "target": "Package",
             "version": "[7.1.2, )"
@@ -4223,13 +4289,5 @@
         "#import": []
       }
     }
-  },
-  "logs": [
-    {
-      "code": "Undefined",
-      "level": "Warning",
-      "warningLevel": 1,
-      "message": "Problem beim Lesen der Cachedatei \"C:\\Users\\laska\\source\\repos\\Disposio\\src\\Disposio\\Disposio\\obj\\project.nuget.cache\": '<' is an invalid start of a property name. Expected a '\"'. Path: $ | LineNumber: 2 | BytePositionInLine: 0."
-    }
-  ]
+  }
 }
