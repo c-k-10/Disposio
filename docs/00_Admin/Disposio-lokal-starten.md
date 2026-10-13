@@ -85,3 +85,15 @@ Passwort-Sonderzeichen, Hostvalidierung, Rollenprüfung und Sitzungsende wurden 
 synthetischen Testdaten ohne Netzwerkzugriff geprüft. Diese Prüfungen ersetzen keine
 interaktiven WinUI-, Login-, CRUD- oder Datenbanktests. Auf diesem PC wurden keine neuen
 Datenbank-Zugangsdaten gefunden; echte Funktionsprüfungen stehen deshalb noch aus.
+
+Der direkte Start der erzeugten EXE wurde versucht und scheiterte vor der Oberfläche:
+`0x80040154` (Klasse nicht registriert) im Windows-App-SDK-Deployment-Initializer.
+.NET 8 und Windows-App-Runtime-Pakete sind installiert; der genaue Registrierungs-/Paketkontext
+muss noch geprüft werden. Starte zunächst über das paketierte Visual-Studio-Profil, damit
+Visual Studio das MSIX-Deployment übernimmt. Dieser Startweg wurde noch nicht interaktiv getestet.
+Die App wurde nicht als erfolgreich laufend bestätigt.
+
+Lokale Sicherung vor der Recovery: `%LOCALAPPDATA%\Disposio-Git-Backups\recovery-20261013-163318`.
+Dort liegen ein Git-Bundle mit allen damaligen Referenzen, der ursprüngliche Index sowie die
+vollständig verschobenen alten Build-Ordner. Alte Builds und Git-Historie können die kompromittierten
+Zugangsdaten enthalten; die Sicherung bleibt lokal und gehört nicht in ein öffentliches Repository.
