@@ -276,3 +276,6 @@ C:\Wirtschaftinformatik\PROJEKT_DISPOSIO\Disposio\src\Disposio\Disposio\obj\x64\
 C:\Wirtschaftinformatik\PROJEKT_DISPOSIO\Disposio\src\Disposio\Disposio\obj\x64\Debug\net8.0-windows10.0.19041.0\win-x64\Views\LoginPage\LoginPage.g.cs
 C:\Wirtschaftinformatik\PROJEKT_DISPOSIO\Disposio\src\Disposio\Disposio\obj\x64\Debug\net8.0-windows10.0.19041.0\win-x64\Views\LoginPage\LoginPage.xaml
 C:\Wirtschaftinformatik\PROJEKT_DISPOSIO\Disposio\src\Disposio\Disposio\obj\x64\Debug\net8.0-windows10.0.19041.0\win-x64\Views\LoginPage\LoginPage.xbf
+C:\Wirtschaftinformatik\PROJEKT_DISPOSIO\Disposio\src\Disposio\Disposio\bin\x64\Debug\net8.0-windows10.0.19041.0\win-x64\Microsoft.Extensions.DependencyInjection.Abstractions.dll
+C:\Wirtschaftinformatik\PROJEKT_DISPOSIO\Disposio\src\Disposio\Disposio\bin\x64\Debug\net8.0-windows10.0.19041.0\win-x64\Microsoft.Extensions.Logging.Abstractions.dll
+C:\Wirtschaftinformatik\PROJEKT_DISPOSIO\Disposio\src\Disposio\Disposio\bin\x64\Debug\net8.0-windows10.0.19041.0\win-x64\Npgsql.dll
