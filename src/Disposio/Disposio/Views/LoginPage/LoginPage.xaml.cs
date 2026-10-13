@@ -148,22 +148,33 @@ namespace Disposio.Views
                 return;
             }
 
-<<<<<<< HEAD
-            AngemeldeterBenutzer? user;
-            try { user = await AuthService.LoginAsync(company, email, pwd); }
-            catch { user = null; }
-
-            var resultDlg = new ContentDialog
+            // Versuche Login über AuthService; bei Erfolg zur Dashboard-Ansicht navigieren,
+            // ansonsten Fehlermeldung anzeigen.
+            AngemeldeterBenutzer? user = null;
+            try
             {
-                Title = user is null ? "Fehler" : "Erfolgreich",
-                Content = user is null ? "Firma, E-Mail oder Passwort falsch." : $"Willkommen, {user.Vorname}!",
-                CloseButtonText = "OK",
-                XamlRoot = this.XamlRoot
-            };
-            await resultDlg.ShowAsync();
-=======
-            // The existing demo login opens the customer dashboard.
-            // A backend authentication service can be connected here later.
+                user = await AuthService.LoginAsync(company, email, pwd);
+            }
+            catch
+            {
+                user = null;
+            }
+
+            if (user is null)
+            {
+                var errorDlg = new ContentDialog
+                {
+                    XamlRoot = this.XamlRoot,
+                    RequestedTheme = this.RequestedTheme,
+                    Title = "Fehler",
+                    Content = "Firma, E-Mail oder Passwort falsch.",
+                    CloseButtonText = "OK"
+                };
+                await errorDlg.ShowAsync();
+                return;
+            }
+
+            // Bei erfolgreichem Login: Dashboard öffnen
             var appearance = new DashboardAppearance
             {
                 AccentHex = (ColorCombo.SelectedItem as ComboBoxItem)?.Tag as string ?? "#FF004D",
@@ -171,7 +182,6 @@ namespace Disposio.Views
             };
             Frame?.Navigate(typeof(DashboardAnsicht), appearance);
             Frame?.BackStack.Clear();
->>>>>>> 9ef0d635b931af1ca0360d3721c7aaaabd549de3
         }
     }
 }

@@ -32,7 +32,7 @@ namespace Disposio
         {
             this.InitializeComponent();
             var runtimeFrame = new Frame();
-            runtimeFrame.Navigate(openDashboard ? typeof(DashboardAnsicht) : typeof(LoginPage));
+            runtimeFrame.Navigate(openDashboard ? typeof(LoginPage) : typeof(DashboardAnsicht));
             this.Content = runtimeFrame;
         }
     }
