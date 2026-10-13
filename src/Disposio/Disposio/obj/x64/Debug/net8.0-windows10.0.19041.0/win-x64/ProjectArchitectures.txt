@@ -1,1 +1,0 @@
-C:\Wirtschaftinformatik\PROJEKT_DISPOSIO\Disposio\src\Disposio\Disposio\Disposio.csproj;x64
