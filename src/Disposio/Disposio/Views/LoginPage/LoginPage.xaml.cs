@@ -26,6 +26,25 @@ namespace Disposio.Views
             this.InitializeComponent();
         }
 
+        protected override void OnNavigatedTo(NavigationEventArgs e)
+        {
+            base.OnNavigatedTo(e);
+            if (e.Parameter is DashboardAppearance appearance)
+            {
+                foreach (ComboBoxItem item in ColorCombo.Items)
+                {
+                    if (string.Equals(item.Tag as string, appearance.AccentHex, StringComparison.OrdinalIgnoreCase))
+                    {
+                        ColorCombo.SelectedItem = item;
+                        break;
+                    }
+                }
+                ModeSwitch.IsOn = appearance.IsLight;
+                RequestedTheme = appearance.IsLight ? ElementTheme.Light : ElementTheme.Dark;
+                ApplyTheme(appearance.IsLight);
+            }
+        }
+
         private void ColorCombo_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
             if ((sender as ComboBox)?.SelectedItem is ComboBoxItem item && item.Tag is string hex)
@@ -118,6 +137,8 @@ namespace Disposio.Views
             {
                 var dlg = new ContentDialog
                 {
+                    XamlRoot = this.XamlRoot,
+                    RequestedTheme = this.RequestedTheme,
                     Title = "Fehler",
                     Content = "Bitte alle Pflichtfelder ausfüllen.",
                     CloseButtonText = "OK"
@@ -126,14 +147,15 @@ namespace Disposio.Views
                 return;
             }
 
-            var successDlg = new ContentDialog
+            // The existing demo login opens the customer dashboard.
+            // A backend authentication service can be connected here later.
+            var appearance = new DashboardAppearance
             {
-                Title = "Erfolgreich",
-                Content = $"Login erfolgreich für: {company}",
-                CloseButtonText = "OK"
+                AccentHex = (ColorCombo.SelectedItem as ComboBoxItem)?.Tag as string ?? "#FF004D",
+                IsLight = ModeSwitch.IsOn
             };
-
-            await successDlg.ShowAsync();
+            Frame?.Navigate(typeof(DashboardAnsicht), appearance);
+            Frame?.BackStack.Clear();
         }
     }
 }

@@ -24,13 +24,15 @@ namespace Disposio
 {
     public sealed partial class MainWindow : Window
     {
-        public MainWindow()
+        public MainWindow() : this(false)
+        {
+        }
+
+        public MainWindow(bool openDashboard)
         {
             this.InitializeComponent();
-            // Verwende Frame-Navigation und navigiere zur LoginPage
-            // Falls XAML-Frame nicht gefunden wird, erstelle Frame im Code und setze als Content
             var runtimeFrame = new Frame();
-            runtimeFrame.Navigate(typeof(LoginPage));
+            runtimeFrame.Navigate(openDashboard ? typeof(DashboardAnsicht) : typeof(LoginPage));
             this.Content = runtimeFrame;
         }
     }

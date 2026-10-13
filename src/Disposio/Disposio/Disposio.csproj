@@ -56,8 +56,13 @@
     <Folder Include="Themes\" />
     <Folder Include="Services\" />
     <Folder Include="ViewModels\" />
+    <Folder Include="Views\DashboardAnsicht\" />
   </ItemGroup>
   <ItemGroup>
+    <Page Update="Views\DashboardAnsicht\DashboardAnsicht.xaml">
+      <Generator>MSBuild:Compile</Generator>
+      <SubType>Designer</SubType>
+    </Page>
   </ItemGroup>
 
   <!--
