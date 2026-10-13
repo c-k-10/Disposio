@@ -147,23 +147,42 @@ namespace Disposio.Views
                 await dlg.ShowAsync();
                 return;
             }
-
-<<<<<<< HEAD
+            // Anmeldung prüfen
             AngemeldeterBenutzer? user;
-            try { user = await AuthService.LoginAsync(company, email, pwd); }
-            catch { user = null; }
-
-            var resultDlg = new ContentDialog
+            try
             {
-                Title = user is null ? "Fehler" : "Erfolgreich",
-                Content = user is null ? "Firma, E-Mail oder Passwort falsch." : $"Willkommen, {user.Vorname}!",
-                CloseButtonText = "OK",
-                XamlRoot = this.XamlRoot
+                user = await AuthService.LoginAsync(company, email, pwd);
+            }
+            catch
+            {
+                user = null;
+            }
+
+            if (user == null)
+            {
+                var failDlg = new ContentDialog
+                {
+                    XamlRoot = this.XamlRoot,
+                    RequestedTheme = this.RequestedTheme,
+                    Title = "Anmeldung fehlgeschlagen",
+                    Content = "Firma, E-Mail oder Passwort ungültig.",
+                    CloseButtonText = "OK"
+                };
+                await failDlg.ShowAsync();
+                return;
+            }
+
+            var successDlg = new ContentDialog
+            {
+                XamlRoot = this.XamlRoot,
+                RequestedTheme = this.RequestedTheme,
+                Title = "Erfolgreich angemeldet",
+                Content = $"Willkommen {user.Vorname} {user.Nachname}",
+                CloseButtonText = "OK"
             };
-            await resultDlg.ShowAsync();
-=======
-            // The existing demo login opens the customer dashboard.
-            // A backend authentication service can be connected here later.
+            await successDlg.ShowAsync();
+
+            // Nach erfolgreicher Anmeldung zur Dashboard-Ansicht navigieren
             var appearance = new DashboardAppearance
             {
                 AccentHex = (ColorCombo.SelectedItem as ComboBoxItem)?.Tag as string ?? "#FF004D",
@@ -171,7 +190,6 @@ namespace Disposio.Views
             };
             Frame?.Navigate(typeof(DashboardAnsicht), appearance);
             Frame?.BackStack.Clear();
->>>>>>> 9ef0d635b931af1ca0360d3721c7aaaabd549de3
         }
     }
 }

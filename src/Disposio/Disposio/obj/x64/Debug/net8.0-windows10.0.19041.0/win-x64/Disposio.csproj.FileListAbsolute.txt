@@ -568,3 +568,7 @@ C:\Wirtschaftinformatik\PROJEKT_DISPOSIO\Disposio\src\Disposio\Disposio\obj\x64\
 C:\Wirtschaftinformatik\PROJEKT_DISPOSIO\Disposio\src\Disposio\Disposio\obj\x64\Debug\net8.0-windows10.0.19041.0\win-x64\Views\DashboardAnsicht\DashboardAnsicht.xbf
 C:\Wirtschaftinformatik\PROJEKT_DISPOSIO\Disposio\src\Disposio\Disposio\bin\x64\Debug\net8.0-windows10.0.19041.0\win-x64\Views\DashboardAnsicht\DashboardAnsicht.xbf
 >>>>>>> 9ef0d635b931af1ca0360d3721c7aaaabd549de3
+C:\Users\laska\source\repos\Disposio\src\Disposio\Disposio\obj\x64\Debug\net8.0-windows10.0.19041.0\win-x64\Views\DashboardAnsicht\DashboardAnsicht.g.i.cs
+C:\Users\laska\source\repos\Disposio\src\Disposio\Disposio\obj\x64\Debug\net8.0-windows10.0.19041.0\win-x64\Views\DashboardAnsicht\DashboardAnsicht.g.cs
+C:\Users\laska\source\repos\Disposio\src\Disposio\Disposio\obj\x64\Debug\net8.0-windows10.0.19041.0\win-x64\Views\DashboardAnsicht\DashboardAnsicht.xaml
+C:\Users\laska\source\repos\Disposio\src\Disposio\Disposio\obj\x64\Debug\net8.0-windows10.0.19041.0\win-x64\Views\DashboardAnsicht\DashboardAnsicht.xbf
