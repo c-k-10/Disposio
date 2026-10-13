@@ -27,6 +27,25 @@ namespace Disposio.Views
             this.InitializeComponent();
         }
 
+        protected override void OnNavigatedTo(NavigationEventArgs e)
+        {
+            base.OnNavigatedTo(e);
+            if (e.Parameter is DashboardAppearance appearance)
+            {
+                foreach (ComboBoxItem item in ColorCombo.Items)
+                {
+                    if (string.Equals(item.Tag as string, appearance.AccentHex, StringComparison.OrdinalIgnoreCase))
+                    {
+                        ColorCombo.SelectedItem = item;
+                        break;
+                    }
+                }
+                ModeSwitch.IsOn = appearance.IsLight;
+                RequestedTheme = appearance.IsLight ? ElementTheme.Light : ElementTheme.Dark;
+                ApplyTheme(appearance.IsLight);
+            }
+        }
+
         private void ColorCombo_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
             if ((sender as ComboBox)?.SelectedItem is ComboBoxItem item && item.Tag is string hex)
@@ -119,6 +138,8 @@ namespace Disposio.Views
             {
                 var dlg = new ContentDialog
                 {
+                    XamlRoot = this.XamlRoot,
+                    RequestedTheme = this.RequestedTheme,
                     Title = "Fehler",
                     Content = "Bitte alle Pflichtfelder ausfüllen.",
                     CloseButtonText = "OK"
@@ -127,6 +148,7 @@ namespace Disposio.Views
                 return;
             }
 
+<<<<<<< HEAD
             AngemeldeterBenutzer? user;
             try { user = await AuthService.LoginAsync(company, email, pwd); }
             catch { user = null; }
@@ -139,6 +161,17 @@ namespace Disposio.Views
                 XamlRoot = this.XamlRoot
             };
             await resultDlg.ShowAsync();
+=======
+            // The existing demo login opens the customer dashboard.
+            // A backend authentication service can be connected here later.
+            var appearance = new DashboardAppearance
+            {
+                AccentHex = (ColorCombo.SelectedItem as ComboBoxItem)?.Tag as string ?? "#FF004D",
+                IsLight = ModeSwitch.IsOn
+            };
+            Frame?.Navigate(typeof(DashboardAnsicht), appearance);
+            Frame?.BackStack.Clear();
+>>>>>>> 9ef0d635b931af1ca0360d3721c7aaaabd549de3
         }
     }
 }

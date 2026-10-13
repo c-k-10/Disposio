@@ -4136,6 +4136,7 @@
     "net8.0-windows10.0.19041.0": [
       "BCrypt.Net-Next >= 4.2.0",
       "CommunityToolkit.WinUI.UI.Controls.DataGrid >= 7.1.2",
+      "Microsoft.Extensions.Logging.Abstractions >= 8.0.0",
       "Microsoft.Windows.SDK.BuildTools >= 10.0.28000.2705",
       "Microsoft.WindowsAppSDK >= 2.5.1",
       "Npgsql >= 10.0.3"
@@ -4200,6 +4201,10 @@
           "CommunityToolkit.WinUI.UI.Controls.DataGrid": {
             "target": "Package",
             "version": "[7.1.2, )"
+          },
+          "Microsoft.Extensions.Logging.Abstractions": {
+            "target": "Package",
+            "version": "[8.0.0, )"
           },
           "Microsoft.Windows.SDK.BuildTools": {
             "target": "Package",
@@ -4289,5 +4294,13 @@
         "#import": []
       }
     }
-  }
+  },
+  "logs": [
+    {
+      "code": "Undefined",
+      "level": "Warning",
+      "warningLevel": 1,
+      "message": "Problem beim Lesen der Cachedatei \"C:\\Users\\laska\\source\\repos\\Disposio\\src\\Disposio\\Disposio\\obj\\project.nuget.cache\": '<' is an invalid start of a property name. Expected a '\"'. Path: $ | LineNumber: 2 | BytePositionInLine: 0."
+    }
+  ]
 }

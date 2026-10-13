@@ -43,7 +43,11 @@ namespace Disposio
         /// <param name="args">Details about the launch request and process.</param>
         protected override void OnLaunched(Microsoft.UI.Xaml.LaunchActivatedEventArgs args)
         {
-            _window = new MainWindow();
+            bool openDashboard = Environment.GetCommandLineArgs()
+                .Skip(1)
+                .Any(argument => string.Equals(argument, "--dashboard", StringComparison.OrdinalIgnoreCase));
+
+            _window = new MainWindow(openDashboard);
             _window.Activate();
         }
     }

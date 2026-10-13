@@ -10,6 +10,7 @@
       "Disposio/1.0.0": {
         "dependencies": {
           "CommunityToolkit.WinUI.UI.Controls.DataGrid": "7.1.2",
+          "Microsoft.Extensions.Logging.Abstractions": "8.0.0",
           "Microsoft.WindowsAppSDK": "2.5.1",
           "Npgsql": "10.0.3",
           "Microsoft.Web.WebView2.Core.Projection": "1.0.3719.77",

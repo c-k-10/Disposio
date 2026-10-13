@@ -11,7 +11,7 @@
             <GradientStop Color="#0B0D12" Offset="0"/>
             <GradientStop Color="#13161A" Offset="1"/>
         </LinearGradientBrush>
-        <SolidColorBrush x:Key="PrimaryBrush" Color="#FFFF4D5A" />
+        <SolidColorBrush x:Key="PrimaryBrush" Color="#FF004D" />
         <SolidColorBrush x:Key="PanelBrush" Color="#26292D" />
         <SolidColorBrush x:Key="PanelDarkBrush" Color="#1B1E23" />
         <SolidColorBrush x:Key="TextMain" Color="#E6E9F0" />
@@ -73,11 +73,22 @@
                             </StackPanel>
 
                             <!-- footer button -->
-                            <StackPanel Grid.Row="3" Margin="0,16,0,0">
-                                <Border CornerRadius="10" Background="{StaticResource PrimaryBrush}" Height="52">
-                                    <Button x:Name="LoginButton" Content="Anmelden" Background="Transparent" Foreground="{StaticResource ButtonTextOnPrimary}" FontWeight="SemiBold" Click="LoginButton_Click"/>
-                                </Border>
-                            </StackPanel>
+							<StackPanel Grid.Row="3" Margin="0,16,0,0">
+								<Border CornerRadius="10"
+										Background="{StaticResource PrimaryBrush}"
+										Height="52">
+
+									<Button x:Name="LoginButton"
+											Content="Anmelden"
+											Background="Transparent"
+											Foreground="{StaticResource ButtonTextOnPrimary}"
+											FontWeight="SemiBold"
+											HorizontalContentAlignment="Center"
+											VerticalContentAlignment="Center"
+											BorderThickness="0"
+											Click="LoginButton_Click"/>
+								</Border>
+							</StackPanel>
                         </Grid>
                     </Border>
 

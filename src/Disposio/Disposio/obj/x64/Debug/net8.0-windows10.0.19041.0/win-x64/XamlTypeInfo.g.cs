@@ -226,7 +226,11 @@ namespace Disposio.Disposio_XamlTypeInfo
         
         private void InitTypeTables()
         {
+<<<<<<< HEAD
             _typeNameTable = new string[18];
+=======
+            _typeNameTable = new string[25];
+>>>>>>> 9ef0d635b931af1ca0360d3721c7aaaabd549de3
             _typeNameTable[0] = "Microsoft.UI.Xaml.Controls.XamlControlsResources";
             _typeNameTable[1] = "Microsoft.UI.Xaml.ResourceDictionary";
             _typeNameTable[2] = "Object";
@@ -238,6 +242,7 @@ namespace Disposio.Disposio_XamlTypeInfo
             _typeNameTable[8] = "System.ValueType";
             _typeNameTable[9] = "Disposio.MainWindow";
             _typeNameTable[10] = "Microsoft.UI.Xaml.Window";
+<<<<<<< HEAD
             _typeNameTable[11] = "Disposio.Views.LoginPage";
             _typeNameTable[12] = "Microsoft.UI.Xaml.Controls.Page";
             _typeNameTable[13] = "Microsoft.UI.Xaml.Controls.UserControl";
@@ -247,6 +252,24 @@ namespace Disposio.Disposio_XamlTypeInfo
             _typeNameTable[17] = "Int32";
 
             _typeTable = new global::System.Type[18];
+=======
+            _typeNameTable[11] = "Microsoft.UI.Xaml.Controls.Button";
+            _typeNameTable[12] = "Disposio.Views.DashboardAnsicht";
+            _typeNameTable[13] = "Microsoft.UI.Xaml.Controls.Page";
+            _typeNameTable[14] = "Microsoft.UI.Xaml.Controls.UserControl";
+            _typeNameTable[15] = "System.Collections.ObjectModel.ObservableCollection`1<Disposio.Views.Kunde>";
+            _typeNameTable[16] = "System.Collections.ObjectModel.Collection`1<Disposio.Views.Kunde>";
+            _typeNameTable[17] = "Disposio.Views.Kunde";
+            _typeNameTable[18] = "String";
+            _typeNameTable[19] = "Int32";
+            _typeNameTable[20] = "Microsoft.UI.Xaml.Media.Brush";
+            _typeNameTable[21] = "Disposio.Views.LoginPage";
+            _typeNameTable[22] = "Microsoft.UI.Xaml.Controls.TreeViewNode";
+            _typeNameTable[23] = "Microsoft.UI.Xaml.DependencyObject";
+            _typeNameTable[24] = "System.Collections.Generic.IList`1<Microsoft.UI.Xaml.Controls.TreeViewNode>";
+
+            _typeTable = new global::System.Type[25];
+>>>>>>> 9ef0d635b931af1ca0360d3721c7aaaabd549de3
             _typeTable[0] = typeof(global::Microsoft.UI.Xaml.Controls.XamlControlsResources);
             _typeTable[1] = typeof(global::Microsoft.UI.Xaml.ResourceDictionary);
             _typeTable[2] = typeof(global::System.Object);
@@ -258,6 +281,7 @@ namespace Disposio.Disposio_XamlTypeInfo
             _typeTable[8] = typeof(global::System.ValueType);
             _typeTable[9] = typeof(global::Disposio.MainWindow);
             _typeTable[10] = typeof(global::Microsoft.UI.Xaml.Window);
+<<<<<<< HEAD
             _typeTable[11] = typeof(global::Disposio.Views.LoginPage);
             _typeTable[12] = typeof(global::Microsoft.UI.Xaml.Controls.Page);
             _typeTable[13] = typeof(global::Microsoft.UI.Xaml.Controls.UserControl);
@@ -265,6 +289,22 @@ namespace Disposio.Disposio_XamlTypeInfo
             _typeTable[15] = typeof(global::Microsoft.UI.Xaml.DependencyObject);
             _typeTable[16] = typeof(global::System.Collections.Generic.IList<global::Microsoft.UI.Xaml.Controls.TreeViewNode>);
             _typeTable[17] = typeof(global::System.Int32);
+=======
+            _typeTable[11] = typeof(global::Microsoft.UI.Xaml.Controls.Button);
+            _typeTable[12] = typeof(global::Disposio.Views.DashboardAnsicht);
+            _typeTable[13] = typeof(global::Microsoft.UI.Xaml.Controls.Page);
+            _typeTable[14] = typeof(global::Microsoft.UI.Xaml.Controls.UserControl);
+            _typeTable[15] = typeof(global::System.Collections.ObjectModel.ObservableCollection<global::Disposio.Views.Kunde>);
+            _typeTable[16] = typeof(global::System.Collections.ObjectModel.Collection<global::Disposio.Views.Kunde>);
+            _typeTable[17] = typeof(global::Disposio.Views.Kunde);
+            _typeTable[18] = typeof(global::System.String);
+            _typeTable[19] = typeof(global::System.Int32);
+            _typeTable[20] = typeof(global::Microsoft.UI.Xaml.Media.Brush);
+            _typeTable[21] = typeof(global::Disposio.Views.LoginPage);
+            _typeTable[22] = typeof(global::Microsoft.UI.Xaml.Controls.TreeViewNode);
+            _typeTable[23] = typeof(global::Microsoft.UI.Xaml.DependencyObject);
+            _typeTable[24] = typeof(global::System.Collections.Generic.IList<global::Microsoft.UI.Xaml.Controls.TreeViewNode>);
+>>>>>>> 9ef0d635b931af1ca0360d3721c7aaaabd549de3
         }
 
         private int LookupTypeIndexByName(string typeName)
@@ -302,17 +342,35 @@ namespace Disposio.Disposio_XamlTypeInfo
         private object Activate_0_XamlControlsResources() { return new global::Microsoft.UI.Xaml.Controls.XamlControlsResources(); }
         private object Activate_4_MicaBackdrop() { return new global::Microsoft.UI.Xaml.Media.MicaBackdrop(); }
         private object Activate_9_MainWindow() { return new global::Disposio.MainWindow(); }
+<<<<<<< HEAD
         private object Activate_11_LoginPage() { return new global::Disposio.Views.LoginPage(); }
         private object Activate_14_TreeViewNode() { return new global::Microsoft.UI.Xaml.Controls.TreeViewNode(); }
+=======
+        private object Activate_12_DashboardAnsicht() { return new global::Disposio.Views.DashboardAnsicht(); }
+        private object Activate_15_ObservableCollection() { return new global::System.Collections.ObjectModel.ObservableCollection<global::Disposio.Views.Kunde>(); }
+        private object Activate_16_Collection() { return new global::System.Collections.ObjectModel.Collection<global::Disposio.Views.Kunde>(); }
+        private object Activate_21_LoginPage() { return new global::Disposio.Views.LoginPage(); }
+        private object Activate_22_TreeViewNode() { return new global::Microsoft.UI.Xaml.Controls.TreeViewNode(); }
+>>>>>>> 9ef0d635b931af1ca0360d3721c7aaaabd549de3
         private void StaticInitializer_0_XamlControlsResources() => global::System.Runtime.CompilerServices.RuntimeHelpers.RunClassConstructor(typeof(global::Microsoft.UI.Xaml.Controls.XamlControlsResources).TypeHandle);
         private void StaticInitializer_4_MicaBackdrop() => global::System.Runtime.CompilerServices.RuntimeHelpers.RunClassConstructor(typeof(global::Microsoft.UI.Xaml.Media.MicaBackdrop).TypeHandle);
         private void StaticInitializer_6_MicaKind() => global::System.Runtime.CompilerServices.RuntimeHelpers.RunClassConstructor(typeof(global::Microsoft.UI.Composition.SystemBackdrops.MicaKind).TypeHandle);
         private void StaticInitializer_7_Enum() => global::System.Runtime.CompilerServices.RuntimeHelpers.RunClassConstructor(typeof(global::System.Enum).TypeHandle);
         private void StaticInitializer_8_ValueType() => global::System.Runtime.CompilerServices.RuntimeHelpers.RunClassConstructor(typeof(global::System.ValueType).TypeHandle);
         private void StaticInitializer_9_MainWindow() => global::System.Runtime.CompilerServices.RuntimeHelpers.RunClassConstructor(typeof(global::Disposio.MainWindow).TypeHandle);
+<<<<<<< HEAD
         private void StaticInitializer_11_LoginPage() => global::System.Runtime.CompilerServices.RuntimeHelpers.RunClassConstructor(typeof(global::Disposio.Views.LoginPage).TypeHandle);
         private void StaticInitializer_14_TreeViewNode() => global::System.Runtime.CompilerServices.RuntimeHelpers.RunClassConstructor(typeof(global::Microsoft.UI.Xaml.Controls.TreeViewNode).TypeHandle);
         private void StaticInitializer_16_IList() => global::System.Runtime.CompilerServices.RuntimeHelpers.RunClassConstructor(typeof(global::System.Collections.Generic.IList<global::Microsoft.UI.Xaml.Controls.TreeViewNode>).TypeHandle);
+=======
+        private void StaticInitializer_12_DashboardAnsicht() => global::System.Runtime.CompilerServices.RuntimeHelpers.RunClassConstructor(typeof(global::Disposio.Views.DashboardAnsicht).TypeHandle);
+        private void StaticInitializer_15_ObservableCollection() => global::System.Runtime.CompilerServices.RuntimeHelpers.RunClassConstructor(typeof(global::System.Collections.ObjectModel.ObservableCollection<global::Disposio.Views.Kunde>).TypeHandle);
+        private void StaticInitializer_16_Collection() => global::System.Runtime.CompilerServices.RuntimeHelpers.RunClassConstructor(typeof(global::System.Collections.ObjectModel.Collection<global::Disposio.Views.Kunde>).TypeHandle);
+        private void StaticInitializer_17_Kunde() => global::System.Runtime.CompilerServices.RuntimeHelpers.RunClassConstructor(typeof(global::Disposio.Views.Kunde).TypeHandle);
+        private void StaticInitializer_21_LoginPage() => global::System.Runtime.CompilerServices.RuntimeHelpers.RunClassConstructor(typeof(global::Disposio.Views.LoginPage).TypeHandle);
+        private void StaticInitializer_22_TreeViewNode() => global::System.Runtime.CompilerServices.RuntimeHelpers.RunClassConstructor(typeof(global::Microsoft.UI.Xaml.Controls.TreeViewNode).TypeHandle);
+        private void StaticInitializer_24_IList() => global::System.Runtime.CompilerServices.RuntimeHelpers.RunClassConstructor(typeof(global::System.Collections.Generic.IList<global::Microsoft.UI.Xaml.Controls.TreeViewNode>).TypeHandle);
+>>>>>>> 9ef0d635b931af1ca0360d3721c7aaaabd549de3
         private void MapAdd_0_XamlControlsResources(object instance, object key, object item)
         {
             var collection = (global::System.Collections.Generic.IDictionary<global::System.Object, global::System.Object>)instance;
@@ -320,7 +378,23 @@ namespace Disposio.Disposio_XamlTypeInfo
             var newItem = (global::System.Object)item;
             collection.Add(newKey, newItem);
         }
+<<<<<<< HEAD
         private void VectorAdd_16_IList(object instance, object item)
+=======
+        private void VectorAdd_15_ObservableCollection(object instance, object item)
+        {
+            var collection = (global::System.Collections.Generic.ICollection<global::Disposio.Views.Kunde>)instance;
+            var newItem = (global::Disposio.Views.Kunde)item;
+            collection.Add(newItem);
+        }
+        private void VectorAdd_16_Collection(object instance, object item)
+        {
+            var collection = (global::System.Collections.Generic.ICollection<global::Disposio.Views.Kunde>)instance;
+            var newItem = (global::Disposio.Views.Kunde)item;
+            collection.Add(newItem);
+        }
+        private void VectorAdd_24_IList(object instance, object item)
+>>>>>>> 9ef0d635b931af1ca0360d3721c7aaaabd549de3
         {
             var collection = (global::System.Collections.Generic.ICollection<global::Microsoft.UI.Xaml.Controls.TreeViewNode>)instance;
             var newItem = (global::Microsoft.UI.Xaml.Controls.TreeViewNode)item;
@@ -402,14 +476,27 @@ namespace Disposio.Disposio_XamlTypeInfo
                 xamlType = new global::Disposio.Disposio_XamlTypeInfo.XamlSystemBaseType(typeName, type);
                 break;
 
+<<<<<<< HEAD
             case 11:   //  Disposio.Views.LoginPage
                 userType = new global::Disposio.Disposio_XamlTypeInfo.XamlUserType(this, typeName, type, GetXamlTypeByName("Microsoft.UI.Xaml.Controls.Page"));
                 userType.Activator = Activate_11_LoginPage;
                 userType.StaticInitializer = StaticInitializer_11_LoginPage;
+=======
+            case 11:   //  Microsoft.UI.Xaml.Controls.Button
+                xamlType = new global::Disposio.Disposio_XamlTypeInfo.XamlSystemBaseType(typeName, type);
+                break;
+
+            case 12:   //  Disposio.Views.DashboardAnsicht
+                userType = new global::Disposio.Disposio_XamlTypeInfo.XamlUserType(this, typeName, type, GetXamlTypeByName("Microsoft.UI.Xaml.Controls.Page"));
+                userType.Activator = Activate_12_DashboardAnsicht;
+                userType.StaticInitializer = StaticInitializer_12_DashboardAnsicht;
+                userType.AddMemberName("Kunden");
+>>>>>>> 9ef0d635b931af1ca0360d3721c7aaaabd549de3
                 userType.SetIsLocalType();
                 xamlType = userType;
                 break;
 
+<<<<<<< HEAD
             case 12:   //  Microsoft.UI.Xaml.Controls.Page
                 xamlType = new global::Disposio.Disposio_XamlTypeInfo.XamlSystemBaseType(typeName, type);
                 break;
@@ -422,6 +509,69 @@ namespace Disposio.Disposio_XamlTypeInfo
                 userType = new global::Disposio.Disposio_XamlTypeInfo.XamlUserType(this, typeName, type, GetXamlTypeByName("Microsoft.UI.Xaml.DependencyObject"));
                 userType.Activator = Activate_14_TreeViewNode;
                 userType.StaticInitializer = StaticInitializer_14_TreeViewNode;
+=======
+            case 13:   //  Microsoft.UI.Xaml.Controls.Page
+                xamlType = new global::Disposio.Disposio_XamlTypeInfo.XamlSystemBaseType(typeName, type);
+                break;
+
+            case 14:   //  Microsoft.UI.Xaml.Controls.UserControl
+                xamlType = new global::Disposio.Disposio_XamlTypeInfo.XamlSystemBaseType(typeName, type);
+                break;
+
+            case 15:   //  System.Collections.ObjectModel.ObservableCollection`1<Disposio.Views.Kunde>
+                userType = new global::Disposio.Disposio_XamlTypeInfo.XamlUserType(this, typeName, type, GetXamlTypeByName("System.Collections.ObjectModel.Collection`1<Disposio.Views.Kunde>"));
+                userType.StaticInitializer = StaticInitializer_15_ObservableCollection;
+                userType.CollectionAdd = VectorAdd_15_ObservableCollection;
+                userType.SetIsReturnTypeStub();
+                xamlType = userType;
+                break;
+
+            case 16:   //  System.Collections.ObjectModel.Collection`1<Disposio.Views.Kunde>
+                userType = new global::Disposio.Disposio_XamlTypeInfo.XamlUserType(this, typeName, type, GetXamlTypeByName("Object"));
+                userType.Activator = Activate_16_Collection;
+                userType.StaticInitializer = StaticInitializer_16_Collection;
+                userType.CollectionAdd = VectorAdd_16_Collection;
+                xamlType = userType;
+                break;
+
+            case 17:   //  Disposio.Views.Kunde
+                userType = new global::Disposio.Disposio_XamlTypeInfo.XamlUserType(this, typeName, type, GetXamlTypeByName("Object"));
+                userType.StaticInitializer = StaticInitializer_17_Kunde;
+                userType.AddMemberName("Firmenname");
+                userType.AddMemberName("Kennung");
+                userType.AddMemberName("AdminEmail");
+                userType.AddMemberName("Benutzer");
+                userType.AddMemberName("Status");
+                userType.AddMemberName("StatusBorderBrush");
+                userType.SetIsLocalType();
+                xamlType = userType;
+                break;
+
+            case 18:   //  String
+                xamlType = new global::Disposio.Disposio_XamlTypeInfo.XamlSystemBaseType(typeName, type);
+                break;
+
+            case 19:   //  Int32
+                xamlType = new global::Disposio.Disposio_XamlTypeInfo.XamlSystemBaseType(typeName, type);
+                break;
+
+            case 20:   //  Microsoft.UI.Xaml.Media.Brush
+                xamlType = new global::Disposio.Disposio_XamlTypeInfo.XamlSystemBaseType(typeName, type);
+                break;
+
+            case 21:   //  Disposio.Views.LoginPage
+                userType = new global::Disposio.Disposio_XamlTypeInfo.XamlUserType(this, typeName, type, GetXamlTypeByName("Microsoft.UI.Xaml.Controls.Page"));
+                userType.Activator = Activate_21_LoginPage;
+                userType.StaticInitializer = StaticInitializer_21_LoginPage;
+                userType.SetIsLocalType();
+                xamlType = userType;
+                break;
+
+            case 22:   //  Microsoft.UI.Xaml.Controls.TreeViewNode
+                userType = new global::Disposio.Disposio_XamlTypeInfo.XamlUserType(this, typeName, type, GetXamlTypeByName("Microsoft.UI.Xaml.DependencyObject"));
+                userType.Activator = Activate_22_TreeViewNode;
+                userType.StaticInitializer = StaticInitializer_22_TreeViewNode;
+>>>>>>> 9ef0d635b931af1ca0360d3721c7aaaabd549de3
                 userType.AddMemberName("Children");
                 userType.AddMemberName("Content");
                 userType.AddMemberName("Depth");
@@ -433,6 +583,7 @@ namespace Disposio.Disposio_XamlTypeInfo
                 xamlType = userType;
                 break;
 
+<<<<<<< HEAD
             case 15:   //  Microsoft.UI.Xaml.DependencyObject
                 xamlType = new global::Disposio.Disposio_XamlTypeInfo.XamlSystemBaseType(typeName, type);
                 break;
@@ -448,6 +599,19 @@ namespace Disposio.Disposio_XamlTypeInfo
             case 17:   //  Int32
                 xamlType = new global::Disposio.Disposio_XamlTypeInfo.XamlSystemBaseType(typeName, type);
                 break;
+=======
+            case 23:   //  Microsoft.UI.Xaml.DependencyObject
+                xamlType = new global::Disposio.Disposio_XamlTypeInfo.XamlSystemBaseType(typeName, type);
+                break;
+
+            case 24:   //  System.Collections.Generic.IList`1<Microsoft.UI.Xaml.Controls.TreeViewNode>
+                userType = new global::Disposio.Disposio_XamlTypeInfo.XamlUserType(this, typeName, type, null);
+                userType.StaticInitializer = StaticInitializer_24_IList;
+                userType.CollectionAdd = VectorAdd_24_IList;
+                userType.SetIsReturnTypeStub();
+                xamlType = userType;
+                break;
+>>>>>>> 9ef0d635b931af1ca0360d3721c7aaaabd549de3
             }
             return xamlType;
         }
@@ -529,52 +693,152 @@ namespace Disposio.Disposio_XamlTypeInfo
             var that = (global::Microsoft.UI.Xaml.Media.MicaBackdrop)instance;
             that.Kind = (global::Microsoft.UI.Composition.SystemBackdrops.MicaKind)Value;
         }
+<<<<<<< HEAD
         private object get_2_TreeViewNode_Children(object instance)
+=======
+        private object get_2_DashboardAnsicht_Kunden(object instance)
+        {
+            var that = (global::Disposio.Views.DashboardAnsicht)instance;
+            return that.Kunden;
+        }
+        private object get_3_Kunde_Firmenname(object instance)
+        {
+            var that = (global::Disposio.Views.Kunde)instance;
+            return that.Firmenname;
+        }
+        private void set_3_Kunde_Firmenname(object instance, object Value)
+        {
+            var that = (global::Disposio.Views.Kunde)instance;
+            that.Firmenname = (global::System.String)Value;
+        }
+        private object get_4_Kunde_Kennung(object instance)
+        {
+            var that = (global::Disposio.Views.Kunde)instance;
+            return that.Kennung;
+        }
+        private void set_4_Kunde_Kennung(object instance, object Value)
+        {
+            var that = (global::Disposio.Views.Kunde)instance;
+            that.Kennung = (global::System.String)Value;
+        }
+        private object get_5_Kunde_AdminEmail(object instance)
+        {
+            var that = (global::Disposio.Views.Kunde)instance;
+            return that.AdminEmail;
+        }
+        private void set_5_Kunde_AdminEmail(object instance, object Value)
+        {
+            var that = (global::Disposio.Views.Kunde)instance;
+            that.AdminEmail = (global::System.String)Value;
+        }
+        private object get_6_Kunde_Benutzer(object instance)
+        {
+            var that = (global::Disposio.Views.Kunde)instance;
+            return that.Benutzer;
+        }
+        private void set_6_Kunde_Benutzer(object instance, object Value)
+        {
+            var that = (global::Disposio.Views.Kunde)instance;
+            that.Benutzer = (global::System.Int32)Value;
+        }
+        private object get_7_Kunde_Status(object instance)
+        {
+            var that = (global::Disposio.Views.Kunde)instance;
+            return that.Status;
+        }
+        private void set_7_Kunde_Status(object instance, object Value)
+        {
+            var that = (global::Disposio.Views.Kunde)instance;
+            that.Status = (global::System.String)Value;
+        }
+        private object get_8_Kunde_StatusBorderBrush(object instance)
+        {
+            var that = (global::Disposio.Views.Kunde)instance;
+            return that.StatusBorderBrush;
+        }
+        private object get_9_TreeViewNode_Children(object instance)
+>>>>>>> 9ef0d635b931af1ca0360d3721c7aaaabd549de3
         {
             var that = (global::Microsoft.UI.Xaml.Controls.TreeViewNode)instance;
             return that.Children;
         }
+<<<<<<< HEAD
         private object get_3_TreeViewNode_Content(object instance)
+=======
+        private object get_10_TreeViewNode_Content(object instance)
+>>>>>>> 9ef0d635b931af1ca0360d3721c7aaaabd549de3
         {
             var that = (global::Microsoft.UI.Xaml.Controls.TreeViewNode)instance;
             return that.Content;
         }
+<<<<<<< HEAD
         private void set_3_TreeViewNode_Content(object instance, object Value)
+=======
+        private void set_10_TreeViewNode_Content(object instance, object Value)
+>>>>>>> 9ef0d635b931af1ca0360d3721c7aaaabd549de3
         {
             var that = (global::Microsoft.UI.Xaml.Controls.TreeViewNode)instance;
             that.Content = (global::System.Object)Value;
         }
+<<<<<<< HEAD
         private object get_4_TreeViewNode_Depth(object instance)
+=======
+        private object get_11_TreeViewNode_Depth(object instance)
+>>>>>>> 9ef0d635b931af1ca0360d3721c7aaaabd549de3
         {
             var that = (global::Microsoft.UI.Xaml.Controls.TreeViewNode)instance;
             return that.Depth;
         }
+<<<<<<< HEAD
         private object get_5_TreeViewNode_HasChildren(object instance)
+=======
+        private object get_12_TreeViewNode_HasChildren(object instance)
+>>>>>>> 9ef0d635b931af1ca0360d3721c7aaaabd549de3
         {
             var that = (global::Microsoft.UI.Xaml.Controls.TreeViewNode)instance;
             return that.HasChildren;
         }
+<<<<<<< HEAD
         private object get_6_TreeViewNode_HasUnrealizedChildren(object instance)
+=======
+        private object get_13_TreeViewNode_HasUnrealizedChildren(object instance)
+>>>>>>> 9ef0d635b931af1ca0360d3721c7aaaabd549de3
         {
             var that = (global::Microsoft.UI.Xaml.Controls.TreeViewNode)instance;
             return that.HasUnrealizedChildren;
         }
+<<<<<<< HEAD
         private void set_6_TreeViewNode_HasUnrealizedChildren(object instance, object Value)
+=======
+        private void set_13_TreeViewNode_HasUnrealizedChildren(object instance, object Value)
+>>>>>>> 9ef0d635b931af1ca0360d3721c7aaaabd549de3
         {
             var that = (global::Microsoft.UI.Xaml.Controls.TreeViewNode)instance;
             that.HasUnrealizedChildren = (global::System.Boolean)Value;
         }
+<<<<<<< HEAD
         private object get_7_TreeViewNode_IsExpanded(object instance)
+=======
+        private object get_14_TreeViewNode_IsExpanded(object instance)
+>>>>>>> 9ef0d635b931af1ca0360d3721c7aaaabd549de3
         {
             var that = (global::Microsoft.UI.Xaml.Controls.TreeViewNode)instance;
             return that.IsExpanded;
         }
+<<<<<<< HEAD
         private void set_7_TreeViewNode_IsExpanded(object instance, object Value)
+=======
+        private void set_14_TreeViewNode_IsExpanded(object instance, object Value)
+>>>>>>> 9ef0d635b931af1ca0360d3721c7aaaabd549de3
         {
             var that = (global::Microsoft.UI.Xaml.Controls.TreeViewNode)instance;
             that.IsExpanded = (global::System.Boolean)Value;
         }
+<<<<<<< HEAD
         private object get_8_TreeViewNode_Parent(object instance)
+=======
+        private object get_15_TreeViewNode_Parent(object instance)
+>>>>>>> 9ef0d635b931af1ca0360d3721c7aaaabd549de3
         {
             var that = (global::Microsoft.UI.Xaml.Controls.TreeViewNode)instance;
             return that.Parent;
@@ -601,50 +865,126 @@ namespace Disposio.Disposio_XamlTypeInfo
                 xamlMember.Getter = get_1_MicaBackdrop_Kind;
                 xamlMember.Setter = set_1_MicaBackdrop_Kind;
                 break;
+<<<<<<< HEAD
             case "Microsoft.UI.Xaml.Controls.TreeViewNode.Children":
                 userType = (global::Disposio.Disposio_XamlTypeInfo.XamlUserType)GetXamlTypeByName("Microsoft.UI.Xaml.Controls.TreeViewNode");
                 xamlMember = new global::Disposio.Disposio_XamlTypeInfo.XamlMember(this, "Children", "System.Collections.Generic.IList`1<Microsoft.UI.Xaml.Controls.TreeViewNode>");
                 xamlMember.Getter = get_2_TreeViewNode_Children;
+=======
+            case "Disposio.Views.DashboardAnsicht.Kunden":
+                userType = (global::Disposio.Disposio_XamlTypeInfo.XamlUserType)GetXamlTypeByName("Disposio.Views.DashboardAnsicht");
+                xamlMember = new global::Disposio.Disposio_XamlTypeInfo.XamlMember(this, "Kunden", "System.Collections.ObjectModel.ObservableCollection`1<Disposio.Views.Kunde>");
+                xamlMember.Getter = get_2_DashboardAnsicht_Kunden;
+                xamlMember.SetIsReadOnly();
+                break;
+            case "Disposio.Views.Kunde.Firmenname":
+                userType = (global::Disposio.Disposio_XamlTypeInfo.XamlUserType)GetXamlTypeByName("Disposio.Views.Kunde");
+                xamlMember = new global::Disposio.Disposio_XamlTypeInfo.XamlMember(this, "Firmenname", "String");
+                xamlMember.Getter = get_3_Kunde_Firmenname;
+                xamlMember.Setter = set_3_Kunde_Firmenname;
+                break;
+            case "Disposio.Views.Kunde.Kennung":
+                userType = (global::Disposio.Disposio_XamlTypeInfo.XamlUserType)GetXamlTypeByName("Disposio.Views.Kunde");
+                xamlMember = new global::Disposio.Disposio_XamlTypeInfo.XamlMember(this, "Kennung", "String");
+                xamlMember.Getter = get_4_Kunde_Kennung;
+                xamlMember.Setter = set_4_Kunde_Kennung;
+                break;
+            case "Disposio.Views.Kunde.AdminEmail":
+                userType = (global::Disposio.Disposio_XamlTypeInfo.XamlUserType)GetXamlTypeByName("Disposio.Views.Kunde");
+                xamlMember = new global::Disposio.Disposio_XamlTypeInfo.XamlMember(this, "AdminEmail", "String");
+                xamlMember.Getter = get_5_Kunde_AdminEmail;
+                xamlMember.Setter = set_5_Kunde_AdminEmail;
+                break;
+            case "Disposio.Views.Kunde.Benutzer":
+                userType = (global::Disposio.Disposio_XamlTypeInfo.XamlUserType)GetXamlTypeByName("Disposio.Views.Kunde");
+                xamlMember = new global::Disposio.Disposio_XamlTypeInfo.XamlMember(this, "Benutzer", "Int32");
+                xamlMember.Getter = get_6_Kunde_Benutzer;
+                xamlMember.Setter = set_6_Kunde_Benutzer;
+                break;
+            case "Disposio.Views.Kunde.Status":
+                userType = (global::Disposio.Disposio_XamlTypeInfo.XamlUserType)GetXamlTypeByName("Disposio.Views.Kunde");
+                xamlMember = new global::Disposio.Disposio_XamlTypeInfo.XamlMember(this, "Status", "String");
+                xamlMember.Getter = get_7_Kunde_Status;
+                xamlMember.Setter = set_7_Kunde_Status;
+                break;
+            case "Disposio.Views.Kunde.StatusBorderBrush":
+                userType = (global::Disposio.Disposio_XamlTypeInfo.XamlUserType)GetXamlTypeByName("Disposio.Views.Kunde");
+                xamlMember = new global::Disposio.Disposio_XamlTypeInfo.XamlMember(this, "StatusBorderBrush", "Microsoft.UI.Xaml.Media.Brush");
+                xamlMember.Getter = get_8_Kunde_StatusBorderBrush;
+                xamlMember.SetIsReadOnly();
+                break;
+            case "Microsoft.UI.Xaml.Controls.TreeViewNode.Children":
+                userType = (global::Disposio.Disposio_XamlTypeInfo.XamlUserType)GetXamlTypeByName("Microsoft.UI.Xaml.Controls.TreeViewNode");
+                xamlMember = new global::Disposio.Disposio_XamlTypeInfo.XamlMember(this, "Children", "System.Collections.Generic.IList`1<Microsoft.UI.Xaml.Controls.TreeViewNode>");
+                xamlMember.Getter = get_9_TreeViewNode_Children;
+>>>>>>> 9ef0d635b931af1ca0360d3721c7aaaabd549de3
                 xamlMember.SetIsReadOnly();
                 break;
             case "Microsoft.UI.Xaml.Controls.TreeViewNode.Content":
                 userType = (global::Disposio.Disposio_XamlTypeInfo.XamlUserType)GetXamlTypeByName("Microsoft.UI.Xaml.Controls.TreeViewNode");
                 xamlMember = new global::Disposio.Disposio_XamlTypeInfo.XamlMember(this, "Content", "Object");
                 xamlMember.SetIsDependencyProperty();
+<<<<<<< HEAD
                 xamlMember.Getter = get_3_TreeViewNode_Content;
                 xamlMember.Setter = set_3_TreeViewNode_Content;
+=======
+                xamlMember.Getter = get_10_TreeViewNode_Content;
+                xamlMember.Setter = set_10_TreeViewNode_Content;
+>>>>>>> 9ef0d635b931af1ca0360d3721c7aaaabd549de3
                 break;
             case "Microsoft.UI.Xaml.Controls.TreeViewNode.Depth":
                 userType = (global::Disposio.Disposio_XamlTypeInfo.XamlUserType)GetXamlTypeByName("Microsoft.UI.Xaml.Controls.TreeViewNode");
                 xamlMember = new global::Disposio.Disposio_XamlTypeInfo.XamlMember(this, "Depth", "Int32");
                 xamlMember.SetIsDependencyProperty();
+<<<<<<< HEAD
                 xamlMember.Getter = get_4_TreeViewNode_Depth;
+=======
+                xamlMember.Getter = get_11_TreeViewNode_Depth;
+>>>>>>> 9ef0d635b931af1ca0360d3721c7aaaabd549de3
                 xamlMember.SetIsReadOnly();
                 break;
             case "Microsoft.UI.Xaml.Controls.TreeViewNode.HasChildren":
                 userType = (global::Disposio.Disposio_XamlTypeInfo.XamlUserType)GetXamlTypeByName("Microsoft.UI.Xaml.Controls.TreeViewNode");
                 xamlMember = new global::Disposio.Disposio_XamlTypeInfo.XamlMember(this, "HasChildren", "Boolean");
                 xamlMember.SetIsDependencyProperty();
+<<<<<<< HEAD
                 xamlMember.Getter = get_5_TreeViewNode_HasChildren;
+=======
+                xamlMember.Getter = get_12_TreeViewNode_HasChildren;
+>>>>>>> 9ef0d635b931af1ca0360d3721c7aaaabd549de3
                 xamlMember.SetIsReadOnly();
                 break;
             case "Microsoft.UI.Xaml.Controls.TreeViewNode.HasUnrealizedChildren":
                 userType = (global::Disposio.Disposio_XamlTypeInfo.XamlUserType)GetXamlTypeByName("Microsoft.UI.Xaml.Controls.TreeViewNode");
                 xamlMember = new global::Disposio.Disposio_XamlTypeInfo.XamlMember(this, "HasUnrealizedChildren", "Boolean");
+<<<<<<< HEAD
                 xamlMember.Getter = get_6_TreeViewNode_HasUnrealizedChildren;
                 xamlMember.Setter = set_6_TreeViewNode_HasUnrealizedChildren;
+=======
+                xamlMember.Getter = get_13_TreeViewNode_HasUnrealizedChildren;
+                xamlMember.Setter = set_13_TreeViewNode_HasUnrealizedChildren;
+>>>>>>> 9ef0d635b931af1ca0360d3721c7aaaabd549de3
                 break;
             case "Microsoft.UI.Xaml.Controls.TreeViewNode.IsExpanded":
                 userType = (global::Disposio.Disposio_XamlTypeInfo.XamlUserType)GetXamlTypeByName("Microsoft.UI.Xaml.Controls.TreeViewNode");
                 xamlMember = new global::Disposio.Disposio_XamlTypeInfo.XamlMember(this, "IsExpanded", "Boolean");
                 xamlMember.SetIsDependencyProperty();
+<<<<<<< HEAD
                 xamlMember.Getter = get_7_TreeViewNode_IsExpanded;
                 xamlMember.Setter = set_7_TreeViewNode_IsExpanded;
+=======
+                xamlMember.Getter = get_14_TreeViewNode_IsExpanded;
+                xamlMember.Setter = set_14_TreeViewNode_IsExpanded;
+>>>>>>> 9ef0d635b931af1ca0360d3721c7aaaabd549de3
                 break;
             case "Microsoft.UI.Xaml.Controls.TreeViewNode.Parent":
                 userType = (global::Disposio.Disposio_XamlTypeInfo.XamlUserType)GetXamlTypeByName("Microsoft.UI.Xaml.Controls.TreeViewNode");
                 xamlMember = new global::Disposio.Disposio_XamlTypeInfo.XamlMember(this, "Parent", "Microsoft.UI.Xaml.Controls.TreeViewNode");
+<<<<<<< HEAD
                 xamlMember.Getter = get_8_TreeViewNode_Parent;
+=======
+                xamlMember.Getter = get_15_TreeViewNode_Parent;
+>>>>>>> 9ef0d635b931af1ca0360d3721c7aaaabd549de3
                 xamlMember.SetIsReadOnly();
                 break;
             }

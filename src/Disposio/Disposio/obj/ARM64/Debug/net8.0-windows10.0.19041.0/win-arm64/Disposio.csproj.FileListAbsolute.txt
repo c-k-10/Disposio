@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 C:\Users\laska\source\repos\Disposio\src\Disposio\Disposio\bin\ARM64\Debug\net8.0-windows10.0.19041.0\win-arm64\Disposio.exe
 C:\Users\laska\source\repos\Disposio\src\Disposio\Disposio\bin\ARM64\Debug\net8.0-windows10.0.19041.0\win-arm64\Assets\miseur_kofferfell.png
 C:\Users\laska\source\repos\Disposio\src\Disposio\Disposio\bin\ARM64\Debug\net8.0-windows10.0.19041.0\win-arm64\App.xbf
@@ -279,3 +280,18 @@ C:\Users\laska\source\repos\Disposio\src\Disposio\Disposio\obj\ARM64\Debug\net8.
 C:\Users\laska\source\repos\Disposio\src\Disposio\Disposio\obj\ARM64\Debug\net8.0-windows10.0.19041.0\win-arm64\MultipleQualifiersPerDimensionFound.txt
 C:\Users\laska\source\repos\Disposio\src\Disposio\Disposio\obj\ARM64\Debug\net8.0-windows10.0.19041.0\win-arm64\ProjectArchitectures.txt
 C:\Users\laska\source\repos\Disposio\src\Disposio\Disposio\obj\ARM64\Debug\net8.0-windows10.0.19041.0\win-arm64\.winmd_cache\$Microsoft.Web.WebView2.Core.winmd_639039823460000000.json
+=======
+C:\Wirtschaftinformatik\PROJEKT_DISPOSIO\Disposio\src\Disposio\Disposio\obj\ARM64\Debug\net8.0-windows10.0.19041.0\win-arm64\Disposio.csproj.AssemblyReference.cache
+C:\Wirtschaftinformatik\PROJEKT_DISPOSIO\Disposio\src\Disposio\Disposio\obj\ARM64\Debug\net8.0-windows10.0.19041.0\win-arm64\App.g.i.cs
+C:\Wirtschaftinformatik\PROJEKT_DISPOSIO\Disposio\src\Disposio\Disposio\obj\ARM64\Debug\net8.0-windows10.0.19041.0\win-arm64\App.g.cs
+C:\Wirtschaftinformatik\PROJEKT_DISPOSIO\Disposio\src\Disposio\Disposio\obj\ARM64\Debug\net8.0-windows10.0.19041.0\win-arm64\MainWindow.g.i.cs
+C:\Wirtschaftinformatik\PROJEKT_DISPOSIO\Disposio\src\Disposio\Disposio\obj\ARM64\Debug\net8.0-windows10.0.19041.0\win-arm64\MainWindow.g.cs
+C:\Wirtschaftinformatik\PROJEKT_DISPOSIO\Disposio\src\Disposio\Disposio\obj\ARM64\Debug\net8.0-windows10.0.19041.0\win-arm64\App.xaml
+C:\Wirtschaftinformatik\PROJEKT_DISPOSIO\Disposio\src\Disposio\Disposio\obj\ARM64\Debug\net8.0-windows10.0.19041.0\win-arm64\MainWindow.xaml
+C:\Wirtschaftinformatik\PROJEKT_DISPOSIO\Disposio\src\Disposio\Disposio\obj\ARM64\Debug\net8.0-windows10.0.19041.0\win-arm64\Views\DashboardAnsicht\DashboardAnsicht.xaml
+C:\Wirtschaftinformatik\PROJEKT_DISPOSIO\Disposio\src\Disposio\Disposio\obj\ARM64\Debug\net8.0-windows10.0.19041.0\win-arm64\Views\LoginPage\LoginPage.xaml
+C:\Wirtschaftinformatik\PROJEKT_DISPOSIO\Disposio\src\Disposio\Disposio\obj\ARM64\Debug\net8.0-windows10.0.19041.0\win-arm64\App.xbf
+C:\Wirtschaftinformatik\PROJEKT_DISPOSIO\Disposio\src\Disposio\Disposio\obj\ARM64\Debug\net8.0-windows10.0.19041.0\win-arm64\MainWindow.xbf
+C:\Wirtschaftinformatik\PROJEKT_DISPOSIO\Disposio\src\Disposio\Disposio\obj\ARM64\Debug\net8.0-windows10.0.19041.0\win-arm64\Views\DashboardAnsicht\DashboardAnsicht.xbf
+C:\Wirtschaftinformatik\PROJEKT_DISPOSIO\Disposio\src\Disposio\Disposio\obj\ARM64\Debug\net8.0-windows10.0.19041.0\win-arm64\Views\LoginPage\LoginPage.xbf
+>>>>>>> 9ef0d635b931af1ca0360d3721c7aaaabd549de3

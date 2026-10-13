@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "dgSpecHash": "dRhn7fK8uqQ=",
+  "dgSpecHash": "Sm2SLbkP3CI=",
   "success": true,
   "projectFilePath": "C:\\Users\\laska\\source\\repos\\Disposio\\src\\Disposio\\Disposio\\Disposio.csproj",
   "expectedPackageFiles": [
@@ -37,5 +37,15 @@
     "C:\\Users\\laska\\.nuget\\packages\\microsoft.netcore.app.runtime.win-x64\\8.0.31\\microsoft.netcore.app.runtime.win-x64.8.0.31.nupkg.sha512",
     "C:\\Users\\laska\\.nuget\\packages\\microsoft.windowsdesktop.app.runtime.win-x86\\8.0.31\\microsoft.windowsdesktop.app.runtime.win-x86.8.0.31.nupkg.sha512"
   ],
-  "logs": []
+  "logs": [
+    {
+      "code": "Undefined",
+      "level": "Warning",
+      "message": "Problem beim Lesen der Cachedatei \"C:\\Users\\laska\\source\\repos\\Disposio\\src\\Disposio\\Disposio\\obj\\project.nuget.cache\": '<' is an invalid start of a property name. Expected a '\"'. Path: $ | LineNumber: 2 | BytePositionInLine: 0.",
+      "projectPath": "C:\\Users\\laska\\source\\repos\\Disposio\\src\\Disposio\\Disposio\\Disposio.csproj",
+      "warningLevel": 1,
+      "filePath": "C:\\Users\\laska\\source\\repos\\Disposio\\src\\Disposio\\Disposio\\Disposio.csproj",
+      "targetGraphs": []
+    }
+  ]
 }

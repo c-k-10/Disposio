@@ -1,5 +1,9 @@
 {
   "profiles": {
+    "Disposio (Dashboard)": {
+      "commandName": "MsixPackage",
+      "commandLineArgs": "--dashboard"
+    },
     "Disposio (Package)": {
       "commandName": "MsixPackage"
     },
