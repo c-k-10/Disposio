@@ -130,70 +130,83 @@ namespace Disposio.Views
 
         private async void LoginButton_Click(object sender, RoutedEventArgs e)
         {
-            var company = (this.FindName("CompanyBox") as TextBox)?.Text?.Trim();
-            var email = (this.FindName("EmailBox") as TextBox)?.Text?.Trim();
-            var pwd = (this.FindName("PasswordBox") as PasswordBox)?.Password;
+            var button = sender as Microsoft.UI.Xaml.Controls.Button;
+            if (button == null) return;
 
-            if (string.IsNullOrEmpty(company) || string.IsNullOrEmpty(email) || string.IsNullOrEmpty(pwd))
-            {
-                var dlg = new ContentDialog
-                {
-                    XamlRoot = this.XamlRoot,
-                    RequestedTheme = this.RequestedTheme,
-                    Title = "Fehler",
-                    Content = "Bitte alle Pflichtfelder ausfüllen.",
-                    CloseButtonText = "OK"
-                };
-                await dlg.ShowAsync();
-                return;
-            }
-
-            AngemeldeterBenutzer? user = null;
+            // Button deaktivieren, um Reentranz und gleichzeitige ContentDialog-Aufrufe zu verhindern
+            button.IsEnabled = false;
             try
             {
-                user = await AuthService.LoginAsync(company, email, pwd);
-            }
-            catch
-            {
-                user = null;
-            }
+                var company = (this.FindName("CompanyBox") as TextBox)?.Text?.Trim();
+                var email = (this.FindName("EmailBox") as TextBox)?.Text?.Trim();
+                var pwd = (this.FindName("PasswordBox") as PasswordBox)?.Password;
 
-            if (user == null)
-            {
-                var err = new ContentDialog
+                if (string.IsNullOrEmpty(company) || string.IsNullOrEmpty(email) || string.IsNullOrEmpty(pwd))
                 {
-                    XamlRoot = this.XamlRoot,
-                    RequestedTheme = this.RequestedTheme,
-                    Title = "Anmeldung fehlgeschlagen",
-                    Content = "Firma, E-Mail oder Passwort ist ungültig.",
-                    CloseButtonText = "OK"
-                };
-                await err.ShowAsync();
-                return;
-            }
+                    var dlg = new ContentDialog
+                    {
+                        XamlRoot = this.XamlRoot,
+                        RequestedTheme = this.RequestedTheme,
+                        Title = "Fehler",
+                        Content = "Bitte alle Pflichtfelder ausfüllen.",
+                        CloseButtonText = "OK"
+                    };
+                    await dlg.ShowAsync();
+                    return;
+                }
 
-            // Bei erfolgreicher Anmeldung zum Dashboard navigieren
-            try
-            {
-                var accent = (this.FindName("ColorCombo") as ComboBox)?.SelectedItem as ComboBoxItem;
-                var accentHex = accent?.Tag as string ?? "#FF004D";
-                var appearance = new DashboardAppearance { AccentHex = accentHex, IsLight = (this.FindName("ModeSwitch") as ToggleSwitch)?.IsOn ?? true };
-
-                Frame?.Navigate(typeof(DashboardAnsicht), appearance);
-                // BackStack löschen, damit Zurück nicht zur LoginPage führt
-                Frame?.BackStack?.Clear();
-            }
-            catch
-            {
-                var dlg = new ContentDialog
+                AngemeldeterBenutzer? user = null;
+                try
                 {
-                    XamlRoot = this.XamlRoot,
-                    RequestedTheme = this.RequestedTheme,
-                    Title = "Fehler",
-                    Content = "Navigation zum Dashboard ist fehlgeschlagen.",
-                    CloseButtonText = "OK"
-                };
-                await dlg.ShowAsync();
+                    user = await AuthService.LoginAsync(company, email, pwd);
+                }
+                catch
+                {
+                    user = null;
+                }
+
+                if (user == null)
+                {
+                    var err = new ContentDialog
+                    {
+                        XamlRoot = this.XamlRoot,
+                        RequestedTheme = this.RequestedTheme,
+                        Title = "Anmeldung fehlgeschlagen",
+                        Content = "Firma, E-Mail oder Passwort ist ungültig.",
+                        CloseButtonText = "OK"
+                    };
+                    await err.ShowAsync();
+                    return;
+                }
+
+                // Bei erfolgreicher Anmeldung zum Dashboard navigieren
+                try
+                {
+                    var accent = (this.FindName("ColorCombo") as ComboBox)?.SelectedItem as ComboBoxItem;
+                    var accentHex = accent?.Tag as string ?? "#FF004D";
+                    var appearance = new DashboardAppearance { AccentHex = accentHex, IsLight = (this.FindName("ModeSwitch") as ToggleSwitch)?.IsOn ?? true };
+
+                    Frame?.Navigate(typeof(DashboardAnsicht), appearance);
+                    // BackStack löschen, damit Zurück nicht zur LoginPage führt
+                    Frame?.BackStack?.Clear();
+                }
+                catch
+                {
+                    var dlg = new ContentDialog
+                    {
+                        XamlRoot = this.XamlRoot,
+                        RequestedTheme = this.RequestedTheme,
+                        Title = "Fehler",
+                        Content = "Navigation zum Dashboard ist fehlgeschlagen.",
+                        CloseButtonText = "OK"
+                    };
+                    await dlg.ShowAsync();
+                }
+            }
+            finally
+            {
+                // Button reaktivieren; mögliche Ausnahmen (z.B. Seite navigiert) ignorieren
+                try { button.IsEnabled = true; } catch { }
             }
         }
     }

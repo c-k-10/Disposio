@@ -17,7 +17,7 @@
     <DeployOptionalPackages>false</DeployOptionalPackages>
     <WindowsSdkPath></WindowsSdkPath>
     <LayoutDir>C:\Wirtschaftinformatik\PROJEKT_DISPOSIO\Disposio\src\Disposio\Disposio\bin\x64\Debug\net8.0-windows10.0.19041.0\win-x64\AppX</LayoutDir>
-    <RegisteredManifestChecksum>F37701212B96D8C3F027DC08FD2EEF2F1F5A3C082FEC40AB189EE14F7968DCD2</RegisteredManifestChecksum>
+    <RegisteredManifestChecksum>BA81670D18B58CCB4AFD961FD05AAD7C444924E425C022D9E4D7E743D40D11E7</RegisteredManifestChecksum>
     <RegisteredPackageMoniker>23ed48e3-5e77-4058-ba4e-6ee9ce9e3d17_1.0.0.0_x64__vmzdp751m74nj</RegisteredPackageMoniker>
     <RegisteredUserModeAppID>23ed48e3-5e77-4058-ba4e-6ee9ce9e3d17_vmzdp751m74nj!App</RegisteredUserModeAppID>
     <RegisteredPackageID>23ed48e3-5e77-4058-ba4e-6ee9ce9e3d17</RegisteredPackageID>
@@ -28,13 +28,13 @@
     <AppXManifest Include="C:\Wirtschaftinformatik\PROJEKT_DISPOSIO\Disposio\src\Disposio\Disposio\bin\x64\Debug\net8.0-windows10.0.19041.0\win-x64\AppxManifest.xml">
       <PackagePath>AppxManifest.xml</PackagePath>
       <ReRegisterAppIfChanged>true</ReRegisterAppIfChanged>
-      <Modified>2026-10-13T09:39:11.111</Modified>
+      <Modified>2026-10-13T09:57:47.364</Modified>
     </AppXManifest>
   </ItemGroup>
   <ItemGroup>
     <AppxPackagedFile Include="C:\Wirtschaftinformatik\PROJEKT_DISPOSIO\Disposio\src\Disposio\Disposio\bin\x64\Debug\net8.0-windows10.0.19041.0\win-x64\Disposio.runtimeconfig.json">
       <PackagePath>Disposio.runtimeconfig.json</PackagePath>
-      <Modified>2026-10-13T09:36:00.576</Modified>
+      <Modified>2026-10-13T09:57:47.174</Modified>
     </AppxPackagedFile>
     <AppxPackagedFile Include="C:\Wirtschaftinformatik\PROJEKT_DISPOSIO\Disposio\src\Disposio\Disposio\Assets\miseur_kofferfell.png">
       <PackagePath>Assets\miseur_kofferfell.png</PackagePath>
@@ -42,11 +42,11 @@
     </AppxPackagedFile>
     <AppxPackagedFile Include="C:\Wirtschaftinformatik\PROJEKT_DISPOSIO\Disposio\src\Disposio\Disposio\obj\x64\Debug\net8.0-windows10.0.19041.0\win-x64\apphost.exe">
       <PackagePath>Disposio.exe</PackagePath>
-      <Modified>2026-10-13T09:39:10.876</Modified>
+      <Modified>2026-10-13T09:57:47.014</Modified>
     </AppxPackagedFile>
     <AppxPackagedFile Include="C:\Wirtschaftinformatik\PROJEKT_DISPOSIO\Disposio\src\Disposio\Disposio\obj\x64\Debug\net8.0-windows10.0.19041.0\win-x64\Disposio.dll">
       <PackagePath>Disposio.dll</PackagePath>
-      <Modified>2026-10-13T09:39:10.870</Modified>
+      <Modified>2026-10-13T09:57:46.999</Modified>
     </AppxPackagedFile>
     <AppxPackagedFile Include="C:\Users\C K\.nuget\packages\microsoft.netcore.app.runtime.win-x64\8.0.31\runtimes\win-x64\lib\net8.0\Microsoft.CSharp.dll">
       <PackagePath>Microsoft.CSharp.dll</PackagePath>
@@ -970,7 +970,7 @@
     </AppxPackagedFile>
     <AppxPackagedFile Include="C:\Wirtschaftinformatik\PROJEKT_DISPOSIO\Disposio\src\Disposio\Disposio\bin\x64\Debug\net8.0-windows10.0.19041.0\win-x64\Disposio.deps.json">
       <PackagePath>Disposio.deps.json</PackagePath>
-      <Modified>2026-10-13T09:36:00.547</Modified>
+      <Modified>2026-10-13T09:57:47.170</Modified>
     </AppxPackagedFile>
     <AppxPackagedFile Include="C:\Wirtschaftinformatik\PROJEKT_DISPOSIO\Disposio\src\Disposio\Disposio\Assets\LockScreenLogo.scale-200.png">
       <PackagePath>Assets\LockScreenLogo.scale-200.png</PackagePath>
@@ -1010,7 +1010,7 @@
     </AppxPackagedFile>
     <AppxPackagedFile Include="C:\Wirtschaftinformatik\PROJEKT_DISPOSIO\Disposio\src\Disposio\Disposio\bin\x64\Debug\net8.0-windows10.0.19041.0\win-x64\resources.pri">
       <PackagePath>resources.pri</PackagePath>
-      <Modified>2026-10-13T09:36:00.767</Modified>
+      <Modified>2026-10-13T09:57:47.224</Modified>
     </AppxPackagedFile>
   </ItemGroup>
   <ItemGroup>
