@@ -73,11 +73,22 @@
                             </StackPanel>
 
                             <!-- footer button -->
-                            <StackPanel Grid.Row="3" Margin="0,16,0,0">
-                                <Border CornerRadius="10" Background="{StaticResource PrimaryBrush}" Height="52">
-                                    <Button x:Name="LoginButton" Content="Anmelden" Background="Transparent" Foreground="{StaticResource ButtonTextOnPrimary}" FontWeight="SemiBold" Click="LoginButton_Click"/>
-                                </Border>
-                            </StackPanel>
+							<StackPanel Grid.Row="3" Margin="0,16,0,0">
+								<Border CornerRadius="10"
+										Background="{StaticResource PrimaryBrush}"
+										Height="52">
+
+									<Button x:Name="LoginButton"
+											Content="Anmelden"
+											Background="Transparent"
+											Foreground="{StaticResource ButtonTextOnPrimary}"
+											FontWeight="SemiBold"
+											HorizontalContentAlignment="Center"
+											VerticalContentAlignment="Center"
+											BorderThickness="0"
+											Click="LoginButton_Click"/>
+								</Border>
+							</StackPanel>
                         </Grid>
                     </Border>
 
