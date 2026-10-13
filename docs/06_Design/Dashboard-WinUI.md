@@ -6,10 +6,16 @@ liest die Tabelle `public.unternehmen`; sie legt keine Beispieldaten beim Start 
 
 ## Starten und bedienen
 
-- In Visual Studio oben neben dem Startpfeil **„Disposio (Dashboard)“** auswählen und F5 drücken.
-  Dieses Startprofil öffnet das Dashboard ohne Anmeldedaten.
-- „Disposio (Package)“ und „Disposio (Unpackaged)“ starten weiterhin mit der Login-Seite.
-  Das Dashboard-Startprofil übergibt `--dashboard`; `App.xaml.cs` liest diesen Startparameter.
+- Für die normale Anmeldung in Visual Studio **„Disposio (Package)“** auswählen und F5 drücken.
+  „Disposio (Unpackaged)“ beginnt ebenfalls bei der Login-Seite.
+- Im Login den Kontotyp wählen: **„Firmenkonto“** verlangt eine Unternehmenskennung;
+  **„MegakrassenAdmin“** verlangt nur E-Mail und Passwort, weil die Projektbesitzer keiner
+  Kundenfirma angehören. Ein gültiges Firmenkonto erhält keinen Zugang zur globalen Kundenverwaltung.
+- Nach erfolgreicher Anmeldung als MegakrassenAdmin öffnet sich das Dashboard. Es zeigt den
+  Namen und die Rolle des angemeldeten Kontos. Nach einem Neustart ist eine neue Anmeldung nötig.
+- **„Disposio (Dashboard)“** übergibt `--dashboard` und öffnet ausschließlich im **Debug-Build**
+  eine ausdrücklich als **„Entwicklungsansicht“** bezeichnete Vorschau ohne Benutzeranmeldung.
+  Im **Release-Build** führt auch `--dashboard` zur Login-Seite. Die Vorschau ist kein Admin-Konto.
 - Beim Öffnen werden die Unternehmen aus Neon geladen. „Erneut laden“ holt den aktuellen Stand,
   beispielsweise nach einer Änderung durch einen Kollegen.
 - Die Kennzahlen zeigen Unternehmen, Unternehmen in Testphase und tatsächlich zugeordnete Benutzer.
@@ -25,7 +31,36 @@ liest die Tabelle `public.unternehmen`; sie legt keine Beispieldaten beim Start 
   der Server schon gespeichert haben: Deshalb vor einem erneuten Versuch die Liste neu laden.
 - „Abbrechen“ und Escape verwerfen den Formularentwurf. Während eines laufenden Speicherns
   bleibt der Dialog offen, bis das Ergebnis feststeht.
-- „Abmelden“ kehrt zum Login zurück. Akzentfarbe und Hell-/Dunkelmodus werden übernommen.
+- „Abmelden“ löscht die Sitzung, die geladenen Kundendaten der Anzeige und den Navigationsverlauf.
+  Danach erscheint wieder der Login. Akzentfarbe und Hell-/Dunkelmodus werden übernommen.
+
+## Das neue Admin-Konto einrichten
+
+Das vorgesehene neue Konto heißt **`admin@disposio.com`**. Es bekommt keine Firmenkennung und
+keinen Eintrag in der Unternehmenstabelle. In `public.benutzer` ist seine `unternehmen_id`
+deshalb `NULL`: Das bedeutet „dieses Konto gehört keiner Kundenfirma“.
+
+Die Datenbank verwendet bereits die Rolle **`SuperKrasserAdmin`**. Dieselbe Rolle heißt in der
+Oberfläche **„MegakrassenAdmin“**. Die Verbindung zwischen Konto und Rolle steht in
+`public.benutzer_rolle`; die Rollenbezeichnung steht in `public.rolle`. Ein Konto ohne Firma
+allein reicht nicht: Es muss aktiv sein und genau diese Rolle besitzen.
+
+Das lokale Werkzeug liegt in **`tools/AdminKontoEinrichten`**. Aus dem Repository-Hauptordner
+wird es in einer eigenen lokalen Konsole gestartet:
+
+```powershell
+dotnet run --project tools/AdminKontoEinrichten/AdminKontoEinrichten.csproj
+```
+
+Das Passwort wird dort zweimal direkt eingegeben und nur als Sternchen angezeigt. Es muss
+mindestens **15 Zeichen** enthalten und darf höchstens **72 UTF-8-Bytes** belegen. Bei Umlauten
+oder anderen Unicode-Zeichen sind Zeichenanzahl und Byteanzahl unterschiedlich. Die Obergrenze
+verhindert, dass BCrypt einen Teil des Passworts unbemerkt abschneidet.
+
+Das Werkzeug speichert einen BCrypt-Hash und die Rollenzuordnung gemeinsam. Es überschreibt
+kein vorhandenes Konto. Passwörter gehören weder in den Chat noch in Startargumente, Quellcode
+oder diese Dokumentation. Danach im normalen Disposio-Login **„MegakrassenAdmin“** wählen,
+`admin@disposio.com` eingeben und das selbst gewählte Passwort verwenden.
 
 ## Welche Datei macht was?
 
@@ -33,11 +68,39 @@ liest die Tabelle `public.unternehmen`; sie legt keine Beispieldaten beim Start 
 | --- | --- |
 | `Views/DashboardAnsicht/DashboardAnsicht.xaml` | Beschreibt das Aussehen: Liste, Kennzahlen, Buttons und Farben. |
 | `Views/DashboardAnsicht/DashboardAnsicht.xaml.cs` | Reagiert auf Klicks, prüft Formulare und aktualisiert die Anzeige. |
+| `Views/LoginPage/LoginPage.xaml` und `.xaml.cs` | Zeigen die Kontoauswahl und Eingabefelder, rufen die Anmeldung auf und öffnen das Dashboard nur für einen geprüften Plattformadministrator. |
+| `App.xaml.cs` und `MainWindow.xaml.cs` | Bestimmen die Startseite. Die direkte Vorschau wird nur im Debug-Build zugelassen. |
+| `Services/AuthService.cs` | Sucht das Konto, prüft den Passwort-Hash und liest die Rollen. Prüft außerdem vor jedem Unternehmenszugriff die aktuelle Berechtigung erneut. |
+| `Services/BenutzerSitzung.cs` | Merkt sich das angemeldete Konto nur während der laufenden Anwendung; speichert weder Passwort noch Hash. |
 | `Models/Unternehmen.cs` | Bündelt die Unternehmensdaten. Ein Entwurf enthält Eingaben; ein gespeicherter Datensatz enthält zusätzlich Id, Benutzerzahl und Version. |
 | `Services/UnternehmenRepository.cs` | Führt die SQL-Abfragen zum Laden, Anlegen und Bearbeiten aus. |
 | `Services/NeonSqlClient.cs` | Überträgt SQL und getrennte Parameter über Neons HTTPS-Schnittstelle. |
 | `Services/Database.cs` | Stellt die bereits vorhandene Verbindungseinstellung bereit. |
 | `Services/001_unternehmen_dashboard.sql` | Enthält die einmalige Ergänzung der vorhandenen Tabelle. |
+| `Services/002_plattform_admin.sql` | Erlaubt Plattformkonten ohne Firma und verhindert doppelte Plattform-E-Mails. Verwendet die vorhandene Admin-Rolle. |
+| `tools/AdminKontoEinrichten` | Erstellt das neue Admin-Konto mit einer ausschließlich lokalen Passworteingabe. |
+
+Der Ablauf bei der Anmeldung lässt sich so merken:
+
+```text
+Kontotyp, E-Mail und Passwort im Login eingeben
+    ↓
+AuthService sucht ein aktives, eindeutiges Konto und liest seine Rollen
+    ↓
+BCrypt prüft das Passwort gegen den gespeicherten Hash
+    ↓
+Keine Firma + Rolle SuperKrasserAdmin → geprüfter Plattformadministrator
+    ↓
+BenutzerSitzung merkt sich das Konto; die Oberfläche öffnet das Dashboard
+    ↓
+Vor jedem Laden oder Speichern: aktive Admin-Rolle erneut in Neon prüfen
+    ↓
+Rolle entfernt oder Konto deaktiviert → Zugriff ablehnen und zum Login zurückkehren
+```
+
+Die Kontoauswahl in der Oberfläche erteilt keine Rechte. Sie sagt dem Dienst nur, welche Art
+von Konto gesucht werden soll. Auch eine direkte Navigation zur Dashboard-Seite reicht nicht:
+Die Seite prüft die Sitzung und das Repository prüft die aktuelle Berechtigung in der Datenbank.
 
 Der Ablauf beim Speichern lässt sich so merken:
 
@@ -66,6 +129,12 @@ Die Migration ergänzt `public.unternehmen` um die Dashboard-Felder `kennung`, `
 ist ein eigener, einmaliger Schritt; die Anwendung verändert das Datenbankschema nicht beim Start.
 Bestehende Unternehmen und ihre Beziehungen zu Benutzern bleiben erhalten.
 
+`002_plattform_admin.sql` ergänzt diese Struktur für die Projektbesitzer: `unternehmen_id`
+in `public.benutzer` darf jetzt `NULL` sein. Die Fremdschlüsselprüfung für Firmenkonten bleibt
+bestehen. Ein zusätzlicher eindeutiger Index verhindert doppelte Plattformkonten mit derselben
+E-Mail auch bei unterschiedlicher Groß-/Kleinschreibung oder äußeren Leerzeichen. Die Migration
+legt noch kein Benutzerkonto und kein Passwort an; das übernimmt das lokale Einrichtungswerkzeug.
+
 Die Benutzerzahl wird aus den über den Fremdschlüssel zugeordneten Datensätzen in `public.benutzer`
 gezählt. Sie ist kein manuell gepflegter Beispielwert. Ein neues Unternehmen hat zunächst null
 Benutzer, solange ihm keine Benutzer zugeordnet sind.
@@ -84,7 +153,37 @@ Optional kann `DISPOSIO_DB_CONNECTION_STRING` die vorhandene Verbindungseinstell
 Der Wert gehört in die lokale Umgebung, nicht in diese Dokumentation oder in Fehlermeldungen.
 Ohne diese Variable wird die bereits vorhandene Einstellung aus `Database.cs` verwendet.
 
+Diese Anwendung verbindet sich weiterhin direkt aus dem Desktop mit einer gemeinsamen
+Datenbankkonfiguration. Es gibt noch keine eigene Server-API, die Benutzeranmeldung und Rechte
+unabhängig vom Desktop durchsetzt. Die Rollenprüfungen schützen den vorgesehenen Ablauf in der
+Anwendung; sie ersetzen keine serverseitige Zugriffskontrolle für eine verteilte Produktivversion.
+
 ## Fragen fürs Fachgespräch
+
+**Was unterscheidet Anmeldung und Berechtigung?** Die Anmeldung prüft, ob das Passwort zum
+Konto gehört. Die Berechtigungsprüfung entscheidet danach, welche Funktionen dieses Konto
+verwenden darf. Ein korrektes Firmenpasswort öffnet deshalb nicht das globale Dashboard.
+
+**Warum hat ein MegakrassenAdmin keine Firma?** Er verwaltet das Projekt und alle Kundenfirmen.
+`NULL` in `unternehmen_id` beschreibt diese fehlende Firmenzuordnung. Die Rolle
+`SuperKrasserAdmin` erteilt zusätzlich das Recht auf die globale Verwaltung.
+
+**Warum wird die Rolle bei jedem Datenzugriff erneut geprüft?** Ein Konto kann nach der
+Anmeldung deaktiviert oder seine Rolle entfernt werden. Eine alte Sitzung soll solche Änderungen
+nicht dauerhaft umgehen. Deshalb liest `AuthService` die Berechtigung vor dem Laden und Speichern
+erneut aus der Datenbank.
+
+**Was ist ein Passwort-Hash?** BCrypt berechnet einen Prüfwert aus dem Passwort mit zufälligem
+Salt. Beim Login vergleicht die Bibliothek das eingegebene Passwort mit diesem gespeicherten
+Prüfwert. Das Passwort selbst steht weder in der Benutzerzeile noch in der Sitzung.
+
+**Was speichert die Sitzung?** Die Benutzer-Id, den Namen, die Sprache, die Firmenzuordnung
+und die Rollen. Sie liegt im Arbeitsspeicher und wird beim Abmelden oder Beenden verworfen.
+Passwort und Hash werden nicht darin gespeichert.
+
+**Warum funktioniert die Dashboard-Vorschau ohne Passwort?** Das ausdrückliche Debug-Profil
+ist eine Entwicklungshilfe zum Gestalten der Oberfläche. Es zeigt „Entwicklungsansicht“ und
+erzeugt kein angemeldetes Admin-Konto. Beim Release-Build wird dieser Einstieg ausgeschlossen.
 
 **Was ist der Primärschlüssel?** Die Id ist die eindeutige Nummer eines Unternehmens.
 Sie bleibt gleich, auch wenn Firmenname oder Kennung geändert werden. Beziehungen zu Benutzern
@@ -130,21 +229,22 @@ stehen in schmalen Fenstern untereinander.
 
 ## Prüfung und aktueller Umfang
 
-Am 13.10.2026 wurde das Originalprojekt für Debug/x64 erfolgreich ohne gemeldete Fehler oder
-Warnungen gebaut und über „Disposio (Dashboard)“ in Visual Studio Insiders gestartet.
+Am 13.10.2026 wurden die Debug-Kompilierung und die Release-Kompilierung der Anwendung
+erfolgreich geprüft. Die Release-Prüfung deaktivierte nur für den Prüfaufruf `PublishTrimmed`
+und `PublishReadyToRun`, da deren zusätzlichen Veröffentlichungspakete lokal fehlen; die
+Release-Rollenprüfung und der Ausschluss des direkten Dashboardstarts wurden mitkompiliert.
+Eine optimierte Veröffentlichung war nicht Teil dieser Prüfung.
 
-Die echte Neon-Datenbank wurde mit eindeutig markierten künstlichen Datensätzen geprüft:
-Anlegen einschließlich Kontaktdaten und Apostroph im Firmennamen, erneutes Laden mit einem neuen
-Repository, Bearbeiten, doppelte Kennungen beim Anlegen und Bearbeiten sowie Abweisen einer
-veralteten Version. Fehlgeschlagene Schreibvorgänge ließen den bestätigten Datensatz unverändert.
-Die Passwortregel und die echte Benutzerzahl wurden ebenfalls geprüft.
+Der Authentifizierungsdienst bestand jeweils 19 lokale Prüfungen in Debug und Release.
+Zusätzlich bestanden **44 Prüfungen mit der echten Neon-Datenbank**: neues Plattformkonto
+ohne Firma mit BCrypt und Rolle, richtige und falsche Passwörter, deaktiviertes Konto,
+entzogene Rolle, Firmenkonten, kaputte Hashwerte und gesperrte Datenzugriffe ohne Adminrechte.
+Ein berechtigter Prüfadmin konnte Unternehmen dauerhaft anlegen, laden und bearbeiten.
+Alle künstlichen Prüfdaten wurden entfernt. `admin@disposio.com` blieb bei diesen Prüfungen
+unverändert. Das endgültige Konto wird erst angelegt, wenn sein Passwort lokal eingegeben wird.
 
-In der laufenden Oberfläche wurden die leere Liste mit drei Nullen, die Pflichtfeldmeldung,
-das Anlegen, das Wiederfinden nach einem vollständigen Neustart und der Statuswechsel von
-„Testphase“ auf „Aktiv“ geprüft. Dabei änderte sich die Testphase-Kennzahl von 1 auf 0.
-Die Kontakt-E-Mail wurde beim leeren optionalen Feld korrekt aus der Admin-E-Mail übernommen.
-Fehlermeldung und Buttons bleiben im langen Formular außerhalb des scrollbaren Feldbereichs.
-Alle für diese Prüfungen angelegten Datensätze wurden anschließend entfernt.
+Das Einrichtungswerkzeug wurde für .NET 8 erfolgreich mit null Fehlern und null Warnungen gebaut.
 
-Die Kundenansicht hinter „Einloggen“ und eine echte Prüfung von Login-Zugangsdaten sind weiterhin
-nicht angebunden. Das Speichern eines Unternehmens stellt noch keine vollständige Registrierung dar.
+Der normale Login prüft Zugangsdaten und Rollen. Die Kundenansicht hinter **„Einloggen“** ist
+weiterhin ein Platzhalter und führt keinen Wechsel in ein Kundenkonto durch. Auch das Speichern
+eines Unternehmens erstellt noch keinen Kundenadmin und ersetzt keine vollständige Registrierung.

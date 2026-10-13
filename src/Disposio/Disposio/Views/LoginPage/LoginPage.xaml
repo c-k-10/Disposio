@@ -52,28 +52,40 @@
                             <!-- title -->
                             <StackPanel Grid.Row="1" Margin="0,18,0,8">
                                 <TextBlock Text="Willkommen zurück" FontSize="22" FontWeight="SemiBold" Foreground="{StaticResource TextMain}" />
-                                <TextBlock Text="Melden Sie sich mit Ihren Unternehmensdaten an." FontSize="13" Foreground="{StaticResource TextMuted}" Margin="0,6,0,0" />
+                                <TextBlock Text="Wählen Sie Ihr Konto und melden Sie sich an." FontSize="13" Foreground="{StaticResource TextMuted}" Margin="0,6,0,0" />
                             </StackPanel>
 
                             <!-- form -->
-                            <StackPanel Grid.Row="2" Spacing="10">
-                                <TextBlock Text="Unternehmenskennung *" Foreground="{StaticResource TextMain}" FontSize="12" />
-                                <TextBox x:Name="CompanyBox" PlaceholderText="z. B. nordlog" Background="{StaticResource InputBackground}" Foreground="{StaticResource TextMain}" BorderBrush="{StaticResource InputBorder}" CornerRadius="8" Height="40"/>
-
-                                <TextBlock Text="E‑Mail‑Adresse *" Foreground="{StaticResource TextMain}" FontSize="12" Margin="0,8,0,0" />
-                                <TextBox x:Name="EmailBox" PlaceholderText="demo@beispiel.invalid" Background="{StaticResource InputBackground}" Foreground="{StaticResource TextMain}" BorderBrush="{StaticResource InputBorder}" CornerRadius="8" Height="40"/>
-
-                                <TextBlock Text="Passwort *" Foreground="{StaticResource TextMain}" FontSize="12" Margin="0,8,0,0" />
-                                <PasswordBox x:Name="PasswordBox" PlaceholderText="••••••••" Background="{StaticResource InputBackground}" Foreground="{StaticResource TextMain}" BorderBrush="{StaticResource InputBorder}" CornerRadius="8" Height="40"/>
-
-                                <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="0,8,0,0">
-                                    <CheckBox Content="Angemeldet bleiben" Foreground="{StaticResource TextMuted}"/>
+                            <!-- Das Formular kann scrollen, damit Pflichtfelder auch in kleinen Fenstern erreichbar bleiben. -->
+                            <ScrollViewer Grid.Row="2" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                            <StackPanel Spacing="10">
+                                <TextBlock Text="Kontotyp" Foreground="{StaticResource TextMain}" FontSize="12" />
+                                <ComboBox x:Name="AccountTypeCombo" HorizontalAlignment="Stretch" SelectedIndex="0"
+                                          SelectionChanged="AccountTypeCombo_SelectionChanged" AutomationProperties.Name="Kontotyp">
+                                    <ComboBoxItem Content="Firmenkonto" Tag="Firma" />
+                                    <ComboBoxItem Content="MegakrassenAdmin" Tag="Plattform" />
+                                </ComboBox>
+                                <!-- Ein Plattformkonto gehört keiner Firma. In diesem Modus wird die Firmenkennung ausgeblendet. -->
+                                <StackPanel x:Name="CompanyField" Spacing="10">
+                                    <TextBlock Text="Unternehmenskennung *" Foreground="{StaticResource TextMain}" FontSize="12" />
+                                    <TextBox x:Name="CompanyBox" PlaceholderText="z. B. nordlog" MaxLength="100" AutomationProperties.Name="Unternehmenskennung"
+                                             Background="{StaticResource InputBackground}" Foreground="{StaticResource TextMain}" BorderBrush="{StaticResource InputBorder}" CornerRadius="8" Height="40"/>
                                 </StackPanel>
 
+                                <TextBlock Text="E‑Mail‑Adresse *" Foreground="{StaticResource TextMain}" FontSize="12" Margin="0,8,0,0" />
+                                <TextBox x:Name="EmailBox" PlaceholderText="name@beispiel.de" MaxLength="254" AutomationProperties.Name="E-Mail-Adresse"
+                                         Background="{StaticResource InputBackground}" Foreground="{StaticResource TextMain}" BorderBrush="{StaticResource InputBorder}" CornerRadius="8" Height="40"/>
+
+                                <TextBlock Text="Passwort *" Foreground="{StaticResource TextMain}" FontSize="12" Margin="0,8,0,0" />
+                                <PasswordBox x:Name="PasswordBox" PlaceholderText="••••••••" MaxLength="1024" AutomationProperties.Name="Passwort"
+                                             Background="{StaticResource InputBackground}" Foreground="{StaticResource TextMain}" BorderBrush="{StaticResource InputBorder}" CornerRadius="8" Height="40"/>
                             </StackPanel>
+                            </ScrollViewer>
 
                             <!-- footer button -->
 							<StackPanel Grid.Row="3" Margin="0,16,0,0">
+								<TextBlock x:Name="LoginStatusText" Visibility="Collapsed" TextWrapping="Wrap" Margin="0,0,0,12"
+                                           Foreground="{StaticResource TextMain}" AutomationProperties.LiveSetting="Polite" />
 								<Border CornerRadius="10"
 										Background="{StaticResource PrimaryBrush}"
 										Height="52">

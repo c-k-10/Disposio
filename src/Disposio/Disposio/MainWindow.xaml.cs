@@ -15,6 +15,7 @@ using System.Runtime.InteropServices.WindowsRuntime;
 using Windows.Foundation;
 using Windows.Foundation.Collections;
 using Disposio.Views;
+using Disposio.Services;
 
 // To learn more about WinUI, the WinUI project structure,
 // and more about our project templates, see: http://aka.ms/winui-project-info.
@@ -32,9 +33,19 @@ namespace Disposio
         {
             this.InitializeComponent();
             // Ein Frame ist der Bereich, in dem WinUI zwischen Seiten navigiert.
-            // Je nach Startprofil laden wir das Dashboard direkt oder die normale Login-Seite.
+            // Ein normaler Start beginnt immer beim Login. Nur das ausdrückliche Debug-
+            // Startprofil darf eine als solche gekennzeichnete Entwicklungsansicht öffnen.
             var runtimeFrame = new Frame();
-            runtimeFrame.Navigate(openDashboard ? typeof(LoginPage) : typeof(DashboardAnsicht));
+            BenutzerSitzung.Abmelden();
+            bool openDevelopmentDashboard = false;
+#if DEBUG
+            if (openDashboard)
+            {
+                BenutzerSitzung.EntwicklungsansichtStarten();
+                openDevelopmentDashboard = true;
+            }
+#endif
+            runtimeFrame.Navigate(openDevelopmentDashboard ? typeof(DashboardAnsicht) : typeof(LoginPage));
             this.Content = runtimeFrame;
         }
     }

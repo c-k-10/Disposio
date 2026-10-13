@@ -1,0 +1,412 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Page x:ConnectionId='1'
+    x:Class="Disposio.Views.DashboardAnsicht"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    mc:Ignorable="d"
+    RequestedTheme="Dark"
+    FontFamily="Segoe UI"
+    FontSize="16">
+
+    <Page.Resources>
+        <!-- Dieselben Farbobjekte werden in der Seite und ihren Dialogen verwendet.
+             Eine Farbänderung aktualisiert deshalb alle passenden Elemente gemeinsam. -->
+        <SolidColorBrush x:Key="BackgroundBrush" Color="#101319" />
+        <SolidColorBrush x:Key="SidebarBrush" Color="#262930" />
+        <SolidColorBrush x:Key="SurfaceBrush" Color="#262930" />
+        <SolidColorBrush x:Key="BorderBrush" Color="#3D414A" />
+        <SolidColorBrush x:Key="TextBrush" Color="#F0F2F6" />
+        <SolidColorBrush x:Key="MutedTextBrush" Color="#BDC4D1" />
+        <SolidColorBrush x:Key="InputBrush" Color="#262930" />
+        <SolidColorBrush x:Key="AccentBrush" Color="#7B2CBF" />
+        <SolidColorBrush x:Key="AccentTextBrush" Color="#FFFFFF" />
+        <SolidColorBrush x:Key="AccentHoverBrush" Color="#8B4BC9" />
+        <SolidColorBrush x:Key="AccentPressedBrush" Color="#6925A2" />
+        <SolidColorBrush x:Key="ToggleSwitchFillOn" Color="#7B2CBF" />
+        <SolidColorBrush x:Key="ToggleSwitchFillOnPointerOver" Color="#8B4BC9" />
+        <SolidColorBrush x:Key="ToggleSwitchFillOnPressed" Color="#6925A2" />
+        <SolidColorBrush x:Key="TextControlBorderBrushFocused" Color="#7B2CBF" />
+
+        <Style x:Key="DashboardButton" TargetType="Button">
+            <Setter Property="Background" Value="{StaticResource InputBrush}" />
+            <Setter Property="Foreground" Value="{StaticResource TextBrush}" />
+            <Setter Property="BorderBrush" Value="{StaticResource BorderBrush}" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="CornerRadius" Value="10" />
+            <Setter Property="MinHeight" Value="48" />
+            <Setter Property="Padding" Value="20,10" />
+            <Setter Property="FontSize" Value="16" />
+            <Setter Property="HorizontalContentAlignment" Value="Center" />
+            <Setter Property="VerticalContentAlignment" Value="Center" />
+            <Setter Property="UseSystemFocusVisuals" Value="True" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="ButtonBorder"
+                                Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="{TemplateBinding CornerRadius}">
+                            <VisualStateManager.VisualStateGroups>
+                                <VisualStateGroup x:Name="CommonStates">
+                                    <VisualState x:Name="Normal" />
+                                    <VisualState x:Name="PointerOver">
+                                        <VisualState.Setters>
+                                            <Setter Target="ButtonBorder.Opacity" Value="0.85" />
+                                        </VisualState.Setters>
+                                    </VisualState>
+                                    <VisualState x:Name="Pressed">
+                                        <VisualState.Setters>
+                                            <Setter Target="ButtonBorder.Opacity" Value="0.7" />
+                                        </VisualState.Setters>
+                                    </VisualState>
+                                    <VisualState x:Name="Disabled">
+                                        <VisualState.Setters>
+                                            <Setter Target="ButtonBorder.Opacity" Value="0.4" />
+                                        </VisualState.Setters>
+                                    </VisualState>
+                                </VisualStateGroup>
+                            </VisualStateManager.VisualStateGroups>
+                            <ContentPresenter Content="{TemplateBinding Content}"
+                                              ContentTemplate="{TemplateBinding ContentTemplate}"
+                                              Padding="{TemplateBinding Padding}"
+                                              Foreground="{TemplateBinding Foreground}"
+                                              HorizontalContentAlignment="{TemplateBinding HorizontalContentAlignment}"
+                                              VerticalContentAlignment="{TemplateBinding VerticalContentAlignment}" />
+                        </Border>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+        <Style x:Key="PrimaryButton" TargetType="Button" BasedOn="{StaticResource DashboardButton}">
+            <Setter Property="Background" Value="{StaticResource AccentBrush}" />
+            <Setter Property="BorderBrush" Value="{StaticResource AccentBrush}" />
+            <Setter Property="Foreground" Value="{StaticResource AccentTextBrush}" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+        </Style>
+        <Style x:Key="FormTextBox" TargetType="TextBox">
+            <Setter Property="Background" Value="{StaticResource InputBrush}" />
+            <Setter Property="Foreground" Value="{StaticResource TextBrush}" />
+            <Setter Property="BorderBrush" Value="{StaticResource BorderBrush}" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="CornerRadius" Value="10" />
+            <Setter Property="MinHeight" Value="50" />
+            <Setter Property="Padding" Value="14,10" />
+            <Setter Property="FontSize" Value="16" />
+            <Setter Property="HorizontalAlignment" Value="Stretch" />
+        </Style>
+        <Style x:Key="FormComboBox" TargetType="ComboBox">
+            <Setter Property="Background" Value="{StaticResource InputBrush}" />
+            <Setter Property="Foreground" Value="{StaticResource TextBrush}" />
+            <Setter Property="BorderBrush" Value="{StaticResource BorderBrush}" />
+            <Setter Property="CornerRadius" Value="10" />
+            <Setter Property="MinHeight" Value="50" />
+            <Setter Property="Padding" Value="14,10" />
+            <Setter Property="FontSize" Value="16" />
+            <Setter Property="HorizontalAlignment" Value="Stretch" />
+        </Style>
+        <Style x:Key="StatCard" TargetType="Border">
+            <Setter Property="Background" Value="{StaticResource SurfaceBrush}" />
+            <Setter Property="BorderBrush" Value="{StaticResource BorderBrush}" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="CornerRadius" Value="18" />
+            <Setter Property="Padding" Value="26,24" />
+            <Setter Property="MinHeight" Value="132" />
+        </Style>
+    </Page.Resources>
+
+    <Grid Background="{StaticResource BackgroundBrush}">
+        <VisualStateManager.VisualStateGroups>
+            <VisualStateGroup x:ConnectionId='9' x:Name="WindowSizes">
+                <VisualState x:ConnectionId='13' x:Name="Compact">
+                    <VisualState.StateTriggers>
+                        <AdaptiveTrigger MinWindowWidth="0" />
+                    </VisualState.StateTriggers>
+                    <VisualState.Setters>
+                        <Setter Target="SidebarColumn.Width" Value="0" />
+                        <Setter Target="Sidebar.Visibility" Value="Collapsed" />
+                        <Setter Target="CompactAccount.Visibility" Value="Visible" />
+                        <Setter Target="MainContent.Padding" Value="20,24" />
+                        <Setter Target="PageTitle.FontSize" Value="30" />
+                        <Setter Target="HeaderTitleColumn.Width" Value="*" />
+                        <Setter Target="AppearanceControls.(Grid.Row)" Value="1" />
+                        <Setter Target="AppearanceControls.(Grid.Column)" Value="0" />
+                        <Setter Target="AppearanceControls.HorizontalAlignment" Value="Left" />
+                        <Setter Target="AppearanceControls.Margin" Value="0,18,0,0" />
+                    </VisualState.Setters>
+                </VisualState>
+                <VisualState x:ConnectionId='14' x:Name="Desktop">
+                    <VisualState.StateTriggers>
+                        <AdaptiveTrigger MinWindowWidth="1050" />
+                    </VisualState.StateTriggers>
+                    <VisualState.Setters>
+                        <Setter Target="SidebarColumn.Width" Value="240" />
+                    </VisualState.Setters>
+                </VisualState>
+                <VisualState x:ConnectionId='15' x:Name="WideDesktop">
+                    <VisualState.StateTriggers>
+                        <AdaptiveTrigger MinWindowWidth="1450" />
+                    </VisualState.StateTriggers>
+                    <VisualState.Setters>
+                        <Setter Target="SidebarColumn.Width" Value="320" />
+                    </VisualState.Setters>
+                </VisualState>
+            </VisualStateGroup>
+            <VisualStateGroup x:ConnectionId='10' x:Name="ContentSizes">
+                <VisualState x:ConnectionId='11' x:Name="NarrowContent">
+                    <VisualState.StateTriggers>
+                        <AdaptiveTrigger MinWindowWidth="0" />
+                    </VisualState.StateTriggers>
+                    <VisualState.Setters>
+                        <Setter Target="StatsGrid.RowSpacing" Value="16" />
+                        <Setter Target="CustomerCard.(Grid.ColumnSpan)" Value="3" />
+                        <Setter Target="TrialCard.(Grid.Row)" Value="1" />
+                        <Setter Target="TrialCard.(Grid.Column)" Value="0" />
+                        <Setter Target="TrialCard.(Grid.ColumnSpan)" Value="3" />
+                        <Setter Target="UserCard.(Grid.Row)" Value="2" />
+                        <Setter Target="UserCard.(Grid.Column)" Value="0" />
+                        <Setter Target="UserCard.(Grid.ColumnSpan)" Value="3" />
+                        <Setter Target="CreateCustomerButton.(Grid.Row)" Value="1" />
+                        <Setter Target="CreateCustomerButton.(Grid.Column)" Value="0" />
+                        <Setter Target="CreateCustomerButton.Margin" Value="0,16,0,0" />
+                    </VisualState.Setters>
+                </VisualState>
+                <VisualState x:ConnectionId='12' x:Name="RegularContent">
+                    <VisualState.StateTriggers>
+                        <AdaptiveTrigger MinWindowWidth="680" />
+                    </VisualState.StateTriggers>
+                </VisualState>
+            </VisualStateGroup>
+        </VisualStateManager.VisualStateGroups>
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition x:ConnectionId='16' x:Name="SidebarColumn" Width="240" />
+            <ColumnDefinition Width="*" />
+        </Grid.ColumnDefinitions>
+
+        <Border x:ConnectionId='17' x:Name="Sidebar" Background="{StaticResource SidebarBrush}" Padding="24,24">
+            <StackPanel>
+                <TextBlock Text="DISPOSIO" FontSize="36" FontWeight="ExtraBold"
+                           CharacterSpacing="60" Foreground="{StaticResource AccentBrush}" />
+                <TextBlock Text="ADMIN-BEREICH" FontSize="13" CharacterSpacing="260"
+                           Foreground="{StaticResource MutedTextBrush}" Margin="0,22,0,34" />
+                <Border Background="{StaticResource SurfaceBrush}"
+                        BorderBrush="{StaticResource BorderBrush}" BorderThickness="1"
+                        CornerRadius="12" Padding="18,15">
+                    <TextBlock Text="Kunden" FontSize="18" FontWeight="SemiBold"
+                               Foreground="{StaticResource TextBrush}" />
+                </Border>
+                <StackPanel Margin="0,28,0,0" Spacing="6">
+                    <TextBlock x:ConnectionId='43' x:Name="AccountNameText" FontSize="14" TextWrapping="Wrap"
+                               Foreground="{StaticResource TextBrush}" />
+                    <TextBlock x:ConnectionId='44' x:Name="AccountRoleText" FontSize="14" TextWrapping="Wrap"
+                               Foreground="{StaticResource MutedTextBrush}" />
+                    <HyperlinkButton x:ConnectionId='45' Content="Abmelden"                      Padding="0" HorizontalAlignment="Left"
+                                     Foreground="{StaticResource MutedTextBrush}" FontSize="14" />
+                </StackPanel>
+            </StackPanel>
+        </Border>
+
+        <ScrollViewer Grid.Column="1" HorizontalScrollBarVisibility="Disabled"
+                      VerticalScrollBarVisibility="Auto">
+            <StackPanel x:ConnectionId='18' x:Name="MainContent" Padding="36,24,36,30" Spacing="28">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                    </Grid.RowDefinitions>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition x:ConnectionId='38' x:Name="HeaderTitleColumn" Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <StackPanel>
+                        <TextBlock x:ConnectionId='42' x:Name="PageTitle" Text="Unsere Kunden" FontSize="38"
+                                   FontWeight="SemiBold" Foreground="{StaticResource TextBrush}" />
+                        <TextBlock Text="Kunden anlegen, bearbeiten und in ihre Ansicht springen."
+                                   FontSize="18" Foreground="{StaticResource MutedTextBrush}"
+                                   TextWrapping="Wrap" Margin="0,10,20,0" />
+                    </StackPanel>
+                    <StackPanel x:ConnectionId='39' x:Name="AppearanceControls" Grid.Column="1" Orientation="Horizontal"
+                                Spacing="18" VerticalAlignment="Top" HorizontalAlignment="Right">
+                        <ComboBox x:ConnectionId='40' x:Name="ColorCombo" Width="128" Style="{StaticResource FormComboBox}"
+                                                                                
+                                  AutomationProperties.Name="Akzentfarbe" ToolTipService.ToolTip="Akzentfarbe wählen">
+                            <ComboBoxItem Content="Pink-Rot" Tag="#FF004D" />
+                            <ComboBoxItem Content="Blau" Tag="#007BFF" />
+                            <ComboBoxItem Content="Grün" Tag="#00C853" />
+                            <ComboBoxItem Content="Orange" Tag="#FF9100" />
+                            <ComboBoxItem Content="Lila" Tag="#7B2CBF" />
+                        </ComboBox>
+                        <Border Width="72" Height="50">
+                            <ToggleSwitch x:ConnectionId='41' x:Name="ModeSwitch" OnContent="" OffContent="" MinWidth="0"
+                                          HorizontalAlignment="Center" VerticalAlignment="Center"
+                                          RenderTransformOrigin="0.5,0.5"                             
+                                          AutomationProperties.Name="Hellmodus"
+                                          ToolTipService.ToolTip="Hell- und Dunkelmodus umschalten">
+                                <ToggleSwitch.RenderTransform>
+                                    <ScaleTransform ScaleX="1.6" ScaleY="1.6" />
+                                </ToggleSwitch.RenderTransform>
+                            </ToggleSwitch>
+                        </Border>
+                    </StackPanel>
+                </Grid>
+
+                <Grid x:ConnectionId='19' x:Name="CompactAccount" Visibility="Collapsed" ColumnSpacing="12">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <StackPanel Spacing="4">
+                        <TextBlock Text="DISPOSIO" FontWeight="Bold" Foreground="{StaticResource AccentBrush}" />
+                        <TextBlock x:ConnectionId='37' x:Name="CompactAccountText" TextWrapping="Wrap" Foreground="{StaticResource MutedTextBrush}" />
+                    </StackPanel>
+                    <HyperlinkButton x:ConnectionId='36' Grid.Column="1" Content="Abmelden"                      Padding="4,0"
+                                     Foreground="{StaticResource MutedTextBrush}" VerticalAlignment="Center" />
+                </Grid>
+
+                <!-- Der Status erklärt Laden/Fehler. Erneut laden holt den aktuellen Stand aus Neon. -->
+                <Grid ColumnSpacing="16">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <Grid ColumnSpacing="12" VerticalAlignment="Center">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <ProgressRing x:ConnectionId='34' x:Name="DatabaseLoadingIndicator" Width="22" Height="22"
+                                      IsActive="False" Visibility="Collapsed" />
+                        <TextBlock x:ConnectionId='35' x:Name="DatabaseStatusText" Grid.Column="1" Text="Unternehmen werden geladen …"
+                                   TextWrapping="Wrap" VerticalAlignment="Center"
+                                   Foreground="{StaticResource MutedTextBrush}" />
+                    </Grid>
+                    <Button x:ConnectionId='33' x:Name="ReloadCustomersButton" Grid.Column="1" Content="Erneut laden"
+                            Style="{StaticResource DashboardButton}"                               />
+                </Grid>
+
+                <Grid x:ConnectionId='20' x:Name="StatsGrid" ColumnSpacing="18">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                    </Grid.RowDefinitions>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+                    <Border x:ConnectionId='27' x:Name="CustomerCard" Style="{StaticResource StatCard}">
+                        <StackPanel Spacing="8">
+                            <TextBlock x:ConnectionId='32' x:Name="CustomerCountText" Text="–" FontSize="38" FontWeight="Bold"
+                                       Foreground="{StaticResource TextBrush}" />
+                            <TextBlock Text="Kunden" Foreground="{StaticResource MutedTextBrush}" />
+                        </StackPanel>
+                    </Border>
+                    <Border x:ConnectionId='28' x:Name="TrialCard" Grid.Column="1" Style="{StaticResource StatCard}">
+                        <StackPanel Spacing="8">
+                            <TextBlock x:ConnectionId='31' x:Name="TrialCountText" Text="–" FontSize="38" FontWeight="Bold"
+                                       Foreground="{StaticResource TextBrush}" />
+                            <TextBlock Text="in Testphase" TextWrapping="Wrap" Foreground="{StaticResource MutedTextBrush}" />
+                        </StackPanel>
+                    </Border>
+                    <Border x:ConnectionId='29' x:Name="UserCard" Grid.Column="2" Style="{StaticResource StatCard}">
+                        <StackPanel Spacing="8">
+                            <TextBlock x:ConnectionId='30' x:Name="UserCountText" Text="–" FontSize="38" FontWeight="Bold"
+                                       Foreground="{StaticResource TextBrush}" />
+                            <TextBlock Text="Benutzer" Foreground="{StaticResource MutedTextBrush}" />
+                        </StackPanel>
+                    </Border>
+                </Grid>
+
+                <Border Background="{StaticResource SurfaceBrush}" BorderBrush="{StaticResource BorderBrush}"
+                        BorderThickness="1" CornerRadius="18" Padding="26,24">
+                    <StackPanel Spacing="24">
+                        <Grid>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                            </Grid.RowDefinitions>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Text="Alle Kunden" FontSize="24" FontWeight="SemiBold"
+                                       Foreground="{StaticResource TextBrush}" VerticalAlignment="Center" />
+                            <Button x:ConnectionId='26' x:Name="CreateCustomerButton" Grid.Column="1" Content="+ Kunde anlegen" Style="{StaticResource PrimaryButton}"
+                                                                 Margin="16,0,0,0" />
+                        </Grid>
+                        <TextBlock x:ConnectionId='21' x:Name="EmptyCustomersText" Text="Noch keine Unternehmen vorhanden. Lege das erste Unternehmen an."
+                                   Visibility="Collapsed" TextWrapping="Wrap" Foreground="{StaticResource MutedTextBrush}" />
+                        <!-- Durch horizontales Scrollen bleiben auch in kleinen Fenstern alle Spalten erreichbar. -->
+                        <ScrollViewer HorizontalScrollBarVisibility="Auto" HorizontalScrollMode="Enabled"
+                                      VerticalScrollBarVisibility="Disabled" VerticalScrollMode="Disabled">
+                            <StackPanel MinWidth="920">
+                                <Border BorderBrush="{StaticResource BorderBrush}" BorderThickness="0,0,0,1"
+                                        Padding="12,0,12,16">
+                                    <Grid ColumnSpacing="18">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="170" />
+                                            <ColumnDefinition Width="*" MinWidth="250" />
+                                            <ColumnDefinition Width="90" />
+                                            <ColumnDefinition Width="120" />
+                                            <ColumnDefinition Width="250" />
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Text="Kunde" FontSize="14" FontWeight="SemiBold" Foreground="{StaticResource MutedTextBrush}" />
+                                        <TextBlock Grid.Column="1" Text="Kundenadmin" FontSize="14" FontWeight="SemiBold" Foreground="{StaticResource MutedTextBrush}" />
+                                        <TextBlock Grid.Column="2" Text="Benutzer" FontSize="14" FontWeight="SemiBold" Foreground="{StaticResource MutedTextBrush}" />
+                                        <TextBlock Grid.Column="3" Text="Status" FontSize="14" FontWeight="SemiBold" Foreground="{StaticResource MutedTextBrush}" />
+                                    </Grid>
+                                </Border>
+                                <ItemsControl x:ConnectionId='22' x:Name="KundenItems"                              >
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate>
+                                            <Border BorderBrush="{StaticResource BorderBrush}" BorderThickness="0,0,0,1" Padding="12,16">
+                                                <Grid ColumnSpacing="18">
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="170" />
+                                                        <ColumnDefinition Width="*" MinWidth="250" />
+                                                        <ColumnDefinition Width="90" />
+                                                        <ColumnDefinition Width="120" />
+                                                        <ColumnDefinition Width="250" />
+                                                    </Grid.ColumnDefinitions>
+                                                    <StackPanel VerticalAlignment="Center" Spacing="2">
+                                                        <TextBlock Text="{Binding Firmenname}" FontSize="18" FontWeight="SemiBold"
+                                                                   TextTrimming="CharacterEllipsis" Foreground="{StaticResource TextBrush}"
+                                                                   ToolTipService.ToolTip="{Binding Firmenname}" />
+                                                        <TextBlock Text="{Binding Kennung}" FontSize="14" TextTrimming="CharacterEllipsis"
+                                                                   Foreground="{StaticResource MutedTextBrush}" ToolTipService.ToolTip="{Binding Kennung}" />
+                                                    </StackPanel>
+                                                    <TextBlock Grid.Column="1" Text="{Binding AdminEmail}" FontSize="17"
+                                                               VerticalAlignment="Center" TextTrimming="CharacterEllipsis"
+                                                               Foreground="{StaticResource TextBrush}" ToolTipService.ToolTip="{Binding AdminEmail}" />
+                                                    <TextBlock Grid.Column="2" Text="{Binding Benutzer}" FontSize="17"
+                                                               VerticalAlignment="Center" Foreground="{StaticResource TextBrush}" />
+                                                    <Border Grid.Column="3" BorderBrush="{Binding StatusBorderBrush}" BorderThickness="1"
+                                                            CornerRadius="18" Padding="14,5" HorizontalAlignment="Left" VerticalAlignment="Center">
+                                                        <TextBlock Text="{Binding Status}" FontSize="14" Foreground="{StaticResource TextBrush}" />
+                                                    </Border>
+                                                    <StackPanel Grid.Column="4" Orientation="Horizontal" Spacing="14"
+                                                                HorizontalAlignment="Right" VerticalAlignment="Center">
+                                                        <Button x:ConnectionId='24' Content="Bearbeiten" Style="{StaticResource DashboardButton}"                           
+                                                                AutomationProperties.HelpText="{Binding Firmenname}" />
+                                                        <Button x:ConnectionId='25' Content="Einloggen" Style="{StaticResource PrimaryButton}"                            
+                                                                AutomationProperties.HelpText="{Binding Firmenname}" />
+                                                    </StackPanel>
+                                                </Grid>
+                                            </Border>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                            </StackPanel>
+                        </ScrollViewer>
+                    </StackPanel>
+                </Border>
+                <TextBlock Text="Unternehmen werden dauerhaft gespeichert."
+                           FontSize="13" Foreground="{StaticResource MutedTextBrush}" TextWrapping="Wrap" />
+            </StackPanel>
+        </ScrollViewer>
+    </Grid>
+</Page>
+
