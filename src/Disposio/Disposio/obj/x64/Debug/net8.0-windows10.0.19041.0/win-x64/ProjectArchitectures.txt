@@ -1,1 +1,1 @@
-C:\Wirtschaftinformatik\PROJEKT_DISPOSIO\Disposio\src\Disposio\Disposio\Disposio.csproj;x64
+C:\Users\laska\source\repos\Disposio\src\Disposio\Disposio\Disposio.csproj;x64
