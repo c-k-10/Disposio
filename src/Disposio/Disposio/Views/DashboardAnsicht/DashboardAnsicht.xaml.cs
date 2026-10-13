@@ -13,9 +13,14 @@ using System.Net.Mail;
 using System.Runtime.CompilerServices;
 using System.Threading.Tasks;
 using Windows.UI;
+using System.Threading;
+using Disposio.Models;
+using Disposio.Services;
 
 namespace Disposio.Views
 {
+    // Die Seite kümmert sich um Anzeige und Eingaben. SQL gehört in UnternehmenRepository.
+    // Datenfluss: Formular -> Entwurf -> Repository -> Neon -> gespeicherter Datensatz -> Anzeige.
     public sealed partial class DashboardAnsicht : Page
     {
         private static readonly string[] AccentColors =
@@ -24,11 +29,18 @@ namespace Disposio.Views
         };
 
         private readonly HashSet<Kunde> _observedCustomers = new();
+        private readonly IUnternehmenRepository _unternehmenRepository = new UnternehmenRepository();
+        private CancellationTokenSource? _loadCancellation;
+        private bool _isLoading;
+        private bool _hasDataLoaded;
+        private bool _canEditCustomers;
         private bool _isInitialized;
         private bool _dialogOpen;
         private bool _isLight;
         private string _accentHex = "#7B2CBF";
 
+        // ObservableCollection meldet der XAML-Liste automatisch, wenn ein Eintrag hinzukommt.
+        // Sie ist nur die Anzeige-Kopie: Dauerhaft gespeichert wird ausschließlich in Neon.
         public ObservableCollection<Kunde> Kunden { get; } = new();
 
         public DashboardAnsicht()
@@ -36,25 +48,89 @@ namespace Disposio.Views
             InitializeComponent();
             Kunden.CollectionChanged += Kunden_CollectionChanged;
 
-            // Beispieldaten bleiben nur während dieser Dashboard-Sitzung im Speicher.
-            int[] users = { 24, 12, 41, 6 };
-            for (int index = 0; index < users.Length; index++)
-            {
-                int number = index + 1;
-                Kunden.Add(new Kunde(
-                    $"Testfirma {number}",
-                    $"testfirma{number}",
-                    $"admin@testfirma{number}.invalid",
-                    users[index],
-                    number == 4 ? "Testphase" : "Aktiv",
-                    Brush("AccentBrush"),
-                    Brush("BorderBrush")));
-            }
-
             SetAppearanceControls();
             _isInitialized = true;
             ApplyAppearance();
             UpdateStatistics();
+            UpdateDataActions();
+
+            // Ein Konstruktor kann nicht auf einen Datenbankzugriff warten. Loaded startet das
+            // Laden, sobald die Seite sichtbar ist. await hält dabei das Fenster bedienbar.
+            Loaded += Dashboard_Loaded;
+            Unloaded += (_, _) => _loadCancellation?.Cancel();
+        }
+
+        private async void Dashboard_Loaded(object sender, RoutedEventArgs e)
+        {
+            if (!_hasDataLoaded)
+                await LoadCustomersAsync();
+        }
+
+        private async void ReloadCustomers_Click(object sender, RoutedEventArgs e) => await LoadCustomersAsync();
+
+        private async Task LoadCustomersAsync()
+        {
+            if (_isLoading || _dialogOpen || !IsLoaded)
+                return;
+
+            _isLoading = true;
+            _canEditCustomers = false;
+            var cancellation = new CancellationTokenSource();
+            _loadCancellation = cancellation;
+            DatabaseLoadingIndicator.IsActive = true;
+            DatabaseLoadingIndicator.Visibility = Visibility.Visible;
+            DatabaseStatusText.Text = "Unternehmen werden geladen …";
+            EmptyCustomersText.Visibility = Visibility.Collapsed;
+            UpdateDataActions();
+            try
+            {
+                // Erst alle Zeilen laden, dann die Anzeige austauschen. Bei einem Fehler bleibt
+                // der zuletzt geladene Stand sichtbar; eine halbe Liste wird nicht angezeigt.
+                IReadOnlyList<Unternehmen> companies = await _unternehmenRepository.LoadAsync(cancellation.Token);
+                if (cancellation.IsCancellationRequested || !IsLoaded)
+                    return;
+
+                _hasDataLoaded = true;
+                Kunden.Clear();
+                foreach (Unternehmen company in companies)
+                    Kunden.Add(CreateDisplayedCustomer(company));
+
+                _canEditCustomers = true;
+                UpdateStatistics();
+                DatabaseStatusText.Text = "Unternehmen sind geladen. Änderungen werden dauerhaft gespeichert.";
+                EmptyCustomersText.Visibility = Kunden.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
+            }
+            catch (OperationCanceledException) when (cancellation.IsCancellationRequested)
+            {
+                // Beim Verlassen der Seite brauchen wir das Ladeergebnis nicht mehr.
+            }
+            catch (Exception)
+            {
+                // Keine technischen Fehlermeldungen oder Zugangsdaten im Fenster ausgeben.
+                DatabaseStatusText.Text = "Unternehmen konnten nicht geladen werden. Prüfe die Verbindung und versuche es erneut.";
+            }
+            finally
+            {
+                _isLoading = false;
+                if (ReferenceEquals(_loadCancellation, cancellation))
+                    _loadCancellation = null;
+                cancellation.Dispose();
+                DatabaseLoadingIndicator.IsActive = false;
+                DatabaseLoadingIndicator.Visibility = Visibility.Collapsed;
+                UpdateDataActions();
+            }
+        }
+
+        private Kunde CreateDisplayedCustomer(Unternehmen company) => new(
+            company, Brush("AccentBrush"), Brush("BorderBrush"));
+
+        private void UpdateDataActions()
+        {
+            // Bei fehlgeschlagenem Laden sind Anlegen/Bearbeiten gesperrt, damit keine
+            // unvollständige oder veraltete Liste als aktuelle Datenbasis benutzt wird.
+            CreateCustomerButton.IsEnabled = _canEditCustomers && !_isLoading && !_dialogOpen;
+            KundenItems.IsEnabled = _canEditCustomers && !_isLoading && !_dialogOpen;
+            ReloadCustomersButton.IsEnabled = !_isLoading && !_dialogOpen;
         }
 
         protected override void OnNavigatedTo(NavigationEventArgs e)
@@ -107,6 +183,8 @@ namespace Disposio.Views
 
         private void ApplyAppearance()
         {
+            // XAML verwendet dieselben Brush-Objekte überall. Ändern wir deren Farbe,
+            // passen sich Karten, Texte und bereits geöffnete Dialoge gemeinsam an.
             RequestedTheme = _isLight ? ElementTheme.Light : ElementTheme.Dark;
             SetBrush("BackgroundBrush", _isLight ? "#FCFCFD" : "#101319");
             SetBrush("SidebarBrush", _isLight ? "#F0F0F0" : "#262930");
@@ -170,7 +248,8 @@ namespace Disposio.Views
 
         private void Kunden_CollectionChanged(object? sender, NotifyCollectionChangedEventArgs e)
         {
-            // Auch Clear/Reset und extern hinzugefügte Kunden korrekt beobachten.
+            // Neue Kunden beobachten, entfernte Kunden abmelden: Dadurch rechnen die
+            // Kennzahlen auch nach Änderungen, ohne alte Einträge im Speicher festzuhalten.
             foreach (Kunde removed in _observedCustomers.Where(customer => !Kunden.Contains(customer)).ToArray())
             {
                 removed.PropertyChanged -= Customer_PropertyChanged;
@@ -195,6 +274,14 @@ namespace Disposio.Views
 
         private void UpdateStatistics()
         {
+            // Solange noch kein Laden gelungen ist, kennen wir die Zahlen nicht.
+            // Ein Strich bedeutet „noch unbekannt“; eine 0 würde fälschlich „keine Daten“ behaupten.
+            if (!_hasDataLoaded)
+            {
+                CustomerCountText.Text = TrialCountText.Text = UserCountText.Text = "–";
+                return;
+            }
+
             CustomerCountText.Text = Kunden.Count.ToString(CultureInfo.CurrentCulture);
             TrialCountText.Text = Kunden.Count(customer => customer.Status == "Testphase").ToString(CultureInfo.CurrentCulture);
             UserCountText.Text = Kunden.Sum(customer => (long)customer.Benutzer).ToString(CultureInfo.CurrentCulture);
@@ -210,15 +297,35 @@ namespace Disposio.Views
 
         private async Task EditCustomerAsync(Kunde? customer)
         {
-            if (_dialogOpen || XamlRoot is null)
+            if (_dialogOpen || _isLoading || !_canEditCustomers || XamlRoot is null)
                 return;
 
             _dialogOpen = true;
+            UpdateDataActions();
             try
             {
                 var companyBox = CreateTextBox(customer?.Firmenname ?? "");
                 var identifierBox = CreateTextBox(customer?.Kennung ?? "");
                 var emailBox = CreateTextBox(customer?.AdminEmail ?? "");
+                // Die Eingaben werden schon im Formular begrenzt. Das Repository prüft
+                // dieselben Grenzen erneut, bevor es die Daten an Neon überträgt.
+                companyBox.MaxLength = 200;
+                identifierBox.MaxLength = 100;
+                emailBox.MaxLength = 254;
+                // Unsere bestehende Unternehmenstabelle speichert auch Anschrift und Kontakt.
+                // Beim Bearbeiten übernehmen wir die vorhandenen Werte, statt sie zu überschreiben.
+                var addressBox = CreateTextBox(customer?.Adresse ?? "");
+                var postcodeBox = CreateTextBox(customer?.Plz ?? "");
+                var cityBox = CreateTextBox(customer?.Ort ?? "");
+                var phoneBox = CreateTextBox(customer?.Telefon ?? "");
+                var contactEmailBox = CreateTextBox(customer?.KontaktEmail ?? "");
+                var contactPersonBox = CreateTextBox(customer?.Kontaktperson ?? "");
+                addressBox.MaxLength = 300;
+                postcodeBox.MaxLength = 20;
+                cityBox.MaxLength = 150;
+                contactPersonBox.MaxLength = 200;
+                phoneBox.MaxLength = 50;
+                contactEmailBox.MaxLength = 254;
                 emailBox.InputScope = new Microsoft.UI.Xaml.Input.InputScope
                 {
                     Names = { new Microsoft.UI.Xaml.Input.InputScopeName { NameValue = Microsoft.UI.Xaml.Input.InputScopeNameValue.EmailSmtpAddress } }
@@ -249,7 +356,19 @@ namespace Disposio.Views
                 AddField(form, "Unternehmenskennung (für die Anmeldung)", identifierBox);
                 AddField(form, "E-Mail des Kundenadmins", emailBox);
                 AddField(form, "Status", statusBox);
-                form.Children.Add(errorText);
+                form.Children.Add(new TextBlock
+                {
+                    Text = "Kontakt und Anschrift",
+                    FontSize = 18,
+                    FontWeight = Microsoft.UI.Text.FontWeights.SemiBold,
+                    Foreground = Brush("TextBrush")
+                });
+                AddField(form, "Straße und Hausnummer", addressBox);
+                AddField(form, "Postleitzahl", postcodeBox);
+                AddField(form, "Ort", cityBox);
+                AddField(form, "Telefon", phoneBox);
+                AddField(form, "Kontaktperson", contactPersonBox);
+                AddField(form, "Kontakt-E-Mail (leer = E-Mail des Kundenadmins)", contactEmailBox);
 
                 var dialog = CreateDialog(customer is null ? "Neuen Kunden anlegen" : "Kunden bearbeiten");
                 var cancelButton = new Button
@@ -271,20 +390,30 @@ namespace Disposio.Views
                 };
                 footer.Children.Add(cancelButton);
                 footer.Children.Add(saveButton);
-                form.Children.Add(footer);
                 // Eigene Footer-Buttons behalten ihren Stil auch beim Tastaturfokus.
                 dialog.PrimaryButtonText = "";
                 dialog.SecondaryButtonText = "";
                 dialog.CloseButtonText = "";
-                dialog.Content = new ScrollViewer
+                // Nur die Felder scrollen. Meldung und Buttons bleiben sichtbar, auch wenn
+                // ein ungültiges Feld weiter oben den Fokus bekommt.
+                var dialogContent = new Grid { MaxHeight = 560, Width = form.Width };
+                dialogContent.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
+                dialogContent.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+                dialogContent.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+                dialogContent.Children.Add(new ScrollViewer
                 {
                     Content = form,
-                    MaxHeight = 560,
                     VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
                     HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled
-                };
+                });
+                errorText.Margin = new Thickness(0, 12, 0, 0);
+                Grid.SetRow(errorText, 1);
+                dialogContent.Children.Add(errorText);
+                Grid.SetRow(footer, 2);
+                dialogContent.Children.Add(footer);
+                dialog.Content = dialogContent;
 
-                CustomerDraft? acceptedDraft = null;
+                bool isSaving = false;
                 void ShowError(string message, Control field)
                 {
                     errorText.Text = message;
@@ -295,11 +424,15 @@ namespace Disposio.Views
                 companyBox.TextChanged += (_, _) => errorText.Visibility = Visibility.Collapsed;
                 identifierBox.TextChanged += (_, _) => errorText.Visibility = Visibility.Collapsed;
                 emailBox.TextChanged += (_, _) => errorText.Visibility = Visibility.Collapsed;
+                foreach (TextBox field in new[] { addressBox, postcodeBox, cityBox, phoneBox, contactEmailBox, contactPersonBox })
+                    field.TextChanged += (_, _) => errorText.Visibility = Visibility.Collapsed;
                 dialog.Opened += (_, _) => companyBox.Focus(FocusState.Programmatic);
-                bool TryAccept()
+                async Task TrySaveAsync()
                 {
-                    if (acceptedDraft is not null)
-                        return true;
+                    // Auch ein Doppelklick oder Enter während des Wartens darf kein
+                    // zweites INSERT auslösen. Ein Speichervorgang läuft zur selben Zeit.
+                    if (isSaving)
+                        return;
 
                     string company = companyBox.Text.Trim();
                     string identifier = identifierBox.Text.Trim();
@@ -307,40 +440,116 @@ namespace Disposio.Views
                     if (company.Length == 0)
                     {
                         ShowError("Bitte einen Firmennamen eingeben.", companyBox);
-                        return false;
+                        return;
                     }
                     if (identifier.Length == 0)
                     {
                         ShowError("Bitte eine Unternehmenskennung eingeben.", identifierBox);
-                        return false;
+                        return;
                     }
                     if (Kunden.Any(other => !ReferenceEquals(other, customer) &&
                         string.Equals(other.Kennung.Trim(), identifier, StringComparison.OrdinalIgnoreCase)))
                     {
                         ShowError("Diese Unternehmenskennung wird bereits verwendet.", identifierBox);
-                        return false;
+                        return;
                     }
                     if (!MailAddress.TryCreate(email, out MailAddress? address) ||
                         !string.Equals(address.Address, email, StringComparison.OrdinalIgnoreCase))
                     {
                         ShowError("Bitte eine gültige E-Mail-Adresse eingeben.", emailBox);
-                        return false;
+                        return;
                     }
 
                     string status = ((ComboBoxItem)statusBox.SelectedItem).Tag as string ?? "Testphase";
-                    acceptedDraft = new CustomerDraft(company, identifier, email, status);
+                    foreach ((TextBox field, string label) in new[]
+                    {
+                        (addressBox, "Straße und Hausnummer"), (postcodeBox, "Postleitzahl"),
+                        (cityBox, "Ort"), (phoneBox, "Telefon"), (contactPersonBox, "Kontaktperson")
+                    })
+                    {
+                        if (string.IsNullOrWhiteSpace(field.Text))
+                        {
+                            ShowError($"Bitte {label} eingeben.", field);
+                            return;
+                        }
+                    }
+                    string contactEmail = string.IsNullOrWhiteSpace(contactEmailBox.Text)
+                        ? email : contactEmailBox.Text.Trim();
+                    if (!MailAddress.TryCreate(contactEmail, out MailAddress? contactAddress) ||
+                        !string.Equals(contactAddress.Address, contactEmail, StringComparison.OrdinalIgnoreCase))
+                    {
+                        ShowError("Bitte eine gültige Kontakt-E-Mail-Adresse eingeben.", contactEmailBox);
+                        return;
+                    }
+
+                    var draft = new UnternehmenEntwurf(company, identifier, email, status,
+                        addressBox.Text.Trim(), postcodeBox.Text.Trim(), cityBox.Text.Trim(),
+                        phoneBox.Text.Trim(), contactEmail, contactPersonBox.Text.Trim());
+                    isSaving = true;
                     saveButton.IsEnabled = false;
                     cancelButton.IsEnabled = false;
-                    dialog.Hide();
-                    return true;
+                    companyBox.IsEnabled = identifierBox.IsEnabled = emailBox.IsEnabled = statusBox.IsEnabled = false;
+                    foreach (TextBox field in new[] { addressBox, postcodeBox, cityBox, phoneBox, contactEmailBox, contactPersonBox })
+                        field.IsEnabled = false;
+                    saveButton.Content = "Speichert …";
+                    errorText.Visibility = Visibility.Collapsed;
+                    try
+                    {
+                        // null bedeutet „neues Unternehmen“. Beim Bearbeiten schicken wir die
+                        // unveränderliche Id und die Version vom letzten Laden mit.
+                        Unternehmen saved = customer is null
+                            ? await _unternehmenRepository.CreateAsync(draft)
+                            : await _unternehmenRepository.UpdateAsync(customer.Id, customer.Version, draft);
+
+                        // Erst NACH der Bestätigung aus Neon ändern wir die Anzeige.
+                        // Bei einem Fehler bleiben die alte Liste und alle Formulareingaben erhalten.
+                        if (customer is null)
+                            Kunden.Add(CreateDisplayedCustomer(saved));
+                        else
+                            customer.ApplySavedCompany(saved);
+
+                        EmptyCustomersText.Visibility = Visibility.Collapsed;
+                        DatabaseStatusText.Text = "Unternehmen wurde gespeichert.";
+                        isSaving = false;
+                        dialog.Hide();
+                    }
+                    catch (UnternehmenKennungVergebenException)
+                    {
+                        // Die lokale Liste kann eine parallele Anlage eines Kollegen noch nicht
+                        // kennen. Deshalb prüft zusätzlich die Datenbank eindeutige Kennungen.
+                        errorText.Text = "Diese Unternehmenskennung wird bereits verwendet.";
+                        errorText.Visibility = Visibility.Visible;
+                    }
+                    catch (UnternehmenKonfliktException)
+                    {
+                        errorText.Text = "Dieses Unternehmen wurde inzwischen geändert oder gelöscht. Brich ab, lade die Liste erneut und bearbeite den aktuellen Stand.";
+                        errorText.Visibility = Visibility.Visible;
+                    }
+                    catch (Exception)
+                    {
+                        errorText.Text = "Speichern konnte nicht bestätigt werden. Deine Eingaben bleiben erhalten. Prüfe die Verbindung und lade bei Unsicherheit die Liste erneut.";
+                        errorText.Visibility = Visibility.Visible;
+                    }
+                    finally
+                    {
+                        isSaving = false;
+                        saveButton.IsEnabled = cancelButton.IsEnabled = true;
+                        companyBox.IsEnabled = identifierBox.IsEnabled = emailBox.IsEnabled = statusBox.IsEnabled = true;
+                        foreach (TextBox field in new[] { addressBox, postcodeBox, cityBox, phoneBox, contactEmailBox, contactPersonBox })
+                            field.IsEnabled = true;
+                        saveButton.Content = "Speichern";
+                        if (errorText.Visibility == Visibility.Visible)
+                            identifierBox.Focus(FocusState.Programmatic);
+                    }
                 }
 
-                saveButton.Click += (_, _) => TryAccept();
-                cancelButton.Click += (_, _) => dialog.Hide();
-                dialog.PreviewKeyDown += (_, args) =>
+                saveButton.Click += async (_, _) => await TrySaveAsync();
+                cancelButton.Click += (_, _) => { if (!isSaving) dialog.Hide(); };
+                dialog.Closing += (_, args) => args.Cancel = isSaving;
+                dialog.PreviewKeyDown += async (_, args) =>
                 {
                     // Eine geöffnete Auswahlliste verarbeitet Enter/Escape selbst.
-                    if (statusBox.IsDropDownOpen)
+                    if (statusBox.IsDropDownOpen || isSaving)
                         return;
 
                     if (args.Key == Windows.System.VirtualKey.Escape)
@@ -352,31 +561,16 @@ namespace Disposio.Views
                         Microsoft.UI.Xaml.Input.FocusManager.GetFocusedElement(XamlRoot) is not (Button or ComboBox))
                     {
                         args.Handled = true;
-                        TryAccept();
+                        await TrySaveAsync();
                     }
                 };
 
                 await dialog.ShowAsync();
-                // Hide liefert None; nur der validierte Speichern-Pfad setzt acceptedDraft.
-                if (acceptedDraft is CustomerDraft draft)
-                {
-                    if (customer is null)
-                    {
-                        Kunden.Add(new Kunde(draft.Firmenname, draft.Kennung, draft.AdminEmail, 0,
-                            draft.Status, Brush("AccentBrush"), Brush("BorderBrush")));
-                    }
-                    else
-                    {
-                        customer.Firmenname = draft.Firmenname;
-                        customer.Kennung = draft.Kennung;
-                        customer.AdminEmail = draft.AdminEmail;
-                        customer.Status = draft.Status;
-                    }
-                }
             }
             finally
             {
                 _dialogOpen = false;
+                UpdateDataActions();
             }
         }
 
@@ -475,35 +669,58 @@ namespace Disposio.Views
                 frame.BackStack.Clear();
         }
 
-        private sealed record CustomerDraft(string Firmenname, string Kennung, string AdminEmail, string Status);
     }
 
+    // Diese beiden Einstellungen werden beim Wechsel zwischen Login und Dashboard mitgegeben.
     public sealed class DashboardAppearance
     {
         public string AccentHex { get; set; } = "#7B2CBF";
         public bool IsLight { get; set; }
     }
 
+    // Dieses Anzeigemodell enthält zusätzlich Farben. Das reine Datenbankmodell Unternehmen
+    // kennt keine WinUI-Elemente und kann deshalb auch unabhängig von einem Fenster getestet werden.
     public sealed class Kunde : INotifyPropertyChanged
     {
         private readonly Brush _accentBrush;
         private readonly Brush _borderBrush;
+        private Unternehmen _savedCompany;
         private string _firmenname;
         private string _kennung;
         private string _adminEmail;
         private int _benutzer;
         private string _status;
 
-        public Kunde(string firmenname, string kennung, string adminEmail, int benutzer,
-            string status, Brush accentBrush, Brush borderBrush)
+        public Kunde(Unternehmen company, Brush accentBrush, Brush borderBrush)
         {
-            _firmenname = firmenname;
-            _kennung = kennung;
-            _adminEmail = adminEmail;
-            _benutzer = benutzer;
-            _status = status;
+            _savedCompany = company;
+            _firmenname = company.Firmenname;
+            _kennung = company.Kennung;
+            _adminEmail = company.AdminEmail;
+            _benutzer = company.Benutzer;
+            _status = company.Status;
             _accentBrush = accentBrush;
             _borderBrush = borderBrush;
+        }
+
+        // Die Id bleibt gleich, auch wenn Firmenname oder Kennung geändert werden.
+        public long Id => _savedCompany.Id;
+        public DateTime Version => _savedCompany.Version;
+        public string Adresse => _savedCompany.Adresse;
+        public string Plz => _savedCompany.Plz;
+        public string Ort => _savedCompany.Ort;
+        public string Telefon => _savedCompany.Telefon;
+        public string KontaktEmail => _savedCompany.KontaktEmail;
+        public string Kontaktperson => _savedCompany.Kontaktperson;
+
+        public void ApplySavedCompany(Unternehmen saved)
+        {
+            _savedCompany = saved;
+            Firmenname = saved.Firmenname;
+            Kennung = saved.Kennung;
+            AdminEmail = saved.AdminEmail;
+            Benutzer = saved.Benutzer;
+            Status = saved.Status;
         }
 
         public string Firmenname { get => _firmenname; set => Set(ref _firmenname, value); }
@@ -526,6 +743,8 @@ namespace Disposio.Views
 
         private bool Set<T>(ref T field, T value, [CallerMemberName] string? name = null)
         {
+            // Nur echte Änderungen melden. PropertyChanged teilt der XAML-Bindung mit,
+            // welche Eigenschaft sie neu anzeigen muss; die Zeile muss nicht neu gebaut werden.
             if (EqualityComparer<T>.Default.Equals(field, value))
                 return false;
 

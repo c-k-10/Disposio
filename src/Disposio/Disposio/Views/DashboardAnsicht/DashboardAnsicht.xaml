@@ -11,7 +11,8 @@
     FontSize="16">
 
     <Page.Resources>
-        <!-- Shared brushes let the page and its dialogs change appearance together. -->
+        <!-- Dieselben Farbobjekte werden in der Seite und ihren Dialogen verwendet.
+             Eine Farbänderung aktualisiert deshalb alle passenden Elemente gemeinsam. -->
         <SolidColorBrush x:Key="BackgroundBrush" Color="#101319" />
         <SolidColorBrush x:Key="SidebarBrush" Color="#262930" />
         <SolidColorBrush x:Key="SurfaceBrush" Color="#262930" />
@@ -258,6 +259,27 @@
                                      Foreground="{StaticResource MutedTextBrush}" />
                 </StackPanel>
 
+                <!-- Der Status erklärt Laden/Fehler. Erneut laden holt den aktuellen Stand aus Neon. -->
+                <Grid ColumnSpacing="16">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <Grid ColumnSpacing="12" VerticalAlignment="Center">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <ProgressRing x:Name="DatabaseLoadingIndicator" Width="22" Height="22"
+                                      IsActive="False" Visibility="Collapsed" />
+                        <TextBlock x:Name="DatabaseStatusText" Grid.Column="1" Text="Unternehmen werden geladen …"
+                                   TextWrapping="Wrap" VerticalAlignment="Center"
+                                   Foreground="{StaticResource MutedTextBrush}" />
+                    </Grid>
+                    <Button x:Name="ReloadCustomersButton" Grid.Column="1" Content="Erneut laden"
+                            Style="{StaticResource DashboardButton}" Click="ReloadCustomers_Click" />
+                </Grid>
+
                 <Grid x:Name="StatsGrid" ColumnSpacing="18">
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto" />
@@ -271,21 +293,21 @@
                     </Grid.ColumnDefinitions>
                     <Border x:Name="CustomerCard" Style="{StaticResource StatCard}">
                         <StackPanel Spacing="8">
-                            <TextBlock x:Name="CustomerCountText" Text="4" FontSize="38" FontWeight="Bold"
+                            <TextBlock x:Name="CustomerCountText" Text="–" FontSize="38" FontWeight="Bold"
                                        Foreground="{StaticResource TextBrush}" />
                             <TextBlock Text="Kunden" Foreground="{StaticResource MutedTextBrush}" />
                         </StackPanel>
                     </Border>
                     <Border x:Name="TrialCard" Grid.Column="1" Style="{StaticResource StatCard}">
                         <StackPanel Spacing="8">
-                            <TextBlock x:Name="TrialCountText" Text="1" FontSize="38" FontWeight="Bold"
+                            <TextBlock x:Name="TrialCountText" Text="–" FontSize="38" FontWeight="Bold"
                                        Foreground="{StaticResource TextBrush}" />
                             <TextBlock Text="in Testphase" TextWrapping="Wrap" Foreground="{StaticResource MutedTextBrush}" />
                         </StackPanel>
                     </Border>
                     <Border x:Name="UserCard" Grid.Column="2" Style="{StaticResource StatCard}">
                         <StackPanel Spacing="8">
-                            <TextBlock x:Name="UserCountText" Text="83" FontSize="38" FontWeight="Bold"
+                            <TextBlock x:Name="UserCountText" Text="–" FontSize="38" FontWeight="Bold"
                                        Foreground="{StaticResource TextBrush}" />
                             <TextBlock Text="Benutzer" Foreground="{StaticResource MutedTextBrush}" />
                         </StackPanel>
@@ -309,7 +331,9 @@
                             <Button x:Name="CreateCustomerButton" Grid.Column="1" Content="+ Kunde anlegen" Style="{StaticResource PrimaryButton}"
                                     Click="CreateCustomer_Click" Margin="16,0,0,0" />
                         </Grid>
-                        <!-- Keep all customer fields reachable in smaller desktop windows. -->
+                        <TextBlock x:Name="EmptyCustomersText" Text="Noch keine Unternehmen vorhanden. Lege das erste Unternehmen an."
+                                   Visibility="Collapsed" TextWrapping="Wrap" Foreground="{StaticResource MutedTextBrush}" />
+                        <!-- Durch horizontales Scrollen bleiben auch in kleinen Fenstern alle Spalten erreichbar. -->
                         <ScrollViewer HorizontalScrollBarVisibility="Auto" HorizontalScrollMode="Enabled"
                                       VerticalScrollBarVisibility="Disabled" VerticalScrollMode="Disabled">
                             <StackPanel MinWidth="920">
@@ -373,7 +397,7 @@
                         </ScrollViewer>
                     </StackPanel>
                 </Border>
-                <TextBlock Text="Beispieldaten · Änderungen gelten für diese Dashboard-Sitzung."
+                <TextBlock Text="Unternehmen werden dauerhaft gespeichert."
                            FontSize="13" Foreground="{StaticResource MutedTextBrush}" TextWrapping="Wrap" />
             </StackPanel>
         </ScrollViewer>
