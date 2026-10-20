@@ -71,6 +71,7 @@ public static class AuthService
     public static async Task<AngemeldeterBenutzer?> LoginAsync(string firma, string email, string passwort,
         CancellationToken cancellationToken = default)
     {
+        System.Diagnostics.Debug.WriteLine($"[Login] Start: Firma='{firma}', E-Mail-Länge={email?.Length}, Passwort-Länge={passwort?.Length}");
         var firmenkennung = (firma ?? string.Empty).Trim();
         var kontoEmail = (email ?? string.Empty).Trim().ToLowerInvariant();
         if (kontoEmail.Length is 0 or > 254 || firmenkennung.Length > 200 ||
@@ -132,6 +133,7 @@ public static class AuthService
             // auch ein über „Passwort vergessen“ neu gesetztes Passwort sofort.
             var anmeldung = await NeonAuthClient.Instanz.AnmeldenAsync(kontoEmail, passwort, cancellationToken)
                 .ConfigureAwait(false);
+            System.Diagnostics.Debug.WriteLine($"[Login] Neon Auth: Erfolg={anmeldung.Erfolg}, Fehler={anmeldung.Fehler}, Firma='{firmenkennung}'");
             if (!anmeldung.Erfolg || anmeldung.Nutzer is null ||
                 !string.Equals(gespeicherteAuthId, anmeldung.Nutzer.Id, StringComparison.Ordinal))
             {
@@ -166,6 +168,7 @@ public static class AuthService
                       AND NOT EXISTS (SELECT 1 FROM public.benutzer andere WHERE andere.auth_user_id = $2)
                     """,
                     new string?[] { benutzerId, anmeldung.Nutzer.Id }, cancellationToken).ConfigureAwait(false);
+                System.Diagnostics.Debug.WriteLine($"[Login] Treffer in benutzer: {rows.Count}");
             }
         }
 
