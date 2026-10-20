@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- x:Class an den Namen aus deiner angelegten Datei anpassen, falls er abweicht -->
+<Page
+    x:Class="Disposio.Views.PasswortVergessen.passwortVergessen"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    mc:Ignorable="d">
+
+    <Grid Padding="24">
+        <StackPanel MaxWidth="400" Spacing="16" VerticalAlignment="Center" HorizontalAlignment="Center">
+
+            <TextBlock Text="Passwort vergessen" Style="{ThemeResource TitleTextBlockStyle}" />
+
+            <!-- Schritt 1: E-Mail eingeben -->
+            <StackPanel x:Name="SchrittEmail" Spacing="12">
+                <TextBlock Text="Geben Sie Ihre E-Mail-Adresse ein. Wir schicken Ihnen einen Code zum Zurücksetzen."
+                           TextWrapping="Wrap" />
+                <TextBox x:Name="EmailBox" Header="E-Mail" PlaceholderText="name@firma.de"
+                         InputScope="EmailSmtpAddress" KeyDown="EmailBox_KeyDown" />
+                <Button x:Name="CodeSendenButton" Content="Code senden"
+                        Style="{ThemeResource AccentButtonStyle}" Click="CodeSendenButton_Click" />
+            </StackPanel>
+
+            <!-- Schritt 2: Code + neues Passwort -->
+            <StackPanel x:Name="SchrittCode" Spacing="12" Visibility="Collapsed">
+                <TextBlock x:Name="CodeHinweis" TextWrapping="Wrap" />
+                <TextBox x:Name="CodeBox" Header="Code aus der E-Mail" MaxLength="12" />
+                <PasswordBox x:Name="PasswortBox" Header="Neues Passwort" />
+                <PasswordBox x:Name="PasswortWiederholenBox" Header="Neues Passwort wiederholen"
+                             KeyDown="PasswortWiederholenBox_KeyDown" />
+                <Button x:Name="ZuruecksetzenButton" Content="Passwort zurücksetzen"
+                        Style="{ThemeResource AccentButtonStyle}" Click="ZuruecksetzenButton_Click" />
+                <HyperlinkButton Content="Neuen Code anfordern" Click="NeuerCode_Click" Padding="0" />
+            </StackPanel>
+
+            <ProgressRing x:Name="Laedt" IsActive="False" Width="24" Height="24" HorizontalAlignment="Left" />
+
+            <InfoBar x:Name="Meldung" IsOpen="False" IsClosable="False" />
+
+            <HyperlinkButton Content="Zurück zur Anmeldung" Click="Zurueck_Click" Padding="0" />
+        </StackPanel>
+    </Grid>
+</Page>

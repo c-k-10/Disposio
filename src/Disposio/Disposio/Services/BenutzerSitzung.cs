@@ -32,9 +32,6 @@ public static class BenutzerSitzung
         (Firmenzugang is not null && DashboardZugriffErlaubt) ||
         AktuellerBenutzer?.HatFirmenArbeitsbereich == true;
 
-    // Welche Firma die Firmenansicht gerade zeigt. Spätere Datenzugriffe der Ansichten verwenden diese Id.
-    public static long? AktuelleFirmaId => Firmenzugang?.UnternehmenId ?? AktuellerBenutzer?.UnternehmenId;
-
     public static void Starten(AngemeldeterBenutzer benutzer)
     {
         ArgumentNullException.ThrowIfNull(benutzer);

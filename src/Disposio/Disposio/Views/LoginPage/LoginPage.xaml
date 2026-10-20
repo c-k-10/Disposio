@@ -139,8 +139,8 @@
                                     <Grid.RenderTransform>
                                         <TranslateTransform Y="-80" />
                                     </Grid.RenderTransform>
-                                    <Border Background="{StaticResource SpeechBubbleBackground}" BorderBrush="{StaticResource SpeechBorderBrush}" BorderThickness="1" CornerRadius="12" Padding="12,10" Margin="-100,0,0,0" HorizontalAlignment="Left">
-                                        <TextBlock Text="Passwort vergessen?" Foreground="{StaticResource TextMain}" FontSize="13"/>
+                                    <Border Background="{StaticResource SpeechBubbleBackground}" BorderBrush="{StaticResource SpeechBorderBrush}" BorderThickness="1" CornerRadius="12" Padding="12,10" Margin="-100,0,0,0" HorizontalAlignment="Left" >
+                                        <Button Content="Passwort vergessen?" Foreground="{StaticResource TextMain}" FontSize="13" Click="PasswortVergessen_Click"/>
                                     </Border>
                                 </Grid>
                             </Grid>

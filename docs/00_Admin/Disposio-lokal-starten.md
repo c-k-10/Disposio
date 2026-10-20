@@ -5,7 +5,9 @@ Stand: 13.10.2026. Arbeitsbranch: `recovery/desktop-2026-10-13`.
 ## In Visual Studio öffnen
 
 Öffne `src/Disposio/Disposio.slnx` in Visual Studio 2026 Community und wähle die Plattform `x64`.
-Das normale Startprofil `Disposio (Package)` beginnt bei der Anmeldung. Das Profil
+Das normale Startprofil `Disposio (Package)` beginnt bei der Anmeldung. Es steht in der Liste an
+erster Stelle. Zeigt Visual Studio neben dem grünen Start-Knopf ein anderes Profil, dort
+`Disposio (Package)` auswählen. Das Profil
 `Disposio (Dashboard)` ist ausschließlich im Debug-Build eine gekennzeichnete
 Entwicklungsansicht. Sie verwendet echte Datenbankfunktionen; Speichern verändert echte Daten.
 Das Profil `Disposio (Firmenansicht)` zeigt ebenfalls nur im Debug-Build die Firmenansicht mit

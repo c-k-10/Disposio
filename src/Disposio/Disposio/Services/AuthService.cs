@@ -12,7 +12,7 @@ namespace Disposio.Services;
 
 /// <summary>
 /// Ergebnis einer erfolgreichen Anmeldung. Ein Plattform-Admin hat keine Firma:
-/// UnternehmenId ist dann null. Passwort und Hash gehören nicht in diese Sitzung.
+/// UnternehmenId ist dann null. Passwort und Auth-Token gehören nicht in diese Sitzung.
 /// </summary>
 public sealed record AngemeldeterBenutzer(long Id, string Vorname, string Nachname, string Sprache,
     long? UnternehmenId, IReadOnlyList<string> Rollen)
@@ -44,18 +44,25 @@ public sealed record AngemeldeterBenutzer(long Id, string Vorname, string Nachna
 }
 
 /// <summary>
-/// Anmeldung = Konto finden + Passwort prüfen. Berechtigung = seine Rolle prüfen.
-/// Ein richtiges Passwort allein öffnet noch kein Admin-Dashboard.
+/// Ergebnis der Rechteprüfung für Firmendaten: Nur Daten dieser Firma dürfen gelesen oder geändert
+/// werden. AbteilungId ist die Abteilung des Kontos (falls zugeordnet); beim Admin-Zugang null.
+/// Ansichten des Abteilungsleiters zeigen damit nur die eigene Abteilung.
+/// </summary>
+public sealed record FirmenZugriff(long UnternehmenId, long? AbteilungId);
+
+/// <summary>
+/// Anmeldung = Fachkonto (Firma, Rolle) in der eigenen Tabelle finden + Passwort prüfen.
+/// Mit Neon Auth verknüpfte Konten prüft Neon Auth, alle anderen der gespeicherte BCrypt-Hash.
+/// Berechtigung = seine Rolle prüfen. Ein richtiges Passwort allein öffnet noch kein Admin-Dashboard.
 /// </summary>
 public static class AuthService
 {
     public const string MegakrasserAdminRolle = "SuperKrasserAdmin";
 
-        // Spalte 6: Standardrollen. „r.unternehmen_id IS NULL“ verhindert, dass eine gleichnamige
-    // eigene Rolle (z. B. „Kundenadmin“) deren Rechte bekommt.
-    // Spalte 7: eigene Rollen der Firma mit ihren freigeschalteten Ansichten aus K03.
+    // Reihenfolge der Spalten: 0 id, 1 vorname, 2 nachname, 3 sprache, 4 unternehmen_id,
+    // 5 auth_user_id, 6 passwort_hash, 7 Rollen als JSON.
     private const string BenutzerSpalten = """
-        b.benutzer_id, b.vorname, b.nachname, b.sprache, b.unternehmen_id, b.passwort_hash,
+        b.benutzer_id, b.vorname, b.nachname, b.sprache, b.unternehmen_id, b.auth_user_id, b.passwort_hash,
         COALESCE((SELECT json_agg(r.bezeichnung ORDER BY r.bezeichnung)
                   FROM public.benutzer_rolle br
                   JOIN public.rolle r ON r.rollen_id = br.rollen_id
@@ -77,16 +84,16 @@ public static class AuthService
     public static async Task<AngemeldeterBenutzer?> LoginAsync(string firma, string email, string passwort,
         CancellationToken cancellationToken = default)
     {
+        System.Diagnostics.Debug.WriteLine($"[Login] Start: Firma='{firma}', E-Mail-Länge={email?.Length}, Passwort-Länge={passwort?.Length}");
         var firmenkennung = (firma ?? string.Empty).Trim();
-        var kontoEmail = (email ?? string.Empty).Trim();
+        var kontoEmail = (email ?? string.Empty).Trim().ToLowerInvariant();
         if (kontoEmail.Length is 0 or > 254 || firmenkennung.Length > 200 ||
-            string.IsNullOrEmpty(passwort) || Encoding.UTF8.GetByteCount(passwort) > 72)
+            string.IsNullOrEmpty(passwort) || passwort.Length > 128)
         {
-            // Klassisches BCrypt berücksichtigt höchstens 72 UTF-8-Bytes eines Passworts.
-            // Längere Eingaben werden abgelehnt, damit kein Passwortrest unbemerkt abgeschnitten wird.
             return null;
         }
 
+        // 1. Fachkonto in der eigenen Tabelle suchen. Das Passwort geht dabei NICHT an SQL.
         string query;
         string?[] parameters;
         if (firmenkennung.Length == 0)
@@ -122,8 +129,6 @@ public static class AuthService
             parameters = new string?[] { kontoEmail, firmenkennung };
         }
 
-        // Eine gemeinsame Konfiguration in Database.cs statt mehrerer Zugangsdaten-Kopien.
-        // $1 und $2 übertragen Eingaben als Daten. Das Klartext-Passwort geht NICHT an SQL.
         var rows = await new NeonSqlClient().QueryAsync(query, parameters, cancellationToken).ConfigureAwait(false);
         if (rows.Count != 1)
         {
@@ -132,17 +137,52 @@ public static class AuthService
         }
 
         var row = rows[0];
-        var storedHash = Required(row, 5);
-        cancellationToken.ThrowIfCancellationRequested();
+        var benutzerId = Required(row, 0);
+        var gespeicherteAuthId = row[5];
 
-        // ConfigureAwait(false) setzt die Fortsetzung außerhalb des UI-Kontexts fort.
-        // BCrypt kostet Rechenzeit; die Oberfläche muss während der Anmeldung bedienbar bleiben.
-        // Verify vergleicht das eingegebene Passwort mit dem gespeicherten BCrypt-Hash.
-        // Der Hash wird weder angezeigt noch in AngemeldeterBenutzer übernommen.
-        // Offizielle Bibliothek: https://github.com/BcryptNet/bcrypt.net
-        if (!PasswortPasst(passwort, storedHash))
+        if (gespeicherteAuthId is not null)
         {
-            return null;
+            // 2a. Schon mit Neon Auth verknüpft: Nur Neon Auth prüft das Passwort. Dadurch wirkt
+            // auch ein über „Passwort vergessen“ neu gesetztes Passwort sofort.
+            var anmeldung = await NeonAuthClient.Instanz.AnmeldenAsync(kontoEmail, passwort, cancellationToken)
+                .ConfigureAwait(false);
+            System.Diagnostics.Debug.WriteLine($"[Login] Neon Auth: Erfolg={anmeldung.Erfolg}, Fehler={anmeldung.Fehler}, Firma='{firmenkennung}'");
+            if (!anmeldung.Erfolg || anmeldung.Nutzer is null ||
+                !string.Equals(gespeicherteAuthId, anmeldung.Nutzer.Id, StringComparison.Ordinal))
+            {
+                // Falsches Passwort, oder die E-Mail gehört bei Neon Auth zu einer anderen Identität.
+                return null;
+            }
+        }
+        else
+        {
+            // 2b. Noch nicht verknüpft: Das bisherige Passwort (BCrypt-Hash) muss stimmen.
+            // Wichtig: Bei Neon Auth kann sich jeder selbst registrieren. Eine Neon-Auth-Anmeldung
+            // allein beweist deshalb NICHT, dass jemand Besitzer dieses Kontos ist.
+            if (!PasswortPasst(passwort, Required(row, 6)))
+            {
+                return null;
+            }
+
+            // Erst wenn das bisherige Passwort bewiesen ist, wird das Konto mit einem Neon-Auth-Konto
+            // derselben E-Mail und desselben Passworts verknüpft. Danach gilt Schritt 2a.
+            // Ohne passendes Neon-Auth-Konto bleibt es beim bisherigen Passwort.
+            var anmeldung = await NeonAuthClient.Instanz.AnmeldenAsync(kontoEmail, passwort, cancellationToken)
+                .ConfigureAwait(false);
+            if (anmeldung.Erfolg && anmeldung.Nutzer is not null)
+            {
+                // "auth_user_id IS NULL" verhindert, dass ein bereits verknüpftes Konto überschrieben wird.
+                // NOT EXISTS: Eine Neon-Auth-Identität gehört zu höchstens einem Konto (eindeutiger Index).
+                // Hat dieselbe E-Mail schon ein Konto in einer anderen Firma verknüpft, bleibt dieses
+                // Konto beim bisherigen Passwort, statt dass die Anmeldung mit einem Fehler abbricht.
+                await new NeonSqlClient().QueryAsync("""
+                    UPDATE public.benutzer SET auth_user_id = $2
+                    WHERE benutzer_id = $1::bigint AND auth_user_id IS NULL
+                      AND NOT EXISTS (SELECT 1 FROM public.benutzer andere WHERE andere.auth_user_id = $2)
+                    """,
+                    new string?[] { benutzerId, anmeldung.Nutzer.Id }, cancellationToken).ConfigureAwait(false);
+                System.Diagnostics.Debug.WriteLine($"[Login] Treffer in benutzer: {rows.Count}");
+            }
         }
 
         cancellationToken.ThrowIfCancellationRequested();
@@ -150,7 +190,7 @@ public static class AuthService
         var eigeneRollen = JsonSerializer.Deserialize<EigeneRolle[]>(Required(row, 7),
         new JsonSerializerOptions(JsonSerializerDefaults.Web)) ?? Array.Empty<EigeneRolle>();
         var benutzer = new AngemeldeterBenutzer(
-            long.Parse(Required(row, 0), CultureInfo.InvariantCulture),
+            long.Parse(benutzerId, CultureInfo.InvariantCulture),
             Required(row, 1), Required(row, 2), Required(row, 3),
             row[4] is null ? null : long.Parse(Required(row, 4), CultureInfo.InvariantCulture),
             Array.AsReadOnly(rollen))
@@ -201,8 +241,76 @@ public static class AuthService
         }
     }
 
+    /// <summary>
+    /// Prüft vor jedem Laden oder Speichern von Firmendaten erneut in Neon, ob das Konto die Rolle
+    /// noch hat, und liefert die Firma, deren Daten gelesen werden dürfen. Beim Admin-Zugang wird
+    /// stattdessen die MegakrasserAdmin-Rolle geprüft. Jede Firmenansicht mit Daten ruft das zuerst auf
+    /// und verwendet danach nur die zurückgegebene UnternehmenId in ihren SQL-Abfragen.
+    /// </summary>
+    /// <exception cref="UnauthorizedAccessException">Rolle entzogen, Konto deaktiviert oder abgemeldet.</exception>
+    /// <exception cref="InvalidOperationException">Debug-Vorschau ohne Firma: Es gibt keine Firmendaten.</exception>
+    public static async Task<FirmenZugriff> FirmenZugriffPruefenAsync(FirmenRolle rolle,
+        CancellationToken cancellationToken = default)
+    {
+        if (BenutzerSitzung.IstFirmenVorschau)
+        {
+            throw new InvalidOperationException("In der Vorschau ohne Anmeldung werden keine Firmendaten geladen.");
+        }
+
+        if (BenutzerSitzung.Firmenzugang is AdminFirmenzugang zugang)
+        {
+            // Ein MegakrasserAdmin schaut in eine Kundenfirma. Er hat dort alle Büro-Rollen,
+            // aber nur solange seine Admin-Rolle besteht. Abteilungsgrenzen gelten für ihn nicht.
+            await DashboardZugriffPruefenAsync(cancellationToken).ConfigureAwait(false);
+            if (!ReferenceEquals(zugang, BenutzerSitzung.Firmenzugang))
+            {
+                throw new UnauthorizedAccessException("Der Admin-Zugang zu dieser Firma ist beendet.");
+            }
+
+            return new FirmenZugriff(zugang.UnternehmenId, null);
+        }
+
+        var benutzer = BenutzerSitzung.AktuellerBenutzer;
+        if (benutzer?.UnternehmenId is not long unternehmenId || !benutzer.FirmenRollen.Contains(rolle))
+        {
+            throw new UnauthorizedAccessException("Für diese Ansicht fehlt Ihrem Konto die passende Rolle.");
+        }
+
+        // Konto aktiv, gleiche Firma und Rolle noch vorhanden? Die Abteilung wird für die Ansichten
+        // des Abteilungsleiters mitgeliefert, damit sie nur die eigene Abteilung zeigen.
+        const string query = """
+            SELECT b.unternehmen_id, b.abteilung_id FROM public.benutzer b
+            WHERE b.benutzer_id = $1::bigint AND b.aktiv = true AND b.unternehmen_id = $2::bigint
+              AND EXISTS (SELECT 1 FROM public.benutzer_rolle br
+                          JOIN public.rolle r ON r.rollen_id = br.rollen_id
+                          WHERE br.benutzer_id = b.benutzer_id AND r.bezeichnung = $3)
+            """;
+        var rows = await new NeonSqlClient().QueryAsync(query, new string?[]
+        {
+            benutzer.Id.ToString(CultureInfo.InvariantCulture),
+            unternehmenId.ToString(CultureInfo.InvariantCulture),
+            FirmenRollenKatalog.DatenbankName(rolle)
+        }, cancellationToken).ConfigureAwait(false);
+        if (rows.Count != 1 || !ReferenceEquals(benutzer, BenutzerSitzung.AktuellerBenutzer) ||
+            BenutzerSitzung.Firmenzugang is not null)
+        {
+            // Während await könnte eine Abmeldung passiert sein. Auch diesen Fall lehnen wir ab.
+            throw new UnauthorizedAccessException("Die Berechtigung für diese Ansicht ist nicht mehr vorhanden. Bitte melden Sie sich erneut an.");
+        }
+
+        long? abteilungId = rows[0][1] is string abteilung ? long.Parse(abteilung, CultureInfo.InvariantCulture) : null;
+        return new FirmenZugriff(unternehmenId, abteilungId);
+    }
+
     private static bool PasswortPasst(string passwort, string hash)
     {
+        // Klassisches BCrypt berücksichtigt höchstens 72 UTF-8-Bytes eines Passworts.
+        // Längere Eingaben werden abgelehnt, damit kein Passwortrest unbemerkt abgeschnitten wird.
+        if (Encoding.UTF8.GetByteCount(passwort) > 72)
+        {
+            return false;
+        }
+
         try
         {
             // Ungültige alte Hash-Daten ermöglichen keine Anmeldung.

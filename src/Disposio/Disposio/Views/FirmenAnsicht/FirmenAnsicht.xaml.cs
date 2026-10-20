@@ -13,9 +13,9 @@ using Windows.UI;
 
 namespace Disposio.Views
 {
-    // Grundgerüst für alle Firmenkonten: links das Menü je Rolle, rechts die gewählte Ansicht.
-    // Die Ansichten sind noch leer. Sie bekommen ihre Daten, wenn sie einzeln gebaut werden;
-    // jede Ansicht mit Daten muss dann vor dem Laden die Rolle erneut in Neon prüfen.
+    // Rahmen für alle Firmenkonten: links das Menü je Rolle, rechts die gewählte Ansicht.
+    // Die Ansichten selbst liegen in eigenen Dateien je Rollenbereich (Kundenadmin/, Fuhrpark/ …).
+    // Jede Ansicht mit Firmendaten prüft vor dem Laden AuthService.FirmenZugriffPruefenAsync.
     public sealed partial class FirmenAnsicht : Page
     {
         private static readonly string[] AccentColors =
@@ -150,7 +150,8 @@ namespace Disposio.Views
 
         // ── Ansichten wechseln ───────────────────────────────────────────────────────────
 
-        private void Open(string id)
+        // parameter ist ein optionaler Startwert, zum Beispiel die Fahrzeug-Id, wenn F01 die Ansicht F02 öffnet.
+        private void Open(string id, object? parameter = null)
         {
             if (!EnsureAccess())
                 return;
@@ -180,6 +181,18 @@ namespace Disposio.Views
             ContentScroll.ChangeView(null, 0, null, true);
         }
 
+        // Jede fertige Ansicht steht in der Datei ihres Rollenbereichs, zum Beispiel Fuhrpark/FuhrparkAnsichten.cs.
+        // So arbeitet jeder in seinem eigenen Ordner. Ohne Eintrag erscheint der Platzhalter.
+        private static UIElement? CreateView(FirmenAnsichtKontext kontext) => kontext.Ansicht.Rolle switch
+        {
+            FirmenRolle.Disponent => DispositionAnsichten.Erstellen(kontext),
+            FirmenRolle.Fuhrparkmanager => FuhrparkAnsichten.Erstellen(kontext),
+            FirmenRolle.Abteilungsleiter => AbteilungAnsichten.Erstellen(kontext),
+            FirmenRolle.Inhaber => GeschaeftsfuehrungAnsichten.Erstellen(kontext),
+            FirmenRolle.Kundenadmin => KundenadminAnsichten.Erstellen(kontext),
+            _ => null
+        };
+
         private void BuildMenu(string activeId)
         {
             MenuPanel.Children.Clear();
@@ -197,7 +210,7 @@ namespace Disposio.Views
 
                 foreach (AnsichtInfo item in AnsichtenKatalog.Menue(rolle))
                 {
-                    var button = new Button { Content = item.Menuename, Style = (Style)Resources["MenuButton"] };
+                    var button = new Button { Content = item.Menuename, Style = Stil("MenuButton") };
                     if (item.Id == activeId)
                     {
                         button.Background = Brush("AccentBrush");
@@ -265,82 +278,7 @@ namespace Disposio.Views
             return Card(content);
         }
 
-        // K03 zeigt schon echte Inhalte: die Rollen eines Unternehmens und ihre Aufgaben.
-        private UIElement CreateRolesView()
-        {
-            // Die letzte Spalte nimmt den Rest der Breite; lange Aufgaben brechen dort um.
-            var table = new Grid { ColumnSpacing = 18 };
-            table.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1.1, GridUnitType.Star) });
-            table.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-            table.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(2, GridUnitType.Star) });
-
-            IReadOnlyList<FirmenRolle> eigeneRollen = BenutzerSitzung.AktuellerBenutzer?.FirmenRollen ?? Array.Empty<FirmenRolle>();
-            AddRow(table, true, "Rolle", "Bereich", "Aufgaben", false);
-            foreach (FirmenRolle rolle in FirmenRollenKatalog.Alle)
-            {
-                AddRow(table, false, FirmenRollenKatalog.Bezeichnung(rolle), FirmenRollenKatalog.Bereich(rolle),
-                    FirmenRollenKatalog.Aufgaben(rolle), eigeneRollen.Contains(rolle));
-            }
-
-            var content = new StackPanel { Spacing = 18 };
-            content.Children.Add(new TextBlock
-            {
-                Text = "Rollen im Unternehmen",
-                FontSize = 22,
-                FontWeight = FontWeights.SemiBold,
-                Foreground = Brush("TextBrush")
-            });
-            content.Children.Add(table);
-            content.Children.Add(Muted("Ein Konto kann mehrere Rollen haben. Das Menü zeigt dann die Bereiche aller Rollen. " +
-                "Detailrechte werden vor der Umsetzung der einzelnen Ansichten abgestimmt."));
-            content.Children.Add(GoButton("Zur Benutzerliste", "K01", primary: true));
-            return Card(content);
-        }
-
-        private void AddRow(Grid table, bool header, string rolle, string bereich, string aufgaben, bool eigeneRolle)
-        {
-            int row = table.RowDefinitions.Count;
-            table.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
-
-            var first = new StackPanel { Spacing = 2 };
-            first.Children.Add(Cell(rolle, header, bold: !header));
-            if (eigeneRolle)
-            {
-                first.Children.Add(new TextBlock
-                {
-                    Text = "Ihre Rolle",
-                    FontSize = 13,
-                    Foreground = Brush("AccentBrush"),
-                    FontWeight = FontWeights.SemiBold
-                });
-            }
-
-            string[] texts = { bereich, aufgaben };
-            for (int column = 0; column < 3; column++)
-            {
-                var cell = new Border
-                {
-                    BorderBrush = Brush("BorderBrush"),
-                    BorderThickness = new Thickness(0, 0, 0, 1),
-                    Padding = new Thickness(0, 12, 0, 12),
-                    Child = column == 0 ? first : Cell(texts[column - 1], header, bold: false)
-                };
-                Grid.SetRow(cell, row);
-                Grid.SetColumn(cell, column);
-                table.Children.Add(cell);
-            }
-        }
-
         // ── Kleine Bausteine ─────────────────────────────────────────────────────────────
-
-        private TextBlock Cell(string text, bool header, bool bold) => new()
-        {
-            Text = text,
-            FontSize = header ? 14 : 16,
-            FontWeight = header || bold ? FontWeights.SemiBold : FontWeights.Normal,
-            TextWrapping = TextWrapping.Wrap,
-            Foreground = Brush(header ? "MutedTextBrush" : "TextBrush")
-        };
 
         private TextBlock Text(string text) => new()
         {
@@ -363,7 +301,7 @@ namespace Disposio.Views
             var button = new Button
             {
                 Content = label,
-                Style = (Style)Resources[primary ? "PrimaryButton" : "DashboardButton"],
+                Style = Stil(primary ? "PrimaryButton" : "DashboardButton"),
                 HorizontalAlignment = HorizontalAlignment.Left
             };
             button.Click += (_, _) => Open(id);
@@ -392,6 +330,7 @@ namespace Disposio.Views
             SetBrush("TextBrush", _isLight ? "#101319" : "#ECEEF3");
             SetBrush("MutedTextBrush", _isLight ? "#525B6A" : "#B8C1D2");
             SetBrush("InputBrush", _isLight ? "#F0F0F0" : "#20232A");
+            SetBrush("ErrorBrush", _isLight ? "#B91C1C" : "#FF939B");
 
             Color accent = ParseColor(_accentHex);
             Color foreground = BestAccentForeground(accent);
@@ -402,11 +341,14 @@ namespace Disposio.Views
             SetBrush("AccentTextBrush", foreground);
         }
 
-        private SolidColorBrush Brush(string key) => (SolidColorBrush)Resources[key];
+        // Farben und Stile liegen in Themes/FirmenStil.xaml und gelten für alle Firmenansichten.
+        private static SolidColorBrush Brush(string key) => (SolidColorBrush)Application.Current.Resources[key];
 
-        private void SetBrush(string key, string hex) => SetBrush(key, ParseColor(hex));
+        private static Style Stil(string key) => (Style)Application.Current.Resources[key];
 
-        private void SetBrush(string key, Color color) => Brush(key).Color = color;
+        private static void SetBrush(string key, string hex) => SetBrush(key, ParseColor(hex));
+
+        private static void SetBrush(string key, Color color) => Brush(key).Color = color;
 
         private static Color ParseColor(string hex) => Color.FromArgb(
             0xFF,

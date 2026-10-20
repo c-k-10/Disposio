@@ -1,3 +1,4 @@
+using Disposio.Views.PasswortVergessen;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Controls.Primitives;
@@ -246,8 +247,19 @@ namespace Disposio.Views
                 LoginButton.Content = "Anmelden";
             }
         }
-    }
+
+      
+
+        private void PasswortVergessen_Click(object sender, RoutedEventArgs e)
+            {
+                Frame.Navigate(typeof(passwortVergessen));
+            }
+
+}
 
     // Übergabe beim Abmelden: Farbe/Thema bleiben erhalten, der Hinweis enthält keine Kontodaten.
     internal sealed record LoginNavigationParameter(DashboardAppearance Appearance, string Hinweis);
 }
+
+
+       

@@ -8,7 +8,8 @@
         <ResourceDictionary>
             <ResourceDictionary.MergedDictionaries>
                 <XamlControlsResources xmlns="using:Microsoft.UI.Xaml.Controls" />
-                <!-- Other merged dictionaries here -->
+                <!-- Farben und Stile der Firmenansicht. Das Admin-Dashboard hat eigene Kopien in seiner Seite. -->
+                <ResourceDictionary Source="ms-appx:///Themes/FirmenStil.xaml" />
             </ResourceDictionary.MergedDictionaries>
             <!-- Other app resources here -->
         </ResourceDictionary>
