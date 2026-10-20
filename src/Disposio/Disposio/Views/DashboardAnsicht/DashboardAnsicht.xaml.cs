@@ -30,6 +30,7 @@ namespace Disposio.Views
 
         private readonly HashSet<Kunde> _observedCustomers = new();
         private readonly IUnternehmenRepository _unternehmenRepository = new UnternehmenRepository();
+        private readonly IBenutzerRepository _benutzerRepository = new BenutzerRepository();
         private CancellationTokenSource? _loadCancellation;
         private bool _isLoading;
         private bool _hasDataLoaded;
@@ -658,6 +659,245 @@ namespace Disposio.Views
                     ReturnToLogin("Dein Zugriff ist nicht mehr verfügbar. Bitte melde dich erneut an.");
             }
         }
+
+        private async void CreateKundenadmin_Click(object sender, RoutedEventArgs e)
+        {
+            if (sender is Button { DataContext: Kunde customer })
+                await CreateKundenadminAsync(customer);
+        }
+
+        // Der MegakrasserAdmin legt für ein Unternehmen den Kundenadmin an.
+        // Weitere Benutzer legt danach der Kundenadmin selbst an.
+        private async Task CreateKundenadminAsync(Kunde customer)
+        {
+            if (!EnsureDashboardAccess())
+                return;
+
+            if (_dialogOpen || _isLoading || !_canEditCustomers || XamlRoot is null)
+                return;
+
+            _dialogOpen = true;
+            UpdateDataActions();
+            bool accessRevoked = false;
+            try
+            {
+                var firstNameBox = CreateTextBox("");
+                var lastNameBox = CreateTextBox("");
+                // Vorausgefüllt mit der E-Mail, die beim Unternehmen für den Kundenadmin hinterlegt ist.
+                var emailBox = CreateTextBox(customer.AdminEmail);
+                var passwordBox = CreatePasswordBox();
+                var repeatBox = CreatePasswordBox();
+                firstNameBox.MaxLength = 100;
+                lastNameBox.MaxLength = 100;
+                emailBox.MaxLength = 254;
+
+                var errorText = new TextBlock
+                {
+                    FontSize = 14,
+                    TextWrapping = TextWrapping.Wrap,
+                    Foreground = new SolidColorBrush(ParseColor(_isLight ? "#B91C1C" : "#FF939B")),
+                    Visibility = Visibility.Collapsed,
+                    Margin = new Thickness(0, 12, 0, 0)
+                };
+                var form = new StackPanel
+                {
+                    Spacing = 18,
+                    Width = Math.Min(488, Math.Max(0, XamlRoot.Size.Width - 96))
+                };
+                form.Children.Add(new TextBlock
+                {
+                    Text = $"Für {customer.Firmenname} (Kennung: {customer.Kennung})",
+                    FontSize = 14,
+                    TextWrapping = TextWrapping.Wrap,
+                    Foreground = Brush("MutedTextBrush")
+                });
+                AddField(form, "Vorname", firstNameBox);
+                AddField(form, "Nachname", lastNameBox);
+                AddField(form, "E-Mail (für die Anmeldung)", emailBox);
+                AddField(form, "Startpasswort (mindestens 8 Zeichen)", passwordBox);
+                AddField(form, "Startpasswort wiederholen", repeatBox);
+
+                var dialog = CreateDialog("Kundenadmin anlegen");
+                var cancelButton = new Button { Content = "Abbrechen", Style = (Style)Resources["DashboardButton"] };
+                var saveButton = new Button { Content = "Speichern", Style = (Style)Resources["PrimaryButton"] };
+                var footer = new StackPanel
+                {
+                    Orientation = Orientation.Horizontal,
+                    HorizontalAlignment = HorizontalAlignment.Right,
+                    Spacing = 10,
+                    Margin = new Thickness(0, 8, 0, 0)
+                };
+                footer.Children.Add(cancelButton);
+                footer.Children.Add(saveButton);
+                dialog.PrimaryButtonText = "";
+                dialog.SecondaryButtonText = "";
+                dialog.CloseButtonText = "";
+
+                // Gleicher Aufbau wie beim Kundendialog: Felder scrollen, Meldung und Buttons bleiben sichtbar.
+                var dialogContent = new Grid { MaxHeight = 560, Width = form.Width };
+                dialogContent.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
+                dialogContent.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+                dialogContent.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+                dialogContent.Children.Add(new ScrollViewer
+                {
+                    Content = form,
+                    VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
+                    HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled
+                });
+                Grid.SetRow(errorText, 1);
+                dialogContent.Children.Add(errorText);
+                Grid.SetRow(footer, 2);
+                dialogContent.Children.Add(footer);
+                dialog.Content = dialogContent;
+
+                bool isSaving = false;
+                void ShowError(string message, Control field)
+                {
+                    errorText.Text = message;
+                    errorText.Visibility = Visibility.Visible;
+                    field.Focus(FocusState.Programmatic);
+                }
+
+                void SetInputsEnabled(bool enabled)
+                {
+                    firstNameBox.IsEnabled = lastNameBox.IsEnabled = emailBox.IsEnabled = enabled;
+                    passwordBox.IsEnabled = repeatBox.IsEnabled = enabled;
+                    saveButton.IsEnabled = cancelButton.IsEnabled = enabled;
+                }
+
+                foreach (TextBox field in new[] { firstNameBox, lastNameBox, emailBox })
+                    field.TextChanged += (_, _) => errorText.Visibility = Visibility.Collapsed;
+                passwordBox.PasswordChanged += (_, _) => errorText.Visibility = Visibility.Collapsed;
+                repeatBox.PasswordChanged += (_, _) => errorText.Visibility = Visibility.Collapsed;
+                dialog.Opened += (_, _) => firstNameBox.Focus(FocusState.Programmatic);
+
+                async Task TrySaveAsync()
+                {
+                    // Doppelklick oder Enter während des Speicherns darf kein zweites Konto anlegen.
+                    if (isSaving)
+                        return;
+
+                    string email = emailBox.Text.Trim();
+                    if (firstNameBox.Text.Trim().Length == 0)
+                    {
+                        ShowError("Bitte einen Vornamen eingeben.", firstNameBox);
+                        return;
+                    }
+                    if (lastNameBox.Text.Trim().Length == 0)
+                    {
+                        ShowError("Bitte einen Nachnamen eingeben.", lastNameBox);
+                        return;
+                    }
+                    if (!MailAddress.TryCreate(email, out MailAddress? address) ||
+                        !string.Equals(address.Address, email, StringComparison.OrdinalIgnoreCase))
+                    {
+                        ShowError("Bitte eine gültige E-Mail-Adresse eingeben.", emailBox);
+                        return;
+                    }
+                    if (passwordBox.Password.Length < 8)
+                    {
+                        ShowError("Das Startpasswort braucht mindestens 8 Zeichen.", passwordBox);
+                        return;
+                    }
+                    if (!string.Equals(passwordBox.Password, repeatBox.Password, StringComparison.Ordinal))
+                    {
+                        ShowError("Die beiden Passwörter stimmen nicht überein.", repeatBox);
+                        return;
+                    }
+
+                    var draft = new BenutzerEntwurf(customer.Id, firstNameBox.Text, lastNameBox.Text,
+                        email, passwordBox.Password);
+                    isSaving = true;
+                    SetInputsEnabled(false);
+                    saveButton.Content = "Speichert …";
+                    errorText.Visibility = Visibility.Collapsed;
+                    try
+                    {
+                        await _benutzerRepository.KundenadminAnlegenAsync(draft);
+
+                        // Erst nach der Bestätigung aus Neon die Anzeige ändern.
+                        // Benutzer++ aktualisiert Karte und Kennzahl „Benutzer“ automatisch.
+                        customer.Benutzer++;
+                        DatabaseStatusText.Text = $"Kundenadmin für {customer.Firmenname} wurde angelegt.";
+                        isSaving = false;
+                        dialog.Hide();
+                    }
+                    catch (UnauthorizedAccessException)
+                    {
+                        accessRevoked = true;
+                        isSaving = false;
+                        dialog.Hide();
+                    }
+                    catch (BenutzerEmailVergebenException exception)
+                    {
+                        errorText.Text = exception.Message;
+                        errorText.Visibility = Visibility.Visible;
+                    }
+                    catch (ArgumentException exception)
+                    {
+                        // Diese Meldungen stammen aus unserer eigenen Prüfung im Repository.
+                        errorText.Text = exception.Message;
+                        errorText.Visibility = Visibility.Visible;
+                    }
+                    catch (Exception)
+                    {
+                        errorText.Text = "Speichern konnte nicht bestätigt werden. Prüfe die Verbindung und lade die Liste neu, bevor du es erneut versuchst.";
+                        errorText.Visibility = Visibility.Visible;
+                    }
+                    finally
+                    {
+                        isSaving = false;
+                        SetInputsEnabled(true);
+                        saveButton.Content = "Speichern";
+                    }
+                }
+
+                saveButton.Click += async (_, _) => await TrySaveAsync();
+                cancelButton.Click += (_, _) => { if (!isSaving) dialog.Hide(); };
+                dialog.Closing += (_, args) => args.Cancel = isSaving;
+                dialog.PreviewKeyDown += async (_, args) =>
+                {
+                    if (isSaving)
+                        return;
+
+                    if (args.Key == Windows.System.VirtualKey.Escape)
+                    {
+                        args.Handled = true;
+                        dialog.Hide();
+                    }
+                    else if (args.Key == Windows.System.VirtualKey.Enter &&
+                        Microsoft.UI.Xaml.Input.FocusManager.GetFocusedElement(XamlRoot) is not Button)
+                    {
+                        args.Handled = true;
+                        await TrySaveAsync();
+                    }
+                };
+
+                await dialog.ShowAsync();
+            }
+            finally
+            {
+                _dialogOpen = false;
+                UpdateDataActions();
+                if (accessRevoked)
+                    ReturnToLogin("Dein Zugriff ist nicht mehr verfügbar. Bitte melde dich erneut an.");
+            }
+        }
+
+        // PasswordBox zeigt Punkte statt Klartext. Optik wie FormTextBox, da dieser Style nur für TextBox gilt.
+        private PasswordBox CreatePasswordBox() => new()
+        {
+            Background = Brush("InputBrush"),
+            Foreground = Brush("TextBrush"),
+            BorderBrush = Brush("BorderBrush"),
+            BorderThickness = new Thickness(1),
+            CornerRadius = new CornerRadius(10),
+            MinHeight = 50,
+            Padding = new Thickness(14, 10, 14, 10),
+            FontSize = 16,
+            MaxLength = 72,
+            HorizontalAlignment = HorizontalAlignment.Stretch
+        };
 
         private TextBox CreateTextBox(string text) => new()
         {
