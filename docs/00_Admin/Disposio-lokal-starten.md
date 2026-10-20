@@ -42,8 +42,36 @@ Führe die Skripte nur nach Prüfung und Sicherung der Zieldatenbank aus. Die Wi
 hat weder Migrationen ausgeführt noch Konten angelegt.
 
 Das vorhandene Werkzeug `tools/AdminKontoEinrichten` kann ein neues Plattformkonto anlegen.
-Es verwendet dieselbe Umgebungsvariable und fragt das neue Passwort lokal verdeckt ab.
-Bestehende Konten werden nicht überschrieben. Nur nach bewusstem Entschluss ausführen.
+Es verwendet dieselbe Umgebungsvariable und fragt E-Mail, Vorname und Nachname ab, danach das
+neue Passwort lokal verdeckt. Das Passwort tippt die Person selbst ein, der das Konto gehört.
+Bestehende Konten werden nicht überschrieben. Nur nach bewusstem Entschluss ausführen:
+
+```powershell
+dotnet run --project tools/AdminKontoEinrichten
+```
+
+Jeder Projektbesitzer hat ein eigenes MegakrassenAdmin-Konto (Stand 20.10.2026:
+`admin@disposio.com` = Niklas Bäricke; Konten für Christina Kiesl und Pavlos Laskaridis
+werden mit dem Werkzeug angelegt). Kein Sammelkonto teilen, sonst ist im Protokoll nicht
+erkennbar, wer etwas geändert hat.
+
+## Aktionsprotokoll
+
+Anlegen und Bearbeiten eines Unternehmens im Dashboard schreibt im selben SQL-Befehl einen
+Eintrag in `public.aktionsprotokoll`: Konto (`benutzer_id`), Zeitpunkt, Aktion und beim
+Bearbeiten die geänderten Felder. Eine Anzeige in der App gibt es noch nicht. Nachsehen in
+Neon (SQL Editor):
+
+```sql
+SELECT p.zeitpunkt, b.vorname || ' ' || b.nachname AS admin, p.aktion, u.firmenname, p.detail
+FROM public.aktionsprotokoll p
+JOIN public.unternehmen u ON u.unternehmen_id = p.unternehmen_id
+LEFT JOIN public.benutzer b ON b.benutzer_id = p.benutzer_id
+ORDER BY p.zeitpunkt DESC;
+```
+
+Einträge aus der Entwicklungsansicht (Debug-Profil ohne Anmeldung) haben kein Konto und
+`akteur_art = 'Entwicklungsansicht'`.
 
 Firmenkonten werden anhand von Kennung oder Firmenname und BCrypt-Passwort geprüft.
 Eine eigene Firmenansicht ist im wiederhergestellten Branch noch nicht angebunden.
