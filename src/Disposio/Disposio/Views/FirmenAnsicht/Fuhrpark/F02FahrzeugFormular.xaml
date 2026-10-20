@@ -1,0 +1,145 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- F02 „Fahrzeug anlegen / bearbeiten“: zurzeit nur Anlegen. Pflichtfelder sind mit * markiert. -->
+<UserControl
+    x:Class="Disposio.Views.F02FahrzeugFormular"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+    <Border Style="{StaticResource KarteStyle}">
+        <StackPanel Spacing="22">
+            <TextBlock Text="Fahrzeug" Style="{StaticResource UeberschriftText}" />
+            <Grid ColumnSpacing="18" RowSpacing="16">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                </Grid.RowDefinitions>
+
+                <StackPanel>
+                    <TextBlock Text="Kennzeichen *" Style="{StaticResource FeldLabel}" />
+                    <TextBox x:Name="KennzeichenBox" Style="{StaticResource FormTextBox}" MaxLength="15"
+                             PlaceholderText="z. B. H-FC 402" AutomationProperties.Name="Kennzeichen" />
+                </StackPanel>
+                <StackPanel Grid.Column="1">
+                    <TextBlock Text="Fahrzeugklasse *" Style="{StaticResource FeldLabel}" />
+                    <ComboBox x:Name="KlasseBox" Style="{StaticResource FormComboBox}" PlaceholderText="Bitte wählen"
+                              AutomationProperties.Name="Fahrzeugklasse" />
+                </StackPanel>
+
+                <StackPanel Grid.Row="1">
+                    <TextBlock Text="Hersteller *" Style="{StaticResource FeldLabel}" />
+                    <TextBox x:Name="HerstellerBox" Style="{StaticResource FormTextBox}" MaxLength="100"
+                             PlaceholderText="z. B. MAN" AutomationProperties.Name="Hersteller" />
+                </StackPanel>
+                <StackPanel Grid.Row="1" Grid.Column="1">
+                    <TextBlock Text="Modell *" Style="{StaticResource FeldLabel}" />
+                    <TextBox x:Name="ModellBox" Style="{StaticResource FormTextBox}" MaxLength="100"
+                             PlaceholderText="z. B. TGX 18.470" AutomationProperties.Name="Modell" />
+                </StackPanel>
+
+                <StackPanel Grid.Row="2">
+                    <TextBlock Text="Baujahr *" Style="{StaticResource FeldLabel}" />
+                    <TextBox x:Name="BaujahrBox" Style="{StaticResource FormTextBox}" MaxLength="4" InputScope="Number"
+                             PlaceholderText="z. B. 2021" AutomationProperties.Name="Baujahr" />
+                </StackPanel>
+                <StackPanel Grid.Row="2" Grid.Column="1">
+                    <TextBlock Text="Kilometerstand *" Style="{StaticResource FeldLabel}" />
+                    <TextBox x:Name="KilometerBox" Style="{StaticResource FormTextBox}" MaxLength="11" InputScope="Number"
+                             PlaceholderText="z. B. 184.250" AutomationProperties.Name="Kilometerstand" />
+                </StackPanel>
+
+                <StackPanel Grid.Row="3">
+                    <TextBlock Text="TÜV fällig am *" Style="{StaticResource FeldLabel}" />
+                    <CalendarDatePicker x:Name="TuevPicker" Style="{StaticResource FormDatePicker}"
+                                        PlaceholderText="Datum wählen" DateFormat="{}{day.integer(2)}.{month.integer(2)}.{year.full}"
+                                        AutomationProperties.Name="TÜV fällig am" />
+                </StackPanel>
+                <StackPanel Grid.Row="3" Grid.Column="1">
+                    <TextBlock Text="Status *" Style="{StaticResource FeldLabel}" />
+                    <ComboBox x:Name="StatusBox" Style="{StaticResource FormComboBox}" AutomationProperties.Name="Status" />
+                </StackPanel>
+
+                <StackPanel Grid.Row="4">
+                    <TextBlock Text="Abteilung" Style="{StaticResource FeldLabel}" />
+                    <ComboBox x:Name="AbteilungBox" Style="{StaticResource FormComboBox}" AutomationProperties.Name="Abteilung" />
+                </StackPanel>
+            </Grid>
+
+            <TextBlock Text="Laderaum" Style="{StaticResource UeberschriftText}" />
+            <Grid ColumnSpacing="18" RowSpacing="16">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                </Grid.RowDefinitions>
+
+                <StackPanel>
+                    <TextBlock Text="Aufbau *" Style="{StaticResource FeldLabel}" />
+                    <ComboBox x:Name="AufbauBox" Style="{StaticResource FormComboBox}" AutomationProperties.Name="Aufbau"
+                              SelectionChanged="Aufbau_SelectionChanged" />
+                </StackPanel>
+                <StackPanel Grid.Column="1">
+                    <TextBlock x:Name="TemperaturLabel" Text="Solltemperatur (°C)" Style="{StaticResource FeldLabel}" />
+                    <TextBox x:Name="TemperaturBox" Style="{StaticResource FormTextBox}" MaxLength="6"
+                             PlaceholderText="nur bei Frische" AutomationProperties.Name="Solltemperatur" />
+                </StackPanel>
+
+                <StackPanel Grid.Row="1">
+                    <TextBlock Text="Nutzlast (kg) *" Style="{StaticResource FeldLabel}" />
+                    <TextBox x:Name="NutzlastBox" Style="{StaticResource FormTextBox}" MaxLength="7" InputScope="Number"
+                             PlaceholderText="z. B. 25000" AutomationProperties.Name="Nutzlast in Kilogramm" />
+                </StackPanel>
+                <StackPanel Grid.Row="1" Grid.Column="1">
+                    <TextBlock Text="Euro-Palettenstellplätze *" Style="{StaticResource FeldLabel}" />
+                    <TextBox x:Name="StellplaetzeBox" Style="{StaticResource FormTextBox}" MaxLength="3" InputScope="Number"
+                             PlaceholderText="z. B. 33" AutomationProperties.Name="Euro-Palettenstellplätze" />
+                </StackPanel>
+
+                <StackPanel Grid.Row="2">
+                    <TextBlock Text="Nutzbare Ladelänge (m) *" Style="{StaticResource FeldLabel}" />
+                    <TextBox x:Name="LaengeBox" Style="{StaticResource FormTextBox}" MaxLength="6"
+                             PlaceholderText="z. B. 13,6" AutomationProperties.Name="Nutzbare Ladelänge in Metern" />
+                </StackPanel>
+                <StackPanel Grid.Row="2" Grid.Column="1">
+                    <TextBlock Text="Nutzbare Lademeter *" Style="{StaticResource FeldLabel}" />
+                    <TextBox x:Name="LademeterBox" Style="{StaticResource FormTextBox}" MaxLength="6"
+                             PlaceholderText="z. B. 13,6" AutomationProperties.Name="Nutzbare Lademeter" />
+                </StackPanel>
+
+                <StackPanel Grid.Row="3">
+                    <TextBlock Text="Innenbreite (m) *" Style="{StaticResource FeldLabel}" />
+                    <TextBox x:Name="BreiteBox" Style="{StaticResource FormTextBox}" MaxLength="6"
+                             PlaceholderText="z. B. 2,45" AutomationProperties.Name="Innenbreite in Metern" />
+                </StackPanel>
+                <StackPanel Grid.Row="3" Grid.Column="1">
+                    <TextBlock Text="Innenhöhe (m) *" Style="{StaticResource FeldLabel}" />
+                    <TextBox x:Name="HoeheBox" Style="{StaticResource FormTextBox}" MaxLength="6"
+                             PlaceholderText="z. B. 2,6" AutomationProperties.Name="Innenhöhe in Metern" />
+                </StackPanel>
+            </Grid>
+
+            <StackPanel Spacing="10">
+                <TextBlock Style="{StaticResource HinweisText}"
+                           Text="Pflichtfelder sind mit * markiert. Kommazahlen mit Komma oder Punkt eingeben, zum Beispiel 13,6." />
+                <TextBlock x:Name="FehlerAnzeige" Style="{StaticResource FehlerText}" Visibility="Collapsed" />
+                <StackPanel Orientation="Horizontal" Spacing="12">
+                    <Button x:Name="SpeichernButton" Content="Fahrzeug speichern" Style="{StaticResource PrimaryButton}"
+                            Click="Speichern_Click" />
+                    <Button x:Name="AbbrechenButton" Content="Abbrechen" Style="{StaticResource DashboardButton}"
+                            Click="Abbrechen_Click" />
+                </StackPanel>
+            </StackPanel>
+        </StackPanel>
+    </Border>
+</UserControl>

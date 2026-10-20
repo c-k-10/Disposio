@@ -10,6 +10,8 @@ namespace Disposio.Views
     {
         public static UIElement? Erstellen(FirmenAnsichtKontext kontext) => kontext.Ansicht.Id switch
         {
+            "F01" => new F01Fuhrpark(kontext),
+            "F02" => new F02FahrzeugFormular(kontext),
             _ => null
         };
     }

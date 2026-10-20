@@ -11,6 +11,10 @@ Ansicht. Die Ansichten tragen dieselben Wireframe-IDs wie der Prototyp (K01, D04
 - **K03 „Rollen & Rechte“** zeigt bereits echte Inhalte: alle Rollen mit Bereich und Aufgaben.
   Die eigenen Rollen des angemeldeten Kontos sind markiert. K03 liegt in einer eigenen Datei und
   ist das Beispiel dafür, wie eine fertige Ansicht aufgebaut ist.
+- **F01 „Fuhrparkübersicht“** lädt die Fahrzeuge der Firma aus `public.fahrzeug`. **F02** legt ein
+  Fahrzeug an (Bearbeiten folgt). Kennzeichen werden einheitlich gespeichert (Großbuchstaben, ohne
+  doppelte Leerzeichen); ein Kennzeichen, das es in der Firma schon gibt, lehnt die Datenbank ab.
+  Jedes neue Fahrzeug erzeugt einen Eintrag „Fahrzeug angelegt“ im Aktionsprotokoll.
 - Alle anderen Ansichten sind Platzhalter. Sie zeigen Titel, Zweck und Wireframe-ID und werden
   einzeln mit Inhalt gefüllt (siehe „So legt man eine neue Ansicht an“).
 - Jede Ansicht, die Firmendaten lädt oder speichert, prüft vorher mit
@@ -155,11 +159,15 @@ alle Büro-Rollen, ohne dass ein Testkonto nötig ist. Wie beim Dashboard gilt d
 | `Services/BenutzerSitzung.cs` | `FirmenansichtErlaubt`, der Admin-Zugang `Firmenzugang` und die Debug-Vorschau `FirmenVorschauStarten`. |
 | `Services/UnternehmenRepository.cs` | `FirmenzugangOeffnenAsync`: Rolle prüfen, Firma lesen und den Admin-Zugang protokollieren. |
 | `Views/DashboardAnsicht/DashboardAnsicht.xaml.cs` | „Einloggen“ öffnet nach Bestätigung die Firmenansicht der gewählten Firma. |
+| `Models/Fahrzeug.cs` | Fahrzeug, Formulareingaben (`FahrzeugEntwurf`) und die Auswahllisten für Klasse, Aufbau und Status. |
+| `Services/FahrzeugRepository.cs` | Fahrzeuge und Abteilungen laden, Fahrzeug anlegen. Prüft Rolle und Eingaben, protokolliert das Anlegen. |
+| `Views/FirmenAnsicht/Fuhrpark/F01Fuhrpark.xaml` | Fahrzeugliste mit „Erneut laden“ und „+ Fahrzeug anlegen“. |
+| `Views/FirmenAnsicht/Fuhrpark/F02FahrzeugFormular.xaml` | Formular „Fahrzeug anlegen“ mit Pflichtfeldprüfung. |
 
 ## Nächste Schritte
 
-- Die Ansichten einzeln mit Daten füllen: K01–K04 (Benutzer verwalten) und F01/F02 (Fuhrpark)
-  zuerst, weil Touren Fahrer und Fahrzeuge brauchen.
+- Die Ansichten einzeln mit Daten füllen: K01–K04 (Benutzer verwalten) und F02 „Bearbeiten“
+  als Nächstes, weil Touren Fahrer und Fahrzeuge brauchen.
 - Jede Tour gehört zu einer Abteilung (`tour.abteilung_id` ist Pflicht). Abteilungen anzulegen
   passt zum Kundenadmin (K02 „Abteilungszugriff“).
 - Für echte Anmeldetests je Rolle Testkonten anlegen (Schreibzugriff auf Neon, vorher absprechen).
