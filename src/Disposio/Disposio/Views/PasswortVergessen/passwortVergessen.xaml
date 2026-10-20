@@ -15,7 +15,7 @@
 
             <!-- Schritt 1: E-Mail eingeben -->
             <StackPanel x:Name="SchrittEmail" Spacing="12">
-                <TextBlock Text="Gib deine E-Mail-Adresse ein. Wir schicken dir einen Code zum Zurücksetzen."
+                <TextBlock Text="Geben Sie Ihre E-Mail-Adresse ein. Wir schicken Ihnen einen Code zum Zurücksetzen."
                            TextWrapping="Wrap" />
                 <TextBox x:Name="EmailBox" Header="E-Mail" PlaceholderText="name@firma.de"
                          InputScope="EmailSmtpAddress" KeyDown="EmailBox_KeyDown" />
