@@ -4,3 +4,12 @@
 # .NET build output (all projects and configurations)
 [Bb][Ii][Nn]/
 [Oo][Bb][Jj]/
+
+# Per-user Visual Studio files (VS rewrites them constantly)
+*.user
+*.suo
+*.Backup.tmp
+
+# Obsidian: personal window layout
+.obsidian/workspace.json
+.obsidian/workspace-mobile.json
