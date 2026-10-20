@@ -54,7 +54,7 @@ namespace Disposio.Views
 
                 foreach (AnsichtInfo item in punkte)
                 {
-                    var button = new Button { Content = item.Menuename, Style = (Style)Resources["MenuButton"] };
+                    var button = new Button { Content = item.Menuename, Style = Stil("MenuButton") };
                     if (item.Id == activeId)
                     {
                         button.Background = Brush("AccentBrush");
@@ -70,15 +70,15 @@ namespace Disposio.Views
 
         // ── K03 Rollen & Rechte ──────────────────────────────────────────────────────────
 
-        private UIElement CreateRollenUndRechteView()
+        private UIElement CreateRollenUndRechteView(FirmenAnsichtKontext kontext)
         {
             var root = new StackPanel { Spacing = 22 };
 
-            // Oben die Standardrollen mit ihren Aufgaben (Tabelle aus dem Grundgerüst).
-            root.Children.Add(CreateRolesView());
+            // Oben die Standardrollen mit ihren Aufgaben (Kundenadmin/K03RollenUndRechte.xaml).
+            root.Children.Add(new K03RollenUndRechte(kontext));
 
             // Darunter die eigenen Rollen des Unternehmens.
-            var newButton = new Button { Content = "+ Neue Rolle", Style = (Style)Resources["PrimaryButton"], IsEnabled = false };
+            var newButton = new Button { Content = "+ Neue Rolle", Style = Stil("PrimaryButton"), IsEnabled = false };
             var header = new Grid { ColumnSpacing = 16 };
             header.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
             header.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
@@ -182,7 +182,7 @@ namespace Disposio.Views
                 var button = new Button
                 {
                     Content = "Bearbeiten",
-                    Style = (Style)Resources["DashboardButton"],
+                    Style = Stil("DashboardButton"),
                     MinHeight = 36,
                     Padding = new Thickness(14, 4, 14, 4)
                 };
@@ -265,13 +265,13 @@ namespace Disposio.Views
             };
             editor.Children.Add(errorText);
 
-            var cancelButton = new Button { Content = "Abbrechen", Style = (Style)Resources["DashboardButton"] };
-            var saveButton = new Button { Content = "Rolle speichern", Style = (Style)Resources["PrimaryButton"] };
+            var cancelButton = new Button { Content = "Abbrechen", Style = Stil("DashboardButton") };
+            var saveButton = new Button { Content = "Rolle speichern", Style = Stil("PrimaryButton") };
             var buttons = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 10, HorizontalAlignment = HorizontalAlignment.Right };
             Button? deleteButton = null;
             if (rolle is not null)
             {
-                deleteButton = new Button { Content = "Rolle löschen", Style = (Style)Resources["DashboardButton"] };
+                deleteButton = new Button { Content = "Rolle löschen", Style = Stil("DashboardButton") };
                 buttons.Children.Add(deleteButton);
             }
             buttons.Children.Add(cancelButton);
