@@ -43,16 +43,19 @@ namespace Disposio
         /// <param name="args">Details about the launch request and process.</param>
         protected override void OnLaunched(Microsoft.UI.Xaml.LaunchActivatedEventArgs args)
         {
-            // Das Dashboard-Startprofil ist eine Vorschau für die Entwicklung. Im fertigen
-            // Release beginnt auch ein Aufruf mit --dashboard immer bei der Anmeldung.
-            bool openDashboard = false;
+            // Die Startprofile für Dashboard und Firmenansicht sind Vorschauen für die Entwicklung.
+            // Im fertigen Release beginnt auch ein Aufruf mit --dashboard oder --firmenansicht
+            // immer bei der Anmeldung.
+            StartAnsicht start = StartAnsicht.Anmeldung;
 #if DEBUG
-            openDashboard = Environment.GetCommandLineArgs()
-                .Skip(1)
-                .Any(argument => string.Equals(argument, "--dashboard", StringComparison.OrdinalIgnoreCase));
+            string[] arguments = Environment.GetCommandLineArgs().Skip(1).ToArray();
+            if (arguments.Any(argument => string.Equals(argument, "--dashboard", StringComparison.OrdinalIgnoreCase)))
+                start = StartAnsicht.DashboardVorschau;
+            else if (arguments.Any(argument => string.Equals(argument, "--firmenansicht", StringComparison.OrdinalIgnoreCase)))
+                start = StartAnsicht.FirmenVorschau;
 #endif
 
-            _window = new MainWindow(openDashboard);
+            _window = new MainWindow(start);
             _window.Activate();
         }
     }

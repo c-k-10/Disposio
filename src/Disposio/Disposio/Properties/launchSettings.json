@@ -4,6 +4,10 @@
       "commandName": "MsixPackage",
       "commandLineArgs": "--dashboard"
     },
+    "Disposio (Firmenansicht)": {
+      "commandName": "MsixPackage",
+      "commandLineArgs": "--firmenansicht"
+    },
     "Disposio (Package)": {
       "commandName": "MsixPackage"
     },

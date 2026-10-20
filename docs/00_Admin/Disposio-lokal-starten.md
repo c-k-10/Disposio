@@ -8,6 +8,8 @@ Stand: 13.10.2026. Arbeitsbranch: `recovery/desktop-2026-10-13`.
 Das normale Startprofil `Disposio (Package)` beginnt bei der Anmeldung. Das Profil
 `Disposio (Dashboard)` ist ausschließlich im Debug-Build eine gekennzeichnete
 Entwicklungsansicht. Sie verwendet echte Datenbankfunktionen; Speichern verändert echte Daten.
+Das Profil `Disposio (Firmenansicht)` zeigt ebenfalls nur im Debug-Build die Firmenansicht mit
+allen Büro-Rollen ohne Anmeldung. Sie lädt keine Firmendaten (siehe `docs/06_Design/Firmenansicht-WinUI.md`).
 
 ## Lokale Datenbankkonfiguration
 
