@@ -39,6 +39,13 @@ public sealed record AngemeldeterBenutzer(long Id, string Vorname, string Nachna
 }
 
 /// <summary>
+/// Ergebnis der Rechteprüfung für Firmendaten: Nur Daten dieser Firma dürfen gelesen oder geändert
+/// werden. AbteilungId ist die Abteilung des Kontos (falls zugeordnet); beim Admin-Zugang null.
+/// Ansichten des Abteilungsleiters zeigen damit nur die eigene Abteilung.
+/// </summary>
+public sealed record FirmenZugriff(long UnternehmenId, long? AbteilungId);
+
+/// <summary>
 /// Anmeldung = Fachkonto (Firma, Rolle) in der eigenen Tabelle finden + Passwort prüfen.
 /// Mit Neon Auth verknüpfte Konten prüft Neon Auth, alle anderen der gespeicherte BCrypt-Hash.
 /// Berechtigung = seine Rolle prüfen. Ein richtiges Passwort allein öffnet noch kein Admin-Dashboard.
@@ -213,6 +220,67 @@ public static class AuthService
             // Während await könnte eine Abmeldung passiert sein. Auch diesen Fall lehnen wir ab.
             throw new UnauthorizedAccessException("Die Dashboard-Berechtigung ist nicht mehr vorhanden. Bitte erneut anmelden.");
         }
+    }
+
+    /// <summary>
+    /// Prüft vor jedem Laden oder Speichern von Firmendaten erneut in Neon, ob das Konto die Rolle
+    /// noch hat, und liefert die Firma, deren Daten gelesen werden dürfen. Beim Admin-Zugang wird
+    /// stattdessen die MegakrasserAdmin-Rolle geprüft. Jede Firmenansicht mit Daten ruft das zuerst auf
+    /// und verwendet danach nur die zurückgegebene UnternehmenId in ihren SQL-Abfragen.
+    /// </summary>
+    /// <exception cref="UnauthorizedAccessException">Rolle entzogen, Konto deaktiviert oder abgemeldet.</exception>
+    /// <exception cref="InvalidOperationException">Debug-Vorschau ohne Firma: Es gibt keine Firmendaten.</exception>
+    public static async Task<FirmenZugriff> FirmenZugriffPruefenAsync(FirmenRolle rolle,
+        CancellationToken cancellationToken = default)
+    {
+        if (BenutzerSitzung.IstFirmenVorschau)
+        {
+            throw new InvalidOperationException("In der Vorschau ohne Anmeldung werden keine Firmendaten geladen.");
+        }
+
+        if (BenutzerSitzung.Firmenzugang is AdminFirmenzugang zugang)
+        {
+            // Ein MegakrasserAdmin schaut in eine Kundenfirma. Er hat dort alle Büro-Rollen,
+            // aber nur solange seine Admin-Rolle besteht. Abteilungsgrenzen gelten für ihn nicht.
+            await DashboardZugriffPruefenAsync(cancellationToken).ConfigureAwait(false);
+            if (!ReferenceEquals(zugang, BenutzerSitzung.Firmenzugang))
+            {
+                throw new UnauthorizedAccessException("Der Admin-Zugang zu dieser Firma ist beendet.");
+            }
+
+            return new FirmenZugriff(zugang.UnternehmenId, null);
+        }
+
+        var benutzer = BenutzerSitzung.AktuellerBenutzer;
+        if (benutzer?.UnternehmenId is not long unternehmenId || !benutzer.FirmenRollen.Contains(rolle))
+        {
+            throw new UnauthorizedAccessException("Für diese Ansicht fehlt Ihrem Konto die passende Rolle.");
+        }
+
+        // Konto aktiv, gleiche Firma und Rolle noch vorhanden? Die Abteilung wird für die Ansichten
+        // des Abteilungsleiters mitgeliefert, damit sie nur die eigene Abteilung zeigen.
+        const string query = """
+            SELECT b.unternehmen_id, b.abteilung_id FROM public.benutzer b
+            WHERE b.benutzer_id = $1::bigint AND b.aktiv = true AND b.unternehmen_id = $2::bigint
+              AND EXISTS (SELECT 1 FROM public.benutzer_rolle br
+                          JOIN public.rolle r ON r.rollen_id = br.rollen_id
+                          WHERE br.benutzer_id = b.benutzer_id AND r.bezeichnung = $3)
+            """;
+        var rows = await new NeonSqlClient().QueryAsync(query, new string?[]
+        {
+            benutzer.Id.ToString(CultureInfo.InvariantCulture),
+            unternehmenId.ToString(CultureInfo.InvariantCulture),
+            FirmenRollenKatalog.DatenbankName(rolle)
+        }, cancellationToken).ConfigureAwait(false);
+        if (rows.Count != 1 || !ReferenceEquals(benutzer, BenutzerSitzung.AktuellerBenutzer) ||
+            BenutzerSitzung.Firmenzugang is not null)
+        {
+            // Während await könnte eine Abmeldung passiert sein. Auch diesen Fall lehnen wir ab.
+            throw new UnauthorizedAccessException("Die Berechtigung für diese Ansicht ist nicht mehr vorhanden. Bitte melden Sie sich erneut an.");
+        }
+
+        long? abteilungId = rows[0][1] is string abteilung ? long.Parse(abteilung, CultureInfo.InvariantCulture) : null;
+        return new FirmenZugriff(unternehmenId, abteilungId);
     }
 
     private static bool PasswortPasst(string passwort, string hash)

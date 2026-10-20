@@ -1,5 +1,11 @@
 {
   "profiles": {
+    "Disposio (Package)": {
+      "commandName": "MsixPackage"
+    },
+    "Disposio (Unpackaged)": {
+      "commandName": "Project"
+    },
     "Disposio (Dashboard)": {
       "commandName": "MsixPackage",
       "commandLineArgs": "--dashboard"
@@ -7,12 +13,6 @@
     "Disposio (Firmenansicht)": {
       "commandName": "MsixPackage",
       "commandLineArgs": "--firmenansicht"
-    },
-    "Disposio (Package)": {
-      "commandName": "MsixPackage"
-    },
-    "Disposio (Unpackaged)": {
-      "commandName": "Project"
     }
   }
 }
