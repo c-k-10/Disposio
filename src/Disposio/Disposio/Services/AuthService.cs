@@ -5,6 +5,7 @@ using System.Linq;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
+using Disposio.Models;
 
 namespace Disposio.Services;
 
@@ -20,6 +21,18 @@ public sealed record AngemeldeterBenutzer(long Id, string Vorname, string Nachna
     // Ein Konto mit Firmenzuordnung ist kein Plattform-Admin.
     public bool IstMegakrasserAdmin => UnternehmenId is null &&
         Rollen.Any(rolle => string.Equals(rolle, AuthService.MegakrasserAdminRolle, StringComparison.Ordinal));
+
+    // Nur für die Anzeige in der Firmenansicht. Plattformkonten haben beides nicht.
+    public string? Firmenname { get; init; }
+    public string? Abteilung { get; init; }
+
+    // Firmenrollen zählen nur bei einem Konto mit Firma. Ein Plattformkonto bekommt keine.
+    public IReadOnlyList<FirmenRolle> FirmenRollen => UnternehmenId is null
+        ? Array.Empty<FirmenRolle>()
+        : FirmenRollenKatalog.AusDatenbank(Rollen);
+
+    // Fahrer arbeiten in der Fahrer-App. Am PC braucht es mindestens eine Büro-Rolle.
+    public bool HatFirmenArbeitsbereich => FirmenRollen.Any(rolle => rolle != FirmenRolle.Fahrer);
 
     public string Anzeigename => $"{Vorname} {Nachname}".Trim();
 }
@@ -74,7 +87,7 @@ public static class AuthService
         {
             // Projektbesitzer erhalten KEINE erfundene Firma. EXISTS verlangt ihre Admin-Rolle.
             query = $"""
-                SELECT {BenutzerSpalten}
+                SELECT {BenutzerSpalten}, NULL::text, NULL::text
                 FROM public.benutzer b
                 WHERE b.unternehmen_id IS NULL AND b.aktiv = true
                   AND lower(btrim(b.email)) = lower($1)
@@ -87,8 +100,13 @@ public static class AuthService
         }
         else
         {
+            // Kennung ist der normale Firmen-Anmeldename. Der ausgeschriebene Firmenname
+            // bleibt für vorhandene Konten ebenfalls möglich. Beide Spalten existieren wirklich.
+            // Firmenname und Abteilung werden nur angezeigt. Die Abteilung muss zur selben Firma gehören.
             query = $"""
-                SELECT {BenutzerSpalten}
+                SELECT {BenutzerSpalten}, u.firmenname,
+                       (SELECT a.bezeichnung FROM public.abteilung a
+                        WHERE a.abteilung_id = b.abteilung_id AND a.unternehmen_id = b.unternehmen_id)
                 FROM public.benutzer b
                 JOIN public.unternehmen u ON u.unternehmen_id = b.unternehmen_id
                 WHERE b.aktiv = true AND lower(btrim(b.email)) = lower($1)
@@ -137,7 +155,11 @@ public static class AuthService
             long.Parse(benutzerId, CultureInfo.InvariantCulture),
             Required(row, 1), Required(row, 2), Required(row, 3),
             row[4] is null ? null : long.Parse(Required(row, 4), CultureInfo.InvariantCulture),
-            Array.AsReadOnly(rollen));
+            Array.AsReadOnly(rollen))
+        {
+            Firmenname = row[7],
+            Abteilung = row[8]
+        };
 
         return firmenkennung.Length == 0 && !benutzer.IstMegakrasserAdmin ? null : benutzer;
     }

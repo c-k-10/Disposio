@@ -342,7 +342,7 @@
                         <!-- Durch horizontales Scrollen bleiben auch in kleinen Fenstern alle Spalten erreichbar. -->
                         <ScrollViewer HorizontalScrollBarVisibility="Auto" HorizontalScrollMode="Enabled"
                                       VerticalScrollBarVisibility="Disabled" VerticalScrollMode="Disabled">
-                            <StackPanel MinWidth="920">
+                            <StackPanel MinWidth="1170">
                                 <Border BorderBrush="{StaticResource BorderBrush}" BorderThickness="0,0,0,1"
                                         Padding="12,0,12,16">
                                     <Grid ColumnSpacing="18">
@@ -351,7 +351,7 @@
                                             <ColumnDefinition Width="*" MinWidth="250" />
                                             <ColumnDefinition Width="90" />
                                             <ColumnDefinition Width="120" />
-                                            <ColumnDefinition Width="250" />
+                                            <ColumnDefinition Width="500" />
                                         </Grid.ColumnDefinitions>
                                         <TextBlock Text="Kunde" FontSize="14" FontWeight="SemiBold" Foreground="{StaticResource MutedTextBrush}" />
                                         <TextBlock Grid.Column="1" Text="Kundenadmin" FontSize="14" FontWeight="SemiBold" Foreground="{StaticResource MutedTextBrush}" />
@@ -369,7 +369,7 @@
                                                         <ColumnDefinition Width="*" MinWidth="250" />
                                                         <ColumnDefinition Width="90" />
                                                         <ColumnDefinition Width="120" />
-                                                        <ColumnDefinition Width="250" />
+                                                        <ColumnDefinition Width="500" />
                                                     </Grid.ColumnDefinitions>
                                                     <StackPanel VerticalAlignment="Center" Spacing="2">
                                                         <TextBlock Text="{Binding Firmenname}" FontSize="18" FontWeight="SemiBold"
@@ -389,6 +389,8 @@
                                                     </Border>
                                                     <StackPanel Grid.Column="4" Orientation="Horizontal" Spacing="14"
                                                                 HorizontalAlignment="Right" VerticalAlignment="Center">
+                                                        <Button Content="Kundenadmin anlegen" Style="{StaticResource DashboardButton}" Click="CreateKundenadmin_Click"
+                                                                AutomationProperties.HelpText="{Binding Firmenname}" />
                                                         <Button Content="Bearbeiten" Style="{StaticResource DashboardButton}" Click="EditCustomer_Click"
                                                                 AutomationProperties.HelpText="{Binding Firmenname}" />
                                                         <Button Content="Einloggen" Style="{StaticResource PrimaryButton}" Click="LoginCustomer_Click"

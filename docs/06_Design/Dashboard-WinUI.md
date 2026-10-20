@@ -245,6 +245,7 @@ unverändert. Das endgültige Konto wird erst angelegt, wenn sein Passwort lokal
 
 Das Einrichtungswerkzeug wurde für .NET 8 erfolgreich mit null Fehlern und null Warnungen gebaut.
 
-Der normale Login prüft Zugangsdaten und Rollen. Die Kundenansicht hinter **„Einloggen“** ist
-weiterhin ein Platzhalter und führt keinen Wechsel in ein Kundenkonto durch. Auch das Speichern
+Der normale Login prüft Zugangsdaten und Rollen. **„Einloggen“** öffnet nach einer Bestätigung
+die Firmenansicht des Kunden. Der MegakrassenAdmin bleibt dabei mit seinem eigenen Konto angemeldet,
+und der Zugang wird im Aktionsprotokoll gespeichert (siehe `Firmenansicht-WinUI.md`). Das Speichern
 eines Unternehmens erstellt noch keinen Kundenadmin und ersetzt keine vollständige Registrierung.

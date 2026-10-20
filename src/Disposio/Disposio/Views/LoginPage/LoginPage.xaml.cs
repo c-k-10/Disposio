@@ -15,7 +15,8 @@ using System.Runtime.InteropServices.WindowsRuntime;
 using Windows.Foundation;
 using Windows.Foundation.Collections;
 using Windows.UI;
-using Disposio.Views.PasswortVergessen;
+using Disposio.Models;
+using Disposio.Services;
 
 // To learn more about WinUI, the WinUI project structure,
 // and more about our project templates, see: http://aka.ms/winui-project-info.
@@ -195,7 +196,7 @@ namespace Disposio.Views
                 {
                     // Eine unterbrochene Verbindung ist etwas anderes als falsche Zugangsdaten.
                     // Technische Details und Passwörter werden hier niemals angezeigt.
-                    ShowLoginStatus("Die Anmeldung ist gerade nicht möglich. Prüfe die Verbindung und versuche es erneut.");
+                    ShowLoginStatus("Die Anmeldung ist gerade nicht möglich. Bitte prüfen Sie die Verbindung und versuchen Sie es erneut.");
                     return;
                 }
 
@@ -206,22 +207,26 @@ namespace Disposio.Views
                     return;
                 }
 
-                if (!user.IstMegakrasserAdmin)
+                if (!user.IstMegakrasserAdmin && !user.HatFirmenArbeitsbereich)
                 {
-                    ShowLoginStatus("Die Anmeldung war erfolgreich. Das Verwaltungsdashboard ist nur für MegakrassenAdmins verfügbar. Die Firmenansicht ist noch nicht angebunden.");
+                    // Passwort stimmt, aber für den PC fehlt eine passende Rolle. Es wird keine Sitzung gestartet.
+                    ShowLoginStatus(user.FirmenRollen.Contains(FirmenRolle.Fahrer)
+                        ? "Für Fahrer gibt es am PC keinen Arbeitsbereich. Bitte verwenden Sie die Fahrer-App."
+                        : "Ihrem Konto ist noch keine Rolle zugewiesen. Bitte wenden Sie sich an Ihren Kundenadmin.");
                     return;
                 }
 
                 try
                 {
-                    // Nur ein geprüfter Plattformadministrator startet eine Sitzung für diese
-                    // globale Ansicht. Das Dashboard und das Repository prüfen den Zugriff erneut.
+                    // Plattformadministratoren öffnen die globale Kundenverwaltung, Firmenkonten
+                    // ihre Firmenansicht. Beide Seiten prüfen den Zugriff beim Öffnen erneut.
                     BenutzerSitzung.Starten(user);
                     var accent = ColorCombo.SelectedItem as ComboBoxItem;
                     var accentHex = accent?.Tag as string ?? "#FF004D";
                     var appearance = new DashboardAppearance { AccentHex = accentHex, IsLight = ModeSwitch.IsOn };
+                    Type target = user.IstMegakrasserAdmin ? typeof(DashboardAnsicht) : typeof(FirmenAnsicht);
 
-                    if (Frame is not Frame frame || !frame.Navigate(typeof(DashboardAnsicht), appearance))
+                    if (Frame is not Frame frame || !frame.Navigate(target, appearance))
                         throw new InvalidOperationException();
                     // BackStack löschen, damit Zurück nicht zur LoginPage führt
                     frame.BackStack.Clear();
@@ -229,7 +234,7 @@ namespace Disposio.Views
                 catch (Exception)
                 {
                     BenutzerSitzung.Abmelden();
-                    ShowLoginStatus("Das Dashboard konnte nicht geöffnet werden. Bitte melde dich erneut an.");
+                    ShowLoginStatus("Die Ansicht konnte nicht geöffnet werden. Bitte melden Sie sich erneut an.");
                 }
             }
             finally
