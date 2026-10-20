@@ -61,6 +61,7 @@ public sealed class UnternehmenRepository : IUnternehmenRepository
         // $1 bis $10 sind Platzhalter. Eingaben werden als Parameter übertragen und NICHT in SQL eingesetzt.
         // Damit bleiben z. B. Apostrophe im Firmennamen normale Daten und können keinen SQL-Befehl verändern.
         // RETURNING liefert die wirklich gespeicherte Zeile einschließlich der neu vergebenen Id zurück.
+        // Der Protokolleintrag entsteht im selben Befehl: Entweder ist beides gespeichert oder nichts.
         var query = $"""
             WITH gespeichert AS (
                 INSERT INTO public.unternehmen
@@ -68,13 +69,20 @@ public sealed class UnternehmenRepository : IUnternehmenRepository
                      kontaktperson, passwortregeln)
                 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, 'Mindestens 8 Zeichen')
                 RETURNING *
+            ), protokoll AS (
+                INSERT INTO public.aktionsprotokoll (akteur_art, aktion, ergebnis, detail, unternehmen_id, benutzer_id)
+                SELECT $11, 'Unternehmen angelegt', 'Gespeichert',
+                       'Kennung ' || g.kennung || ' · Status ' || g.status, g.unternehmen_id, $12::bigint
+                FROM gespeichert g
             )
             SELECT {Columns} FROM gespeichert u
             """;
+        var (akteurArt, benutzerId) = Akteur();
+        var parameters = new List<string?>(EntwurfParameters(eingaben)) { akteurArt, benutzerId };
 
         try
         {
-            var rows = await _client.Value.QueryAsync(query, EntwurfParameters(eingaben), cancellationToken);
+            var rows = await _client.Value.QueryAsync(query, parameters, cancellationToken);
             if (rows.Count == 1)
             {
                 return ReadUnternehmen(rows[0]);
@@ -107,21 +115,44 @@ public sealed class UnternehmenRepository : IUnternehmenRepository
         // Id identifiziert das Unternehmen. Version ist der Zeitpunkt seiner letzten Änderung.
         // WHERE prüft beides: Hat jemand inzwischen gespeichert, überschreiben wir seine Änderung nicht.
         // Bestehende Passwortregeln und die Mindestlänge bleiben beim Bearbeiten erhalten.
+        // Alle Teile eines WITH-Befehls sehen denselben Datenstand: „vorher“ liest also noch die
+        // alten Werte. Daraus ergibt sich, welche Felder das Protokoll als geändert nennt.
         var query = $"""
-            WITH gespeichert AS (
+            WITH vorher AS (
+                SELECT * FROM public.unternehmen
+                WHERE unternehmen_id = $11::bigint AND updated_at = $12::timestamptz
+            ), gespeichert AS (
                 UPDATE public.unternehmen
                 SET firmenname = $1, kennung = $2, admin_email = $3, status = $4,
                     adresse = $5, plz = $6, ort = $7, telefon = $8, email = $9, kontaktperson = $10,
                     updated_at = GREATEST(clock_timestamp(), updated_at + interval '1 microsecond')
                 WHERE unternehmen_id = $11::bigint AND updated_at = $12::timestamptz
                 RETURNING *
+            ), protokoll AS (
+                INSERT INTO public.aktionsprotokoll (akteur_art, aktion, ergebnis, detail, unternehmen_id, benutzer_id)
+                SELECT $13, 'Unternehmen bearbeitet', 'Gespeichert',
+                       COALESCE('Geändert: ' || NULLIF(concat_ws(', ',
+                           CASE WHEN v.firmenname IS DISTINCT FROM g.firmenname THEN 'Firmenname' END,
+                           CASE WHEN v.kennung IS DISTINCT FROM g.kennung THEN 'Kennung' END,
+                           CASE WHEN v.admin_email IS DISTINCT FROM g.admin_email THEN 'Admin-E-Mail' END,
+                           CASE WHEN v.status IS DISTINCT FROM g.status THEN 'Status ' || v.status || ' → ' || g.status END,
+                           CASE WHEN (v.adresse, v.plz, v.ort) IS DISTINCT FROM (g.adresse, g.plz, g.ort) THEN 'Adresse' END,
+                           CASE WHEN v.telefon IS DISTINCT FROM g.telefon THEN 'Telefon' END,
+                           CASE WHEN v.email IS DISTINCT FROM g.email THEN 'Firmen-E-Mail' END,
+                           CASE WHEN v.kontaktperson IS DISTINCT FROM g.kontaktperson THEN 'Kontaktperson' END), ''),
+                           'Ohne inhaltliche Änderung gespeichert'),
+                       g.unternehmen_id, $14::bigint
+                FROM gespeichert g JOIN vorher v ON v.unternehmen_id = g.unternehmen_id
             )
             SELECT {Columns} FROM gespeichert u
             """;
+        var (akteurArt, benutzerId) = Akteur();
         var parameters = new List<string?>(EntwurfParameters(eingaben))
         {
             id.ToString(CultureInfo.InvariantCulture),
-            version.ToString("O", CultureInfo.InvariantCulture)
+            version.ToString("O", CultureInfo.InvariantCulture),
+            akteurArt,
+            benutzerId
         };
 
         try
@@ -139,6 +170,19 @@ public sealed class UnternehmenRepository : IUnternehmenRepository
         {
             throw new UnternehmenKennungVergebenException(exception);
         }
+    }
+
+    /// <summary>
+    /// Wer gerade speichert, für das Aktionsprotokoll: das angemeldete Konto. Jeder MegakrasserAdmin
+    /// hat ein eigenes Konto, dadurch ist jede Änderung einer Person zugeordnet. Die Entwicklungsansicht
+    /// (nur Debug-Build) hat kein Konto und wird als solche vermerkt.
+    /// </summary>
+    private static (string AkteurArt, string? BenutzerId) Akteur()
+    {
+        var benutzer = BenutzerSitzung.AktuellerBenutzer;
+        return benutzer is null
+            ? ("Entwicklungsansicht", null)
+            : ("Benutzer", benutzer.Id.ToString(CultureInfo.InvariantCulture));
     }
 
     private static Unternehmen ReadUnternehmen(string?[] row)

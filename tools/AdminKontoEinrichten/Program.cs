@@ -6,27 +6,33 @@ using Disposio.Services;
 // Quellcode oder Protokolle. ReadKey liest sie direkt und zeigt nur Sternchen an.
 Console.OutputEncoding = Encoding.UTF8;
 int exitCode = 1;
-Console.WriteLine("Disposio – neues Plattformkonto einrichten");
-Console.WriteLine("Konto: admin@disposio.com | Rolle: SuperKrasserAdmin | ohne Kundenfirma");
-Console.WriteLine("Ein vorhandenes Konto wird niemals verändert.");
+Console.WriteLine("Disposio – neues Plattformkonto (MegakrassenAdmin) einrichten");
+Console.WriteLine("Rolle: SuperKrasserAdmin | ohne Kundenfirma | ein Konto je Person");
+Console.WriteLine("Ein vorhandenes Konto wird niemals verändert. Escape bricht jederzeit ab.");
 try
 {
     if (args.Length != 0 || Console.IsInputRedirected)
         throw new InvalidOperationException("Bitte dieses Programm ohne Startargumente in einer lokalen Konsole öffnen.");
 
-    Console.WriteLine("Wähle mindestens 15 Zeichen (höchstens 72 UTF-8-Bytes). Escape bricht ab.");
-    string passwort = PasswortLesen("Neues Passwort: ");
-    string wiederholung = PasswortLesen("Passwort wiederholen: ");
+    string email = EingabeLesen("E-Mail (z. B. vorname@disposio.com): ", verdeckt: false).Trim().ToLowerInvariant();
+    string vorname = EingabeLesen("Vorname: ", verdeckt: false);
+    string nachname = EingabeLesen("Nachname: ", verdeckt: false);
+
+    // Das Passwort tippt die Person selbst ein, der das Konto gehört.
+    Console.WriteLine("Jetzt das eigene Passwort: mindestens 15 Zeichen (höchstens 72 UTF-8-Bytes).");
+    string passwort = EingabeLesen("Neues Passwort: ", verdeckt: true);
+    string wiederholung = EingabeLesen("Passwort wiederholen: ", verdeckt: true);
     if (!string.Equals(passwort, wiederholung, StringComparison.Ordinal))
         throw new ArgumentException("Die beiden Passwörter stimmen nicht überein. Bitte erneut starten.");
 
     Console.WriteLine("Konto wird gespeichert …");
-    await PlattformAdminEinrichtung.AnlegenAsync(PlattformAdminEinrichtung.StandardEmail, passwort);
+    await PlattformAdminEinrichtung.AnlegenAsync(email, vorname, nachname, passwort);
     // .NET-Strings lassen sich nicht garantiert aus dem Speicher entfernen. Wir behalten
     // sie deshalb nicht als Einstellungen und beenden dieses Einrichtungsprogramm danach.
     passwort = wiederholung = string.Empty;
-    Console.WriteLine("Fertig. In Disposio den Kontotyp MegakrassenAdmin auswählen.");
-    Console.WriteLine("E-Mail: admin@disposio.com | Passwort: das eben selbst gewählte Passwort.");
+    Console.WriteLine($"Fertig. Konto für {vorname.Trim()} {nachname.Trim()} angelegt.");
+    Console.WriteLine("In Disposio den Kontotyp MegakrassenAdmin auswählen.");
+    Console.WriteLine($"E-Mail: {email} | Passwort: das eben selbst gewählte Passwort.");
     exitCode = 0;
 }
 catch (OperationCanceledException)
@@ -35,7 +41,7 @@ catch (OperationCanceledException)
 }
 catch (NeonSqlException exception) when (exception.Code == "23505")
 {
-    Console.WriteLine("Das Plattformkonto existiert bereits. Es wurde nicht verändert.");
+    Console.WriteLine("Ein Plattformkonto mit dieser E-Mail existiert bereits. Es wurde nicht verändert.");
 }
 catch (ArgumentException exception)
 {
@@ -56,7 +62,8 @@ Console.WriteLine("Zum Schließen eine Taste drücken.");
 if (!Console.IsInputRedirected) Console.ReadKey(intercept: true);
 return exitCode;
 
-static string PasswortLesen(string hinweis)
+// Liest eine Eingabe Taste für Taste. Verdeckt zeigt nur Sternchen (für Passwörter).
+static string EingabeLesen(string hinweis, bool verdeckt)
 {
     Console.Write(hinweis);
     var eingabe = new StringBuilder();
@@ -80,7 +87,7 @@ static string PasswortLesen(string hinweis)
         else if (!char.IsControl(taste.KeyChar) && eingabe.Length < 256)
         {
             eingabe.Append(taste.KeyChar);
-            Console.Write('*');
+            Console.Write(verdeckt ? '*' : taste.KeyChar);
         }
     }
 }
