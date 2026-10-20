@@ -45,7 +45,7 @@ namespace Disposio
                 openDevelopmentDashboard = true;
             }
 #endif
-            runtimeFrame.Navigate(openDevelopmentDashboard ? typeof(DashboardAnsicht) : typeof(LoginPage));
+            runtimeFrame.Navigate(openDevelopmentDashboard ?  typeof(LoginPage) : typeof(DashboardAnsicht));
             this.Content = runtimeFrame;
         }
     }
