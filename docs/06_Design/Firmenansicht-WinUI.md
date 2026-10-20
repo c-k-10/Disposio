@@ -9,11 +9,60 @@ Ansicht. Die Ansichten tragen dieselben Wireframe-IDs wie der Prototyp (K01, D04
 - Alle 30 Firmenansichten sind angelegt und erreichbar. Unteransichten wie K02 oder D05 stehen
   nicht im Menü, sondern werden über Knöpfe in ihrer Oberansicht geöffnet.
 - **K03 „Rollen & Rechte“** zeigt bereits echte Inhalte: alle Rollen mit Bereich und Aufgaben.
-  Die eigenen Rollen des angemeldeten Kontos sind markiert.
+  Die eigenen Rollen des angemeldeten Kontos sind markiert. K03 liegt in einer eigenen Datei und
+  ist das Beispiel dafür, wie eine fertige Ansicht aufgebaut ist.
 - Alle anderen Ansichten sind Platzhalter. Sie zeigen Titel, Zweck und Wireframe-ID und werden
-  einzeln mit Inhalt gefüllt.
-- Es werden noch keine Firmendaten geladen. Jede Ansicht, die später Daten lädt oder speichert,
-  muss vorher die Rolle erneut in der Datenbank prüfen (wie das Dashboard mit `DashboardZugriffPruefenAsync`).
+  einzeln mit Inhalt gefüllt (siehe „So legt man eine neue Ansicht an“).
+- Jede Ansicht, die Firmendaten lädt oder speichert, prüft vorher mit
+  `AuthService.FirmenZugriffPruefenAsync` die Rolle erneut in der Datenbank.
+
+## So legt man eine neue Ansicht an
+
+Jeder Rollenbereich hat einen eigenen Ordner unter `Views/FirmenAnsicht/`. Wer an einem Bereich
+arbeitet, ändert nur Dateien in diesem Ordner. So kommen sich parallele Branches nicht in die Quere.
+
+| Ordner | Ansichten | Eintragungsdatei |
+| --- | --- | --- |
+| `Kundenadmin/` | K01–K04 | `KundenadminAnsichten.cs` |
+| `Fuhrpark/` | F01–F05 | `FuhrparkAnsichten.cs` |
+| `Disposition/` | D01–D15 | `DispositionAnsichten.cs` |
+| `Abteilung/` | L01–L06 | `AbteilungAnsichten.cs` |
+| `Geschaeftsfuehrung/` | G01–G02 | `GeschaeftsfuehrungAnsichten.cs` |
+
+1. Im passenden Ordner ein **Benutzersteuerelement (WinUI)** anlegen, benannt nach der
+   Wireframe-ID, zum Beispiel `F01Fuhrpark.xaml`. Vorbild: `Kundenadmin/K03RollenUndRechte.xaml`.
+2. Der Konstruktor bekommt den `FirmenAnsichtKontext`. Darüber gibt es `Oeffnen("F02", fahrzeugId)`
+   für andere Ansichten, den Startwert `Parameter`, `IstVorschau` und `ZugriffBeenden()`.
+3. In der Eintragungsdatei des Ordners **eine Zeile** ergänzen:
+   `"F01" => new F01Fuhrpark(kontext),`
+4. Für Farben und Knöpfe die gemeinsamen Stile aus `Themes/FirmenStil.xaml` verwenden, zum Beispiel
+   `Style="{StaticResource KarteStyle}"`, `PrimaryButton`, `FormTextBox`, `HinweisText`, `FehlerText`.
+   Dann passen Hell/Dunkel und Akzentfarbe automatisch.
+
+**Firmendaten laden oder speichern:** SQL gehört wie beim Dashboard in ein Repository unter
+`Services/`. Jede Methode prüft zuerst die Rolle und verwendet danach nur die zurückgegebene Firma:
+
+```csharp
+public async Task<IReadOnlyList<Fahrzeug>> LadenAsync(CancellationToken cancellationToken = default)
+{
+    // Prüft in Neon: Konto aktiv, Rolle vorhanden (beim Admin-Zugang: Admin-Rolle).
+    FirmenZugriff zugriff = await AuthService.FirmenZugriffPruefenAsync(FirmenRolle.Fuhrparkmanager, cancellationToken);
+    // Nur zugriff.UnternehmenId verwenden, nie eine Firmen-Id aus der Oberfläche.
+    var rows = await _client.Value.QueryAsync(
+        "SELECT … FROM public.fahrzeug WHERE unternehmen_id = $1::bigint ORDER BY kennzeichen",
+        new string?[] { zugriff.UnternehmenId.ToString(CultureInfo.InvariantCulture) }, cancellationToken);
+    …
+}
+```
+
+In der Ansicht selbst:
+
+- `IstVorschau` zuerst abfragen und dann statt Daten einen Hinweis zeigen. In der Vorschau gibt es keine Firma.
+- `UnauthorizedAccessException` abfangen und `kontext.ZugriffBeenden()` aufrufen: Die Rolle wurde
+  entzogen oder das Konto deaktiviert, die Anmeldung erscheint.
+- Andere Fehler als verständlichen Text anzeigen, keine technischen Meldungen.
+- Beim Ändern und Löschen gehört `unternehmen_id = $…` immer mit in die `WHERE`-Bedingung.
+  So kann niemand Datensätze einer fremden Firma ändern, auch nicht mit einer falschen Id.
 
 ## Rollen
 
@@ -70,8 +119,8 @@ Sitzung merkt sich die Firma (BenutzerSitzung.Firmenzugang) → Firmenansicht ö
 - Der Admin bleibt mit **seinem eigenen Konto** angemeldet. Es wird kein Kundenkonto und kein
   Kundenpasswort benutzt. Deshalb steht im Protokoll auch sein Name.
 - Oben in der Firmenansicht steht ein Hinweis, dass man eine fremde Firma als MegakrassenAdmin sieht.
-- `BenutzerSitzung.AktuelleFirmaId` liefert die Firma, die gerade angezeigt wird: beim Firmenkonto
-  die eigene, beim Admin-Zugang die gewählte. Spätere Ansichten laden ihre Daten mit dieser Id.
+- `AuthService.FirmenZugriffPruefenAsync` liefert die Firma, deren Daten gezeigt werden dürfen: beim
+  Firmenkonto die eigene, beim Admin-Zugang die gewählte (siehe „So legt man eine neue Ansicht an“).
 
 Alle Admin-Zugänge einer Firma nachsehen:
 
@@ -97,17 +146,22 @@ alle Büro-Rollen, ohne dass ein Testkonto nötig ist. Wie beim Dashboard gilt d
 | --- | --- |
 | `Models/FirmenRolle.cs` | Die sechs Firmenrollen, ihre Bezeichnungen in der Datenbank und ihre Aufgaben. |
 | `Models/AnsichtenKatalog.cs` | Alle Firmenansichten mit Wireframe-ID, Titel, Zweck, Rolle und Oberansicht. Daraus entsteht das Menü. |
-| `Views/FirmenAnsicht/FirmenAnsicht.xaml` | Aussehen: Seitenleiste, Menübereich, Kopfzeile und Inhaltsbereich. |
-| `Views/FirmenAnsicht/FirmenAnsicht.xaml.cs` | Baut das Menü je Rolle, wechselt die Ansichten, prüft den Zugriff und meldet ab. |
-| `Services/AuthService.cs` | Liefert bei Firmenkonten zusätzlich Firmenname, Abteilung und die erkannten Firmenrollen. |
+| `Views/FirmenAnsicht/FirmenAnsicht.xaml` | Aussehen des Rahmens: Seitenleiste, Menübereich, Kopfzeile und Inhaltsbereich. |
+| `Views/FirmenAnsicht/FirmenAnsicht.xaml.cs` | Baut das Menü je Rolle, holt die Ansicht aus der Eintragungsdatei ihres Bereichs, prüft den Zugriff und meldet ab. |
+| `Views/FirmenAnsicht/FirmenAnsichtKontext.cs` | Was jede Ansicht vom Rahmen bekommt: Ansicht, Rollen, Startwert, `Oeffnen`, `ZugriffBeenden`. |
+| `Views/FirmenAnsicht/<Bereich>/` | Die Ansichten eines Rollenbereichs und ihre Eintragungsdatei. |
+| `Themes/FirmenStil.xaml` | Gemeinsame Farben und Stile aller Firmenansichten, in `App.xaml` eingebunden. |
+| `Services/AuthService.cs` | Liefert bei Firmenkonten Firmenname, Abteilung und Firmenrollen. `FirmenZugriffPruefenAsync` prüft vor jedem Datenzugriff die Rolle. |
 | `Services/BenutzerSitzung.cs` | `FirmenansichtErlaubt`, der Admin-Zugang `Firmenzugang` und die Debug-Vorschau `FirmenVorschauStarten`. |
 | `Services/UnternehmenRepository.cs` | `FirmenzugangOeffnenAsync`: Rolle prüfen, Firma lesen und den Admin-Zugang protokollieren. |
 | `Views/DashboardAnsicht/DashboardAnsicht.xaml.cs` | „Einloggen“ öffnet nach Bestätigung die Firmenansicht der gewählten Firma. |
 
 ## Nächste Schritte
 
-- Die Ansichten einzeln mit Daten füllen, beginnend mit K01/K02 (Benutzer verwalten): Erst dann
-  kann ein Kundenadmin selbst Konten anlegen und Rollen vergeben.
+- Die Ansichten einzeln mit Daten füllen: K01–K04 (Benutzer verwalten) und F01/F02 (Fuhrpark)
+  zuerst, weil Touren Fahrer und Fahrzeuge brauchen.
+- Jede Tour gehört zu einer Abteilung (`tour.abteilung_id` ist Pflicht). Abteilungen anzulegen
+  passt zum Kundenadmin (K02 „Abteilungszugriff“).
 - Für echte Anmeldetests je Rolle Testkonten anlegen (Schreibzugriff auf Neon, vorher absprechen).
 - S02 „Passwort zurücksetzen“ ist noch nicht angebunden.
 

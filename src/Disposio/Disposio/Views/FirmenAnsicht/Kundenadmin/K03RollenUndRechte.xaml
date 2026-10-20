@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- K03 „Rollen & Rechte“: erklärt die Rollen eines Unternehmens. Beispiel für eine Firmenansicht
+     in einer eigenen Datei: Aussehen hier, Logik in K03RollenUndRechte.xaml.cs. -->
+<UserControl
+    x:Class="Disposio.Views.K03RollenUndRechte"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:local="using:Disposio.Views">
+
+    <Border Style="{StaticResource KarteStyle}">
+        <StackPanel Spacing="18">
+            <TextBlock Text="Rollen im Unternehmen" Style="{StaticResource UeberschriftText}" />
+
+            <!-- Kopfzeile und Zeilen haben dieselben Spaltenbreiten, deshalb stehen die Spalten untereinander. -->
+            <StackPanel>
+                <Border BorderBrush="{StaticResource BorderBrush}" BorderThickness="0,0,0,1" Padding="0,0,0,12">
+                    <Grid ColumnSpacing="18">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="1.1*" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="2*" />
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Text="Rolle" Style="{StaticResource HinweisText}" FontWeight="SemiBold" />
+                        <TextBlock Grid.Column="1" Text="Bereich" Style="{StaticResource HinweisText}" FontWeight="SemiBold" />
+                        <TextBlock Grid.Column="2" Text="Aufgaben" Style="{StaticResource HinweisText}" FontWeight="SemiBold" />
+                    </Grid>
+                </Border>
+                <ItemsControl x:Name="RollenListe">
+                    <ItemsControl.ItemTemplate>
+                        <!-- x:Bind wird schon beim Bauen geprüft: Ein Tippfehler im Namen fällt sofort auf. -->
+                        <DataTemplate x:DataType="local:RollenZeile">
+                            <Border BorderBrush="{StaticResource BorderBrush}" BorderThickness="0,0,0,1" Padding="0,12">
+                                <Grid ColumnSpacing="18">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="1.1*" />
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="2*" />
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel Spacing="2">
+                                        <TextBlock Text="{x:Bind Bezeichnung}" Style="{StaticResource NormalText}" FontWeight="SemiBold" />
+                                        <TextBlock Text="Ihre Rolle" FontSize="13" FontWeight="SemiBold"
+                                                   Foreground="{StaticResource AccentBrush}"
+                                                   Visibility="{x:Bind EigeneRolleSichtbarkeit}" />
+                                    </StackPanel>
+                                    <TextBlock Grid.Column="1" Text="{x:Bind Bereich}" Style="{StaticResource NormalText}" />
+                                    <TextBlock Grid.Column="2" Text="{x:Bind Aufgaben}" Style="{StaticResource NormalText}" />
+                                </Grid>
+                            </Border>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </StackPanel>
+
+            <TextBlock Style="{StaticResource HinweisText}"
+                       Text="Ein Konto kann mehrere Rollen haben. Das Menü zeigt dann die Bereiche aller Rollen. Detailrechte werden vor der Umsetzung der einzelnen Ansichten abgestimmt." />
+            <Button Content="Zur Benutzerliste" Style="{StaticResource PrimaryButton}" Click="ZurBenutzerliste_Click" />
+        </StackPanel>
+    </Border>
+</UserControl>
