@@ -97,7 +97,7 @@ public sealed partial class passwortVergessen : Page
 
         PasswortBox.Password = "";
         PasswortWiederholenBox.Password = "";
-        Zeige("Passwort geändert. Du kannst dich jetzt anmelden.", InfoBarSeverity.Success);
+        Zeige("Passwort geändert. Sie können sich jetzt anmelden.", InfoBarSeverity.Success);
         ZuruecksetzenButton.IsEnabled = false;
     }
 
