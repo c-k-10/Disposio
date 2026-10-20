@@ -18,6 +18,7 @@ public interface IUnternehmenRepository
     Task<Unternehmen> CreateAsync(UnternehmenEntwurf entwurf, CancellationToken cancellationToken = default);
     Task<Unternehmen> UpdateAsync(long id, DateTime version, UnternehmenEntwurf entwurf,
         CancellationToken cancellationToken = default);
+    Task<AdminFirmenzugang> FirmenzugangOeffnenAsync(long id, CancellationToken cancellationToken = default);
 }
 
 /// <summary>Übersetzt Unternehmen-Datensätze in SQL für unsere vorhandene PostgreSQL-Tabelle bei Neon.</summary>
@@ -170,6 +171,43 @@ public sealed class UnternehmenRepository : IUnternehmenRepository
         {
             throw new UnternehmenKennungVergebenException(exception);
         }
+    }
+
+    /// <summary>
+    /// „Einloggen“ im Dashboard: Ein MegakrasserAdmin öffnet die Firmenansicht einer Kundenfirma.
+    /// Das ist ein Blick in fremde Firmendaten und wird deshalb immer im Aktionsprotokoll vermerkt.
+    /// </summary>
+    public async Task<AdminFirmenzugang> FirmenzugangOeffnenAsync(long id, CancellationToken cancellationToken = default)
+    {
+        await AuthService.DashboardZugriffPruefenAsync(cancellationToken);
+        if (id <= 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(id), "Ein gespeichertes Unternehmen braucht eine gültige Id.");
+        }
+
+        // Firma lesen und Protokolleintrag schreiben geschehen in einem Befehl: Ohne Protokoll kein Zugang.
+        // Ein INSERT im WITH-Teil läuft auch dann, wenn die letzte Abfrage ihn nicht ausliest.
+        const string query = """
+            WITH firma AS (
+                SELECT unternehmen_id, firmenname FROM public.unternehmen WHERE unternehmen_id = $1::bigint
+            ), protokoll AS (
+                INSERT INTO public.aktionsprotokoll (akteur_art, aktion, ergebnis, detail, unternehmen_id, benutzer_id)
+                SELECT $2, 'Firmenansicht als Admin geöffnet', 'Geöffnet',
+                       'Admin-Zugang über das Dashboard', f.unternehmen_id, $3::bigint
+                FROM firma f
+            )
+            SELECT unternehmen_id, firmenname FROM firma
+            """;
+        var (akteurArt, benutzerId) = Akteur();
+        var rows = await _client.Value.QueryAsync(query,
+            new string?[] { id.ToString(CultureInfo.InvariantCulture), akteurArt, benutzerId }, cancellationToken);
+        if (rows.Count != 1)
+        {
+            // Keine Zeile bedeutet: Das Unternehmen wurde inzwischen gelöscht.
+            throw new UnternehmenKonfliktException();
+        }
+
+        return new AdminFirmenzugang(long.Parse(Required(rows[0], 0), CultureInfo.InvariantCulture), Required(rows[0], 1));
     }
 
     /// <summary>

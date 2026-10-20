@@ -1,0 +1,250 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Page
+    x:Class="Disposio.Views.FirmenAnsicht"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    mc:Ignorable="d"
+    RequestedTheme="Dark"
+    FontFamily="Segoe UI"
+    FontSize="16">
+
+    <Page.Resources>
+        <!-- Dieselben Farbnamen wie im Admin-Dashboard. Der Code ändert nur die Farbe dieser
+             Objekte; alle Elemente, die sie verwenden, passen sich dadurch gemeinsam an. -->
+        <SolidColorBrush x:Key="BackgroundBrush" Color="#101319" />
+        <SolidColorBrush x:Key="SidebarBrush" Color="#262930" />
+        <SolidColorBrush x:Key="SurfaceBrush" Color="#262930" />
+        <SolidColorBrush x:Key="BorderBrush" Color="#3D414A" />
+        <SolidColorBrush x:Key="TextBrush" Color="#F0F2F6" />
+        <SolidColorBrush x:Key="MutedTextBrush" Color="#BDC4D1" />
+        <SolidColorBrush x:Key="InputBrush" Color="#262930" />
+        <SolidColorBrush x:Key="AccentBrush" Color="#7B2CBF" />
+        <SolidColorBrush x:Key="AccentTextBrush" Color="#FFFFFF" />
+        <SolidColorBrush x:Key="AccentHoverBrush" Color="#8B4BC9" />
+        <SolidColorBrush x:Key="AccentPressedBrush" Color="#6925A2" />
+
+        <Style x:Key="DashboardButton" TargetType="Button">
+            <Setter Property="Background" Value="{StaticResource InputBrush}" />
+            <Setter Property="Foreground" Value="{StaticResource TextBrush}" />
+            <Setter Property="BorderBrush" Value="{StaticResource BorderBrush}" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="CornerRadius" Value="10" />
+            <Setter Property="MinHeight" Value="44" />
+            <Setter Property="Padding" Value="18,8" />
+            <Setter Property="FontSize" Value="15" />
+            <Setter Property="HorizontalContentAlignment" Value="Center" />
+            <Setter Property="VerticalContentAlignment" Value="Center" />
+            <Setter Property="UseSystemFocusVisuals" Value="True" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="ButtonBorder"
+                                Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="{TemplateBinding CornerRadius}">
+                            <VisualStateManager.VisualStateGroups>
+                                <VisualStateGroup x:Name="CommonStates">
+                                    <VisualState x:Name="Normal" />
+                                    <VisualState x:Name="PointerOver">
+                                        <VisualState.Setters>
+                                            <Setter Target="ButtonBorder.Opacity" Value="0.85" />
+                                        </VisualState.Setters>
+                                    </VisualState>
+                                    <VisualState x:Name="Pressed">
+                                        <VisualState.Setters>
+                                            <Setter Target="ButtonBorder.Opacity" Value="0.7" />
+                                        </VisualState.Setters>
+                                    </VisualState>
+                                    <VisualState x:Name="Disabled">
+                                        <VisualState.Setters>
+                                            <Setter Target="ButtonBorder.Opacity" Value="0.4" />
+                                        </VisualState.Setters>
+                                    </VisualState>
+                                </VisualStateGroup>
+                            </VisualStateManager.VisualStateGroups>
+                            <ContentPresenter Content="{TemplateBinding Content}"
+                                              ContentTemplate="{TemplateBinding ContentTemplate}"
+                                              Padding="{TemplateBinding Padding}"
+                                              Foreground="{TemplateBinding Foreground}"
+                                              HorizontalContentAlignment="{TemplateBinding HorizontalContentAlignment}"
+                                              VerticalContentAlignment="{TemplateBinding VerticalContentAlignment}" />
+                        </Border>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+        <Style x:Key="PrimaryButton" TargetType="Button" BasedOn="{StaticResource DashboardButton}">
+            <Setter Property="Background" Value="{StaticResource AccentBrush}" />
+            <Setter Property="BorderBrush" Value="{StaticResource AccentBrush}" />
+            <Setter Property="Foreground" Value="{StaticResource AccentTextBrush}" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+        </Style>
+        <!-- Menüpunkte: ohne Rahmen, linksbündig. Beim Überfahren erscheint ein dünner Rahmen;
+             der aktive Menüpunkt bekommt im Code die Akzentfarbe. -->
+        <Style x:Key="MenuButton" TargetType="Button" BasedOn="{StaticResource DashboardButton}">
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="BorderBrush" Value="{StaticResource BorderBrush}" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="HorizontalAlignment" Value="Stretch" />
+            <Setter Property="HorizontalContentAlignment" Value="Left" />
+            <Setter Property="MinHeight" Value="42" />
+            <Setter Property="Padding" Value="14,8" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="ButtonBorder"
+                                Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="{TemplateBinding CornerRadius}">
+                            <VisualStateManager.VisualStateGroups>
+                                <VisualStateGroup x:Name="CommonStates">
+                                    <VisualState x:Name="Normal" />
+                                    <VisualState x:Name="PointerOver">
+                                        <VisualState.Setters>
+                                            <Setter Target="ButtonBorder.BorderThickness" Value="1" />
+                                        </VisualState.Setters>
+                                    </VisualState>
+                                    <VisualState x:Name="Pressed">
+                                        <VisualState.Setters>
+                                            <Setter Target="ButtonBorder.BorderThickness" Value="1" />
+                                            <Setter Target="ButtonBorder.Opacity" Value="0.7" />
+                                        </VisualState.Setters>
+                                    </VisualState>
+                                    <VisualState x:Name="Disabled">
+                                        <VisualState.Setters>
+                                            <Setter Target="ButtonBorder.Opacity" Value="0.4" />
+                                        </VisualState.Setters>
+                                    </VisualState>
+                                </VisualStateGroup>
+                            </VisualStateManager.VisualStateGroups>
+                            <ContentPresenter Content="{TemplateBinding Content}"
+                                              ContentTemplate="{TemplateBinding ContentTemplate}"
+                                              Padding="{TemplateBinding Padding}"
+                                              Foreground="{TemplateBinding Foreground}"
+                                              HorizontalContentAlignment="{TemplateBinding HorizontalContentAlignment}"
+                                              VerticalContentAlignment="{TemplateBinding VerticalContentAlignment}" />
+                        </Border>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+    </Page.Resources>
+
+    <Grid Background="{StaticResource BackgroundBrush}">
+        <VisualStateManager.VisualStateGroups>
+            <VisualStateGroup x:Name="WindowSizes">
+                <VisualState x:Name="Compact">
+                    <VisualState.StateTriggers>
+                        <AdaptiveTrigger MinWindowWidth="0" />
+                    </VisualState.StateTriggers>
+                    <VisualState.Setters>
+                        <!-- Das Menü bleibt auch in kleinen Fenstern sichtbar, nur schmaler. -->
+                        <Setter Target="SidebarColumn.Width" Value="220" />
+                        <Setter Target="Sidebar.Padding" Value="16,20" />
+                        <Setter Target="MainContent.Padding" Value="20,24" />
+                        <Setter Target="PageTitle.FontSize" Value="30" />
+                    </VisualState.Setters>
+                </VisualState>
+                <VisualState x:Name="Desktop">
+                    <VisualState.StateTriggers>
+                        <AdaptiveTrigger MinWindowWidth="1050" />
+                    </VisualState.StateTriggers>
+                    <VisualState.Setters>
+                        <Setter Target="SidebarColumn.Width" Value="270" />
+                    </VisualState.Setters>
+                </VisualState>
+                <VisualState x:Name="WideDesktop">
+                    <VisualState.StateTriggers>
+                        <AdaptiveTrigger MinWindowWidth="1450" />
+                    </VisualState.StateTriggers>
+                    <VisualState.Setters>
+                        <Setter Target="SidebarColumn.Width" Value="320" />
+                    </VisualState.Setters>
+                </VisualState>
+            </VisualStateGroup>
+        </VisualStateManager.VisualStateGroups>
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition x:Name="SidebarColumn" Width="270" />
+            <ColumnDefinition Width="*" />
+        </Grid.ColumnDefinitions>
+
+        <Border x:Name="Sidebar" Background="{StaticResource SidebarBrush}" Padding="24,24">
+            <Grid RowSpacing="18">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="*" />
+                    <RowDefinition Height="Auto" />
+                </Grid.RowDefinitions>
+                <StackPanel Spacing="8">
+                    <TextBlock Text="DISPOSIO" FontSize="28" FontWeight="ExtraBold"
+                               CharacterSpacing="60" Foreground="{StaticResource AccentBrush}" />
+                    <TextBlock Text="FIRMENBEREICH" FontSize="12" CharacterSpacing="260"
+                               Foreground="{StaticResource MutedTextBrush}" />
+                </StackPanel>
+
+                <Border Grid.Row="1" Background="{StaticResource BackgroundBrush}"
+                        BorderBrush="{StaticResource BorderBrush}" BorderThickness="1"
+                        CornerRadius="12" Padding="14,10">
+                    <StackPanel Spacing="2">
+                        <TextBlock x:Name="CompanyNameText" FontSize="17" FontWeight="SemiBold"
+                                   TextWrapping="Wrap" Foreground="{StaticResource TextBrush}" />
+                        <TextBlock x:Name="CompanyDetailText" FontSize="13" TextWrapping="Wrap"
+                                   Foreground="{StaticResource MutedTextBrush}" />
+                    </StackPanel>
+                </Border>
+
+                <!-- Das Menü wird je nach Rollen des Kontos im Code aufgebaut. -->
+                <ScrollViewer Grid.Row="2" VerticalScrollBarVisibility="Auto" Margin="-4,0">
+                    <StackPanel x:Name="MenuPanel" Spacing="2" Padding="4,0"
+                                AutomationProperties.Name="Hauptmenü" />
+                </ScrollViewer>
+
+                <StackPanel Grid.Row="3" Spacing="6">
+                    <TextBlock x:Name="AccountNameText" FontSize="14" TextWrapping="Wrap"
+                               Foreground="{StaticResource TextBrush}" />
+                    <TextBlock x:Name="AccountRoleText" FontSize="14" TextWrapping="Wrap"
+                               Foreground="{StaticResource MutedTextBrush}" />
+                    <!-- Nur beim Admin-Zugang sichtbar: zurück in die Kundenverwaltung. -->
+                    <HyperlinkButton x:Name="BackToDashboardLink" Content="Zurück zum Admin-Dashboard"
+                                     Click="BackToDashboard_Click" Padding="0" HorizontalAlignment="Left"
+                                     Visibility="Collapsed" Foreground="{StaticResource AccentBrush}" FontSize="14" />
+                    <HyperlinkButton Content="Abmelden" Click="Logout_Click" Padding="0" HorizontalAlignment="Left"
+                                     Foreground="{StaticResource MutedTextBrush}" FontSize="14" />
+                </StackPanel>
+            </Grid>
+        </Border>
+
+        <ScrollViewer x:Name="ContentScroll" Grid.Column="1" HorizontalScrollBarVisibility="Disabled"
+                      VerticalScrollBarVisibility="Auto">
+            <StackPanel x:Name="MainContent" Padding="36,24,36,30" Spacing="10">
+                <!-- Hinweis beim Admin-Zugang: Man sieht eine fremde Firma, nicht das eigene Konto. -->
+                <Border x:Name="AdminAccessBanner" Visibility="Collapsed" Margin="0,0,0,14"
+                        BorderBrush="{StaticResource AccentBrush}" BorderThickness="1"
+                        CornerRadius="12" Padding="16,10">
+                    <Grid ColumnSpacing="16">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <TextBlock x:Name="AdminAccessText" TextWrapping="Wrap" VerticalAlignment="Center"
+                                   FontSize="15" Foreground="{StaticResource TextBrush}" />
+                        <Button Grid.Column="1" Content="Zurück zum Admin-Dashboard"
+                                Style="{StaticResource DashboardButton}" Click="BackToDashboard_Click" />
+                    </Grid>
+                </Border>
+                <TextBlock x:Name="CrumbText" FontSize="14" TextWrapping="Wrap"
+                           Foreground="{StaticResource MutedTextBrush}" />
+                <TextBlock x:Name="PageTitle" FontSize="38" FontWeight="SemiBold" TextWrapping="Wrap"
+                           Foreground="{StaticResource TextBrush}" />
+                <TextBlock x:Name="PurposeText" FontSize="18" TextWrapping="Wrap"
+                           Foreground="{StaticResource MutedTextBrush}" Margin="0,0,0,18" />
+                <Border x:Name="ViewHost" />
+            </StackPanel>
+        </ScrollViewer>
+    </Grid>
+</Page>

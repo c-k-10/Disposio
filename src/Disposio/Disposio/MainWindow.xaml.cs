@@ -23,29 +23,42 @@ using Disposio.Services;
 
 namespace Disposio
 {
+    // Womit das Fenster startet. Die beiden Vorschauen gibt es nur im Debug-Build.
+    public enum StartAnsicht
+    {
+        Anmeldung,
+        DashboardVorschau,
+        FirmenVorschau
+    }
+
     public sealed partial class MainWindow : Window
     {
-        public MainWindow() : this(false)
+        public MainWindow() : this(StartAnsicht.Anmeldung)
         {
         }
 
-        public MainWindow(bool openDashboard)
+        public MainWindow(StartAnsicht start)
         {
             this.InitializeComponent();
             // Ein Frame ist der Bereich, in dem WinUI zwischen Seiten navigiert.
-            // Ein normaler Start beginnt immer beim Login. Nur das ausdrückliche Debug-
-            // Startprofil darf eine als solche gekennzeichnete Entwicklungsansicht öffnen.
+            // Ein normaler Start beginnt immer beim Login. Nur die ausdrücklichen Debug-
+            // Startprofile dürfen eine als solche gekennzeichnete Entwicklungsansicht öffnen.
             var runtimeFrame = new Frame();
             BenutzerSitzung.Abmelden();
-            bool openDevelopmentDashboard = false;
+            Type startPage = typeof(LoginPage);
 #if DEBUG
-            if (openDashboard)
+            if (start == StartAnsicht.DashboardVorschau)
             {
                 BenutzerSitzung.EntwicklungsansichtStarten();
-                openDevelopmentDashboard = true;
+                startPage = typeof(DashboardAnsicht);
+            }
+            else if (start == StartAnsicht.FirmenVorschau)
+            {
+                BenutzerSitzung.FirmenVorschauStarten();
+                startPage = typeof(FirmenAnsicht);
             }
 #endif
-            runtimeFrame.Navigate(openDevelopmentDashboard ? typeof(DashboardAnsicht) : typeof(LoginPage));
+            runtimeFrame.Navigate(startPage);
             this.Content = runtimeFrame;
         }
     }

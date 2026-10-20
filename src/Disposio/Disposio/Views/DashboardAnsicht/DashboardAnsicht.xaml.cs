@@ -967,26 +967,68 @@ namespace Disposio.Views
             if (!EnsureDashboardAccess())
                 return;
 
-            if (_dialogOpen || XamlRoot is null || sender is not Button { DataContext: Kunde customer })
+            if (_dialogOpen || _isLoading || XamlRoot is null || sender is not Button { DataContext: Kunde customer })
                 return;
 
             _dialogOpen = true;
+            UpdateDataActions();
+            bool accessRevoked = false;
+            bool opened = false;
             try
             {
-                var dialog = CreateDialog("Kundenansicht");
+                // Der Admin bleibt mit seinem eigenen Konto angemeldet und benutzt kein Kundenkonto.
+                // Vorher bestätigen, weil jeder Zugang ins Aktionsprotokoll der Firma geschrieben wird.
+                var dialog = CreateDialog("Firmenansicht öffnen");
                 dialog.Content = new TextBlock
                 {
-                    Text = $"Die Kundenansicht für {customer.Firmenname} ist noch nicht angebunden. Es wurde kein Login durchgeführt.",
+                    Text = $"Sie öffnen die Firmenansicht von {customer.Firmenname} als MegakrassenAdmin. " +
+                        "Dieser Zugang wird im Aktionsprotokoll der Firma gespeichert.",
                     TextWrapping = TextWrapping.Wrap,
                     MaxWidth = 460,
                     Foreground = Brush("TextBrush")
                 };
-                dialog.CloseButtonText = "Verstanden";
-                await dialog.ShowAsync();
+                dialog.PrimaryButtonText = "Öffnen";
+                dialog.CloseButtonText = "Abbrechen";
+                if (await dialog.ShowAsync() != ContentDialogResult.Primary)
+                    return;
+
+                DatabaseStatusText.Text = $"Firmenansicht von {customer.Firmenname} wird geöffnet …";
+                // Prüft die Admin-Rolle erneut in Neon, liest die Firma neu und protokolliert den Zugang.
+                AdminFirmenzugang zugang = await _unternehmenRepository.FirmenzugangOeffnenAsync(customer.Id);
+                if (_returningToLogin || !IsLoaded)
+                    return;
+
+                BenutzerSitzung.FirmenzugangStarten(zugang);
+                var appearance = new DashboardAppearance { AccentHex = _accentHex, IsLight = _isLight };
+                if (Frame is not Frame frame || !frame.Navigate(typeof(FirmenAnsicht), appearance))
+                {
+                    BenutzerSitzung.FirmenzugangBeenden();
+                    throw new InvalidOperationException();
+                }
+
+                // Zurück geht es über „Zurück zum Admin-Dashboard“, nicht über den Navigationsverlauf.
+                frame.BackStack.Clear();
+                opened = true;
+            }
+            catch (UnauthorizedAccessException)
+            {
+                accessRevoked = true;
+            }
+            catch (UnternehmenKonfliktException)
+            {
+                DatabaseStatusText.Text = "Dieses Unternehmen gibt es nicht mehr. Bitte laden Sie die Liste erneut.";
+            }
+            catch (Exception)
+            {
+                DatabaseStatusText.Text = "Die Firmenansicht konnte nicht geöffnet werden. Bitte prüfen Sie die Verbindung und versuchen Sie es erneut.";
             }
             finally
             {
                 _dialogOpen = false;
+                if (!opened)
+                    UpdateDataActions();
+                if (accessRevoked)
+                    ReturnToLogin("Ihr Zugriff ist nicht mehr verfügbar. Bitte melden Sie sich erneut an.");
             }
         }
 
