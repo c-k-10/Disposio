@@ -45,9 +45,6 @@ public sealed record Fahrzeug(
     decimal? SolltemperaturC,
     string? Abteilung);
 
-/// <summary>Eine Abteilung zur Auswahl im Fahrzeugformular.</summary>
-public sealed record AbteilungAuswahl(long Id, string Bezeichnung);
-
 /// <summary>
 /// Die festen Auswahllisten des Fahrzeugformulars. Sie folgen dem Wireframe F02
 /// (Fahrzeugklasse, Aufbau, Status) und stehen nur an dieser einen Stelle.

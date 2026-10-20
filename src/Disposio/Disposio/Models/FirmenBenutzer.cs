@@ -48,9 +48,6 @@ public sealed record FirmenBenutzerEntwurf(
     bool Aktiv,
     string? Passwort);
 
-/// <summary>Eine Abteilung des eigenen Unternehmens für die Auswahlliste in K02.</summary>
-public sealed record AbteilungAuswahl(long Id, string Bezeichnung);
-
 /// <summary>Eine Rolle für die Auswahlliste in K02. IstEigene: vom Kundenadmin in K03 angelegt.</summary>
 public sealed record RollenAuswahl(long Id, string Bezeichnung, bool IstEigene)
 {
