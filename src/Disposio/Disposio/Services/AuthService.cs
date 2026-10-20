@@ -32,8 +32,13 @@ public sealed record AngemeldeterBenutzer(long Id, string Vorname, string Nachna
         ? Array.Empty<FirmenRolle>()
         : FirmenRollenKatalog.AusDatenbank(Rollen);
 
-    // Fahrer arbeiten in der Fahrer-App. Am PC braucht es mindestens eine Büro-Rolle.
-    public bool HatFirmenArbeitsbereich => FirmenRollen.Any(rolle => rolle != FirmenRolle.Fahrer);
+    // Eigene Rollen aus K03 mit ihren freigeschalteten Ansichten. Plattformkonten haben keine.
+    public IReadOnlyList<EigeneRolle> EigeneRollen { get; init; } = Array.Empty<EigeneRolle>();
+
+    // Fahrer arbeiten in der Fahrer-App. Am PC braucht es mindestens eine Büro-Rolle
+    // oder eine eigene Rolle mit mindestens einer freigeschalteten Ansicht.
+    public bool HatFirmenArbeitsbereich => FirmenRollen.Any(rolle => rolle != FirmenRolle.Fahrer) ||
+        (UnternehmenId is not null && EigeneRollen.Any(rolle => rolle.Ansichten.Count > 0));
 
     public string Anzeigename => $"{Vorname} {Nachname}".Trim();
 }
@@ -61,7 +66,15 @@ public static class AuthService
         COALESCE((SELECT json_agg(r.bezeichnung ORDER BY r.bezeichnung)
                   FROM public.benutzer_rolle br
                   JOIN public.rolle r ON r.rollen_id = br.rollen_id
-                  WHERE br.benutzer_id = b.benutzer_id), '[]'::json)
+                  WHERE br.benutzer_id = b.benutzer_id AND r.unternehmen_id IS NULL), '[]'::json),
+        COALESCE((SELECT json_agg(json_build_object('rolle', r.bezeichnung, 'ansichten',
+                      COALESCE((SELECT json_agg(be.schluessel ORDER BY be.schluessel)
+                                FROM public.rolle_berechtigung rb
+                                JOIN public.berechtigung be ON be.berechtigung_id = rb.berechtigung_id
+                                WHERE rb.rollen_id = r.rollen_id), '[]'::json)) ORDER BY r.bezeichnung)
+                  FROM public.benutzer_rolle br
+                  JOIN public.rolle r ON r.rollen_id = br.rollen_id
+                  WHERE br.benutzer_id = b.benutzer_id AND r.unternehmen_id = b.unternehmen_id), '[]'::json)
         """;
 
     /// <summary>
@@ -173,7 +186,9 @@ public static class AuthService
         }
 
         cancellationToken.ThrowIfCancellationRequested();
-        var rollen = JsonSerializer.Deserialize<string[]>(Required(row, 7)) ?? Array.Empty<string>();
+        var rollen = JsonSerializer.Deserialize<string[]>(Required(row, 6)) ?? Array.Empty<string>();
+        var eigeneRollen = JsonSerializer.Deserialize<EigeneRolle[]>(Required(row, 7),
+        new JsonSerializerOptions(JsonSerializerDefaults.Web)) ?? Array.Empty<EigeneRolle>();
         var benutzer = new AngemeldeterBenutzer(
             long.Parse(benutzerId, CultureInfo.InvariantCulture),
             Required(row, 1), Required(row, 2), Required(row, 3),
@@ -181,7 +196,8 @@ public static class AuthService
             Array.AsReadOnly(rollen))
         {
             Firmenname = row[8],
-            Abteilung = row[9]
+            Abteilung = row[9],
+            EigeneRollen = Array.AsReadOnly(eigeneRollen)
         };
 
         return firmenkennung.Length == 0 && !benutzer.IstMegakrasserAdmin ? null : benutzer;

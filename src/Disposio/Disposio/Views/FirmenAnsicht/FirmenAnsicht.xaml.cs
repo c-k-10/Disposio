@@ -55,7 +55,9 @@ namespace Disposio.Views
                 ? FirmenRollenKatalog.Alle
                 : BenutzerSitzung.AktuellerBenutzer?.FirmenRollen ?? Array.Empty<FirmenRolle>();
             _rollen = rollen.Where(rolle => rolle != FirmenRolle.Fahrer).ToArray();
-            if (_rollen.Count == 0)
+            _eigeneRollen = EigeneRollenDerSitzung();
+            if (_rollen.Count == 0 && EigeneMenuepunkteGesamt() == 0)
+                if (_rollen.Count == 0)
             {
                 // Erst nach der laufenden Navigation zurück, damit WinUI nicht verschachtelt navigiert.
                 _returningToLogin = true;
@@ -69,7 +71,8 @@ namespace Disposio.Views
         }
 
         // Startansicht: der erste Menüpunkt der ersten Rolle (bei Disponenten die Tagesübersicht).
-        private string StartId() => AnsichtenKatalog.Menue(_rollen[0])[0].Id;
+        // Wer nur eine eigene Rolle hat, startet bei deren erstem Menüpunkt.
+        private string StartId() => _rollen.Count > 0 ? AnsichtenKatalog.Menue(_rollen[0])[0].Id : ErsteEigeneAnsicht();
 
         private void UpdateAccountDisplay()
         {
@@ -155,7 +158,8 @@ namespace Disposio.Views
 
             // Auch eine Ansicht, die nicht im Menü steht, öffnet sich nur mit der passenden Rolle.
             AnsichtInfo? ansicht = AnsichtenKatalog.Finden(id);
-            if (ansicht is null || !_rollen.Contains(ansicht.Rolle))
+            // Eine Ansicht öffnet sich über die passende Standardrolle oder eine eigene Rolle mit dieser Berechtigung.
+            if (ansicht is null || (!_rollen.Contains(ansicht.Rolle) && !EigeneRollenRegeln.Erlaubt(_eigeneRollen, ansicht)))
             {
                 ShowNoAccess();
                 return;
@@ -164,22 +168,14 @@ namespace Disposio.Views
             CrumbText.Text = $"{FirmenRollenKatalog.Bezeichnung(ansicht.Rolle)} / {ansicht.Titel} · {ansicht.Id}";
             PageTitle.Text = ansicht.Titel;
             PurposeText.Text = ansicht.Zweck;
-
-            var kontext = new FirmenAnsichtKontext(ansicht, _rollen, BenutzerSitzung.IstFirmenVorschau, parameter, Open,
-                () => ReturnToLogin("Ihr Zugriff ist nicht mehr verfügbar. Bitte melden Sie sich erneut an."));
-            try
+            ViewHost.Child = ansicht.Id switch
             {
-                ViewHost.Child = CreateView(kontext) ?? CreatePlaceholder(ansicht);
-            }
-            catch (Exception)
-            {
-                // Ein Fehler in einer einzelnen Ansicht soll nicht die ganze Firmenansicht beenden.
-                var content = new StackPanel { Spacing = 18 };
-                content.Children.Add(Text("Diese Ansicht konnte nicht geöffnet werden. Bitte versuchen Sie es erneut."));
-                content.Children.Add(GoButton("Zur Startansicht", StartId(), primary: false));
-                ViewHost.Child = Card(content);
-            }
-
+                "K01" => CreateUsersView(),
+                "K02" => CreateUserEditView(),
+                "K03" => CreateRollenUndRechteView(),
+                "K04" => CreatePasswordPolicyView(),
+                _ => CreatePlaceholder(ansicht)
+            };
             // Bei Unteransichten (zum Beispiel K02) bleibt ihr Menüpunkt (K01) markiert.
             BuildMenu(ansicht.Oberansicht ?? ansicht.Id);
             ContentScroll.ChangeView(null, 0, null, true);
@@ -227,6 +223,9 @@ namespace Disposio.Views
                     MenuPanel.Children.Add(button);
                 }
             }
+
+            // Danach je eigene Rolle ein eigener Menüabschnitt (FirmenAnsicht.EigeneRollen.cs).
+            EigeneRollenMenue(activeId);
         }
 
         // S03: nachvollziehbarer Hinweis statt einer leeren Seite.
