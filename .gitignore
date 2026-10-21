@@ -13,3 +13,6 @@
 # Obsidian: personal window layout
 .obsidian/workspace.json
 .obsidian/workspace-mobile.json
+
+# Neon Function: npm-Pakete
+node_modules/

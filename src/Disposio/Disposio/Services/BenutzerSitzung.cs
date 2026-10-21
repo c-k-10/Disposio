@@ -44,6 +44,8 @@ public static class BenutzerSitzung
 
     public static void Abmelden()
     {
+        // Die Neon-Auth-Sitzung (Cookie) endet mit der Abmeldung. Sonst bliebe eine Admin-Sitzung hängen.
+        NeonAuthClient.Instanz.SitzungVerwerfen();
         AktuellerBenutzer = null;
         IstEntwicklungsansicht = false;
         IstFirmenVorschau = false;

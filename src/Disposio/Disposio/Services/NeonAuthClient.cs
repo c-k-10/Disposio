@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Net;
 using System.Net.Http;
 using System.Net.Http.Json;
@@ -94,6 +95,33 @@ public sealed class NeonAuthClient
                                       or JsonException or KeyNotFoundException)
         {
             return new LoginErgebnis(false, Fehler: "Anmeldung fehlgeschlagen. Bitte erneut versuchen.");
+        }
+    }
+
+    /// <summary>
+    /// Holt ein kurzlebiges JWT (laut Neon-Doku 15 Minuten gültig) für die angemeldete Sitzung.
+    /// Das JWT beweist der Neon Function, wer anfragt. Null, wenn keine Sitzung besteht.
+    /// </summary>
+    public async Task<string?> JwtHolenAsync(CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            // Laut Neon-Doku steht das JWT im Header "set-auth-jwt" der get-session-Antwort.
+            using var sitzung = await _http.GetAsync("get-session", cancellationToken);
+            if (sitzung.IsSuccessStatusCode && sitzung.Headers.TryGetValues("set-auth-jwt", out var werte))
+                return werte.FirstOrDefault();
+
+            // Ersatzweg: Better-Auth-JWT-Plugin, Route "token".
+            using var tokenAntwort = await _http.GetAsync("token", cancellationToken);
+            if (!tokenAntwort.IsSuccessStatusCode)
+                return null;
+            using var doc = JsonDocument.Parse(await tokenAntwort.Content.ReadAsStringAsync(cancellationToken));
+            return doc.RootElement.GetProperty("token").GetString();
+        }
+        catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException
+                                      or JsonException or KeyNotFoundException)
+        {
+            return null;
         }
     }
 

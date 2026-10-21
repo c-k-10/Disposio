@@ -247,6 +247,9 @@ namespace Disposio.Views
             var emailBox = Eingabe(benutzer?.Email ?? "", "name@firma.de");
             firstNameBox.MaxLength = lastNameBox.MaxLength = 100;
             emailBox.MaxLength = 254;
+            // Die E-Mail gehört zum Neon-Auth-Konto. Eine Änderung nur in unserer Tabelle würde den Login brechen.
+            if (!neu)
+                emailBox.IsEnabled = false;
 
             // Rollen (Standard + eigene aus K03) und Abteilungen werden gleich aus Neon geladen.
             // „Keine Abteilung“ gilt für unternehmensweite Rollen.
@@ -279,7 +282,7 @@ namespace Disposio.Views
             if (neu)
             {
                 // Einladungen werden im Prototyp nicht versendet. Deshalb vergibt der Kundenadmin ein
-                // Startpasswort, wie beim Anlegen des Kundenadmins im Dashboard. Gespeichert wird nur der Hash.
+                // Startpasswort, wie beim Anlegen des Kundenadmins im Dashboard. Das Passwort wird bei Neon Auth gespeichert, nicht in unserer Tabelle.
                 Platzieren(form, Feld("Startpasswort *", passwordBox), 4, 0);
                 Platzieren(form, Feld("Startpasswort wiederholen *", repeatBox), 4, 1);
             }
@@ -338,7 +341,8 @@ namespace Disposio.Views
             bool isSaving = false;
             void SetEnabled(bool enabled)
             {
-                firstNameBox.IsEnabled = lastNameBox.IsEnabled = emailBox.IsEnabled = enabled;
+                firstNameBox.IsEnabled = lastNameBox.IsEnabled = enabled;
+                emailBox.IsEnabled = enabled && neu;
                 departmentBox.IsEnabled = languageBox.IsEnabled = enabled;
                 roleBox.IsEnabled = statusBox.IsEnabled = enabled && !eigenesKonto;
                 passwordBox.IsEnabled = repeatBox.IsEnabled = enabled;
