@@ -10,6 +10,7 @@ namespace Disposio.Views
     {
         public static UIElement? Erstellen(FirmenAnsichtKontext kontext) => kontext.Ansicht.Id switch
         {
+            "D08" => new D08LiveKarte(kontext),
             _ => null
         };
     }

@@ -1,0 +1,91 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- G02 „Kennzahlen & Statistik“: Kennzahlen je Kalendermonat und darunter jeder Monat als PDF zum Herunterladen.
+     Bei gesperrter Firma ist das die einzige Ansicht für Geschäftsführung und Kundenadmin. -->
+<UserControl
+    x:Class="Disposio.Views.G02Statistik"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:local="using:Disposio.Views">
+
+    <StackPanel Spacing="18">
+        <!-- Status links, Knopf rechts. Der Status erklärt Laden, Fehler und gespeicherte Downloads. -->
+        <Grid ColumnSpacing="12">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+            <StackPanel Orientation="Horizontal" Spacing="12" VerticalAlignment="Center">
+                <ProgressRing x:Name="LadeAnzeige" Width="20" Height="20" IsActive="False" Visibility="Collapsed" />
+                <TextBlock x:Name="StatusText" Style="{StaticResource HinweisText}" VerticalAlignment="Center" />
+            </StackPanel>
+            <Button x:Name="NeuLadenButton" Grid.Column="1" Content="Erneut laden"
+                    Style="{StaticResource DashboardButton}" Click="NeuLaden_Click" />
+        </Grid>
+
+        <Border Style="{StaticResource KarteStyle}">
+            <StackPanel Spacing="14">
+                <Grid ColumnSpacing="12">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <TextBlock x:Name="MonatTitel" Text="Monat" Style="{StaticResource UeberschriftText}" VerticalAlignment="Center" />
+                    <ComboBox x:Name="MonatBox" Grid.Column="1" Width="170" Style="{StaticResource FormComboBox}"
+                              PlaceholderText="Monat wählen" AutomationProperties.Name="Monat"
+                              SelectionChanged="Monat_SelectionChanged" />
+                    <Button x:Name="MonatPdfButton" Grid.Column="2" Content="Als PDF herunterladen" IsEnabled="False"
+                            Style="{StaticResource PrimaryButton}" Click="MonatPdf_Click" />
+                </Grid>
+
+                <ItemsControl x:Name="ZeilenListe">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate x:DataType="local:StatistikAnzeigeZeile">
+                            <Border BorderBrush="{StaticResource BorderBrush}" BorderThickness="0,0,0,1" Padding="0,10">
+                                <Grid ColumnSpacing="16">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Text="{x:Bind Bezeichnung}" Style="{StaticResource NormalText}" FontWeight="{x:Bind Schrift}" />
+                                    <TextBlock Grid.Column="1" Text="{x:Bind Wert}" Style="{StaticResource NormalText}" FontWeight="{x:Bind Schrift}" />
+                                </Grid>
+                            </Border>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </StackPanel>
+        </Border>
+
+        <Border Style="{StaticResource KarteStyle}">
+            <StackPanel Spacing="12">
+                <TextBlock Text="Downloads" Style="{StaticResource UeberschriftText}" />
+                <TextBlock Style="{StaticResource HinweisText}"
+                           Text="Jeder Monat als PDF. Die Datei wird in Ihrem Ordner „Downloads“ gespeichert." />
+                <ItemsControl x:Name="DownloadListe">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate x:DataType="local:DownloadZeile">
+                            <Border BorderBrush="{StaticResource BorderBrush}" BorderThickness="0,0,0,1" Padding="0,8">
+                                <Grid ColumnSpacing="12">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Text="{x:Bind Kurz}" Style="{StaticResource NormalText}" FontWeight="SemiBold"
+                                               VerticalAlignment="Center" ToolTipService.ToolTip="{x:Bind Lang}" />
+                                    <Button Grid.Column="1" Content="Anzeigen" Style="{StaticResource DashboardButton}"
+                                            MinHeight="34" Padding="12,4" FontSize="13" Click="Anzeigen_Click"
+                                            AutomationProperties.Name="{x:Bind AnzeigenBeschreibung}" />
+                                    <Button Grid.Column="2" Content="PDF herunterladen" Style="{StaticResource DashboardButton}"
+                                            MinHeight="34" Padding="12,4" FontSize="13" Click="Herunterladen_Click"
+                                            AutomationProperties.Name="{x:Bind HerunterladenBeschreibung}" />
+                                </Grid>
+                            </Border>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </StackPanel>
+        </Border>
+    </StackPanel>
+</UserControl>

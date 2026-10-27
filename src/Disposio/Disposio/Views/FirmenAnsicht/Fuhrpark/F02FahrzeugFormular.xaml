@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- F02 „Fahrzeug anlegen / bearbeiten“: zurzeit nur Anlegen. Pflichtfelder sind mit * markiert. -->
+<!-- F02 „Fahrzeug anlegen / bearbeiten“: ohne Startwert ein neues Fahrzeug, mit Fahrzeug-Id aus F01 ein vorhandenes.
+     Pflichtfelder sind mit * markiert. -->
 <UserControl
     x:Class="Disposio.Views.F02FahrzeugFormular"
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
@@ -7,7 +8,7 @@
 
     <Border Style="{StaticResource KarteStyle}">
         <StackPanel Spacing="22">
-            <TextBlock Text="Fahrzeug" Style="{StaticResource UeberschriftText}" />
+            <TextBlock x:Name="FormularTitel" Text="Neues Fahrzeug" Style="{StaticResource UeberschriftText}" />
             <Grid ColumnSpacing="18" RowSpacing="16">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*" />
@@ -62,7 +63,8 @@
                 </StackPanel>
                 <StackPanel Grid.Row="3" Grid.Column="1">
                     <TextBlock Text="Status *" Style="{StaticResource FeldLabel}" />
-                    <ComboBox x:Name="StatusBox" Style="{StaticResource FormComboBox}" AutomationProperties.Name="Status" />
+                    <ComboBox x:Name="StatusBox" Style="{StaticResource FormComboBox}" PlaceholderText="Bitte wählen"
+                              AutomationProperties.Name="Status" />
                 </StackPanel>
 
                 <StackPanel Grid.Row="4">
@@ -86,8 +88,8 @@
 
                 <StackPanel>
                     <TextBlock Text="Aufbau *" Style="{StaticResource FeldLabel}" />
-                    <ComboBox x:Name="AufbauBox" Style="{StaticResource FormComboBox}" AutomationProperties.Name="Aufbau"
-                              SelectionChanged="Aufbau_SelectionChanged" />
+                    <ComboBox x:Name="AufbauBox" Style="{StaticResource FormComboBox}" PlaceholderText="Bitte wählen"
+                              AutomationProperties.Name="Aufbau" SelectionChanged="Aufbau_SelectionChanged" />
                 </StackPanel>
                 <StackPanel Grid.Column="1">
                     <TextBlock x:Name="TemperaturLabel" Text="Solltemperatur (°C)" Style="{StaticResource FeldLabel}" />

@@ -227,6 +227,18 @@ public sealed class KundenadminRepository
                 SELECT g.benutzer_id, r.rollen_id FROM geaendert g CROSS JOIN firmenrolle r
                 ON CONFLICT DO NOTHING
                 RETURNING benutzer_id
+            ), rolle_vorher AS (
+                -- Sieht noch den Stand vor dem Speichern, also die alte Rolle.
+                SELECT string_agg(r.bezeichnung, ', ' ORDER BY r.bezeichnung) AS bezeichnung
+                FROM public.benutzer_rolle br JOIN public.rolle r ON r.rollen_id = br.rollen_id
+                WHERE br.benutzer_id = $1::bigint
+            ), rollenwechsel AS (
+                INSERT INTO public.aktionsprotokoll (akteur_art, aktion, ergebnis, detail, unternehmen_id, benutzer_id)
+                SELECT $10, 'Rolle geändert', 'Gespeichert',
+                       $5::text || ' · ' || COALESCE(v.bezeichnung, 'keine Rolle') || ' → ' || r.bezeichnung,
+                       $2::bigint, $11::bigint
+                FROM geaendert CROSS JOIN firmenrolle r CROSS JOIN rolle_vorher v
+                WHERE v.bezeichnung IS DISTINCT FROM r.bezeichnung
             ), protokoll AS (
                 INSERT INTO public.aktionsprotokoll (akteur_art, aktion, ergebnis, detail, unternehmen_id, benutzer_id)
                 SELECT $10, 'Benutzer bearbeitet', 'Gespeichert',
@@ -342,13 +354,30 @@ public sealed class KundenadminRepository
               ), protokoll AS (
                   INSERT INTO public.aktionsprotokoll (akteur_art, aktion, ergebnis, detail, unternehmen_id, benutzer_id)
                   SELECT $4, 'Rolle angelegt', 'Gespeichert',
-                         $1::text || ' · ' || cardinality($3::bigint[]) || ' Berechtigungen', $2::bigint, $5::bigint
+                         $1::text || ' · Berechtigungen: ' ||
+                         (SELECT string_agg(b.schluessel, ', ' ORDER BY b.schluessel) FROM public.berechtigung b
+                          WHERE b.berechtigung_id = ANY($3::bigint[])),
+                         $2::bigint, $5::bigint
                   FROM ziel
               )
               SELECT rollen_id FROM ziel
               """
             : """
-              WITH ziel AS (
+              WITH vorher AS (
+                  SELECT bezeichnung FROM public.rolle
+                  WHERE rollen_id = $6::bigint AND unternehmen_id = $2::bigint
+              ), hinzu AS (
+                  -- Alle CTEs sehen den Stand VOR dem Speichern. So lässt sich alt und neu vergleichen.
+                  SELECT string_agg(b.schluessel, ', ' ORDER BY b.schluessel) AS liste
+                  FROM public.berechtigung b
+                  WHERE b.berechtigung_id = ANY($3::bigint[])
+                    AND NOT EXISTS (SELECT 1 FROM public.rolle_berechtigung rb
+                                    WHERE rb.rollen_id = $6::bigint AND rb.berechtigung_id = b.berechtigung_id)
+              ), weg AS (
+                  SELECT string_agg(b.schluessel, ', ' ORDER BY b.schluessel) AS liste
+                  FROM public.rolle_berechtigung rb JOIN public.berechtigung b ON b.berechtigung_id = rb.berechtigung_id
+                  WHERE rb.rollen_id = $6::bigint AND NOT (rb.berechtigung_id = ANY($3::bigint[]))
+              ), ziel AS (
                   UPDATE public.rolle SET bezeichnung = $1
                   WHERE rollen_id = $6::bigint AND unternehmen_id = $2::bigint
                   RETURNING rollen_id
@@ -365,8 +394,11 @@ public sealed class KundenadminRepository
               ), protokoll AS (
                   INSERT INTO public.aktionsprotokoll (akteur_art, aktion, ergebnis, detail, unternehmen_id, benutzer_id)
                   SELECT $4, 'Rolle bearbeitet', 'Gespeichert',
-                         $1::text || ' · ' || cardinality($3::bigint[]) || ' Berechtigungen', $2::bigint, $5::bigint
-                  FROM ziel
+                         CASE WHEN v.bezeichnung <> $1::text THEN v.bezeichnung || ' → ' || $1::text ELSE $1::text END
+                         || COALESCE(' · hinzugefügt: ' || h.liste, '')
+                         || COALESCE(' · entfernt: ' || w.liste, ''),
+                         $2::bigint, $5::bigint
+                  FROM ziel CROSS JOIN vorher v CROSS JOIN hinzu h CROSS JOIN weg w
               )
               SELECT rollen_id FROM ziel
               """;
@@ -497,9 +529,11 @@ public sealed class KundenadminRepository
             throw new UnauthorizedAccessException("Für diese Ansicht ist die Rolle Kundenadmin erforderlich.");
 
         // r.unternehmen_id IS NULL: nur die echte Standardrolle zählt, keine gleichnamige eigene Rolle.
-        const string query = """
+        // Eine im Dashboard gesperrte Firma (Status „Inaktiv“) bekommt keine Daten mehr.
+        const string query = $"""
             SELECT b.benutzer_id FROM public.benutzer b
             WHERE b.benutzer_id = $1::bigint AND b.unternehmen_id = $2::bigint AND b.aktiv = true
+              AND {AuthService.FirmaNichtGesperrt}
               AND EXISTS (SELECT 1 FROM public.benutzer_rolle br
                           JOIN public.rolle r ON r.rollen_id = br.rollen_id
                           WHERE br.benutzer_id = b.benutzer_id AND r.bezeichnung = $3 AND r.unternehmen_id IS NULL)

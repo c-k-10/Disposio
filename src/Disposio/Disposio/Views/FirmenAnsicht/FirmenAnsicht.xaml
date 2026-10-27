@@ -100,7 +100,8 @@
         <ScrollViewer x:Name="ContentScroll" Grid.Column="1" HorizontalScrollBarVisibility="Disabled"
                       VerticalScrollBarVisibility="Auto">
             <StackPanel x:Name="MainContent" Padding="36,24,36,30" Spacing="10">
-                <!-- Hinweis beim Admin-Zugang: Man sieht eine fremde Firma, nicht das eigene Konto. -->
+                <!-- Hinweis beim Admin-Zugang: Man sieht eine fremde Firma, nicht das eigene Konto.
+                     Bei gesperrter Firma erklärt er stattdessen den Nur-Statistik-Modus (ohne Knopf). -->
                 <Border x:Name="AdminAccessBanner" Visibility="Collapsed" Margin="0,0,0,14"
                         BorderBrush="{StaticResource AccentBrush}" BorderThickness="1"
                         CornerRadius="12" Padding="16,10">
@@ -111,7 +112,7 @@
                         </Grid.ColumnDefinitions>
                         <TextBlock x:Name="AdminAccessText" TextWrapping="Wrap" VerticalAlignment="Center"
                                    FontSize="15" Foreground="{StaticResource TextBrush}" />
-                        <Button Grid.Column="1" Content="Zurück zum Admin-Dashboard"
+                        <Button x:Name="BannerDashboardButton" Grid.Column="1" Content="Zurück zum Admin-Dashboard"
                                 Style="{StaticResource DashboardButton}" Click="BackToDashboard_Click" />
                     </Grid>
                 </Border>
