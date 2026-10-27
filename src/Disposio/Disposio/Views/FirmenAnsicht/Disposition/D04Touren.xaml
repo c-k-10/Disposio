@@ -1,0 +1,128 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- D04 „Tourenübersicht“: Touren eines Tages suchen, filtern und öffnen. „+ Tour planen“ öffnet D05,
+     „Öffnen“ die Tourdetails (D07), „Zuweisen“ die Zuweisung (D06). -->
+<UserControl
+    x:Class="Disposio.Views.D04Touren"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:local="using:Disposio.Views">
+
+    <StackPanel Spacing="18">
+        <!-- Datumsleiste mit Akzentstreifen links und „+ Tour planen“ rechts -->
+        <Border Background="{StaticResource SurfaceBrush}" BorderBrush="{StaticResource BorderBrush}"
+                BorderThickness="1" CornerRadius="12">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <Border Width="5" Background="{StaticResource AccentBrush}" CornerRadius="12,0,0,12" />
+                <TextBlock x:Name="DatumText" Grid.Column="1" Style="{StaticResource NormalText}" FontWeight="SemiBold"
+                           VerticalAlignment="Center" Margin="22,0" />
+                <Button Grid.Column="2" Content="+ Tour planen" Style="{StaticResource PrimaryButton}"
+                        Margin="0,14,18,14" Click="TourPlanen_Click" />
+            </Grid>
+        </Border>
+
+        <!-- Filter. Datum lädt neu aus der Datenbank, Suche und Status filtern die geladene Liste. -->
+        <Grid ColumnSpacing="16">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="2*" MinWidth="220" />
+                <ColumnDefinition Width="*" MinWidth="170" />
+                <ColumnDefinition Width="1.3*" MinWidth="190" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+            <StackPanel>
+                <TextBlock Text="Tour / Fahrer / Ort" Style="{StaticResource FeldLabel}" />
+                <TextBox x:Name="SuchBox" Style="{StaticResource FormTextBox}" PlaceholderText="Begriff eingeben"
+                         KeyDown="SuchBox_KeyDown" AutomationProperties.Name="Tour, Fahrer oder Ort suchen" />
+            </StackPanel>
+            <StackPanel Grid.Column="1">
+                <TextBlock Text="Status" Style="{StaticResource FeldLabel}" />
+                <ComboBox x:Name="StatusAuswahl" Style="{StaticResource FormComboBox}" AutomationProperties.Name="Status" />
+            </StackPanel>
+            <StackPanel Grid.Column="2">
+                <TextBlock Text="Datum" Style="{StaticResource FeldLabel}" />
+                <CalendarDatePicker x:Name="DatumAuswahl" Style="{StaticResource FormDatePicker}"
+                                    DateFormat="{}{day.integer(2)}.{month.integer(2)}.{year.full}"
+                                    FirstDayOfWeek="Monday" AutomationProperties.Name="Datum" />
+            </StackPanel>
+            <Button Grid.Column="3" Content="Filter anwenden" Style="{StaticResource DashboardButton}"
+                    VerticalAlignment="Bottom" Click="FilterAnwenden_Click" />
+        </Grid>
+
+        <Border Style="{StaticResource KarteStyle}">
+            <StackPanel Spacing="12">
+                <Grid>
+                    <TextBlock Text="Touren" Style="{StaticResource UeberschriftText}" />
+                    <StackPanel Orientation="Horizontal" Spacing="10" HorizontalAlignment="Right" VerticalAlignment="Center">
+                        <ProgressRing x:Name="LadeAnzeige" Width="18" Height="18" IsActive="False" Visibility="Collapsed" />
+                        <TextBlock x:Name="StatusText" Style="{StaticResource HinweisText}" VerticalAlignment="Center" />
+                    </StackPanel>
+                </Grid>
+
+                <!-- Kopfzeile und Zeilen haben dieselben Spaltenbreiten, deshalb stehen die Spalten untereinander. -->
+                <Border Background="{StaticResource InputBrush}" CornerRadius="8" Padding="14,10">
+                    <Grid ColumnSpacing="16">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="1.2*" />
+                            <ColumnDefinition Width="1.5*" />
+                            <ColumnDefinition Width="1.1*" />
+                            <ColumnDefinition Width="1.1*" />
+                            <ColumnDefinition Width="0.9*" />
+                            <ColumnDefinition Width="110" />
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Text="Tour / Bereich" Style="{StaticResource HinweisText}" FontWeight="SemiBold" />
+                        <TextBlock Grid.Column="1" Text="Fahrer / Fahrzeug" Style="{StaticResource HinweisText}" FontWeight="SemiBold" />
+                        <TextBlock Grid.Column="2" Text="Nächster Stopp" Style="{StaticResource HinweisText}" FontWeight="SemiBold" />
+                        <TextBlock Grid.Column="3" Text="Zeitfenster / ETA" Style="{StaticResource HinweisText}" FontWeight="SemiBold" />
+                        <TextBlock Grid.Column="4" Text="Status" Style="{StaticResource HinweisText}" FontWeight="SemiBold" />
+                    </Grid>
+                </Border>
+
+                <ItemsControl x:Name="TourListe">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate x:DataType="local:TourZeile">
+                            <Border BorderBrush="{StaticResource BorderBrush}" BorderThickness="0,0,0,1" Padding="14,12">
+                                <Grid ColumnSpacing="16">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="1.2*" />
+                                        <ColumnDefinition Width="1.5*" />
+                                        <ColumnDefinition Width="1.1*" />
+                                        <ColumnDefinition Width="1.1*" />
+                                        <ColumnDefinition Width="0.9*" />
+                                        <ColumnDefinition Width="110" />
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Text="{x:Bind TourUndBereich}" Style="{StaticResource NormalText}" VerticalAlignment="Center" />
+                                    <TextBlock Grid.Column="1" Text="{x:Bind FahrerUndFahrzeug}" Style="{StaticResource NormalText}" VerticalAlignment="Center" />
+                                    <TextBlock Grid.Column="2" Text="{x:Bind NaechsterStopp}" Style="{StaticResource NormalText}" VerticalAlignment="Center" />
+                                    <TextBlock Grid.Column="3" Text="{x:Bind FensterUndEta}" Style="{StaticResource NormalText}" VerticalAlignment="Center" />
+
+                                    <!-- Status-Badge. Bei Verspätung gefüllt und in Fehlerfarbe, sonst nur umrandet. -->
+                                    <Grid Grid.Column="4" HorizontalAlignment="Left" VerticalAlignment="Center">
+                                        <Border Visibility="{x:Bind NormalSichtbar}" BorderBrush="{StaticResource BorderBrush}"
+                                                BorderThickness="1" CornerRadius="14" Padding="10,3">
+                                            <TextBlock Text="{x:Bind Status}" FontSize="13" Foreground="{StaticResource TextBrush}" />
+                                        </Border>
+                                        <Border Visibility="{x:Bind VerspaetetSichtbar}" Background="{StaticResource InputBrush}"
+                                                BorderBrush="{StaticResource ErrorBrush}" BorderThickness="1" CornerRadius="14" Padding="10,3">
+                                            <TextBlock Text="{x:Bind Status}" FontSize="13" FontWeight="SemiBold"
+                                                       Foreground="{StaticResource ErrorBrush}" />
+                                        </Border>
+                                    </Grid>
+
+                                    <Button Grid.Column="5" Content="{x:Bind AktionText}" Tag="{x:Bind Id}"
+                                            Style="{StaticResource DashboardButton}" MinHeight="36" Padding="14,4"
+                                            HorizontalAlignment="Left" Click="TourAktion_Click" />
+                                </Grid>
+                            </Border>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+
+                <TextBlock x:Name="LeerText" Visibility="Collapsed" Style="{StaticResource HinweisText}" />
+            </StackPanel>
+        </Border>
+    </StackPanel>
+</UserControl>

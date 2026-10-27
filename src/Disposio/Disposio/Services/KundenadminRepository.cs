@@ -67,9 +67,12 @@ public sealed class KundenadminRepository
     {
         long firmaId = await ZugriffPruefenAsync(cancellationToken);
         var rows = await _client.Value.QueryAsync(
+            // Deaktivierte Abteilungen (K05) bleiben wählbar, damit bestehende Zuordnungen erhalten bleiben,
+            // stehen aber gekennzeichnet am Ende. Voraussetzung: 006_abteilung_aktiv.sql.
             """
-            SELECT abteilung_id, bezeichnung FROM public.abteilung
-            WHERE unternehmen_id = $1::bigint ORDER BY lower(bezeichnung)
+            SELECT abteilung_id, CASE WHEN aktiv THEN bezeichnung ELSE bezeichnung || ' (deaktiviert)' END
+            FROM public.abteilung
+            WHERE unternehmen_id = $1::bigint ORDER BY NOT aktiv, lower(bezeichnung)
             """,
             new string?[] { Text(firmaId) }, cancellationToken);
         return rows.Select(row => new AbteilungAuswahl(

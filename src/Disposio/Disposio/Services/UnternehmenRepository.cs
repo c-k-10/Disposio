@@ -63,6 +63,8 @@ public sealed class UnternehmenRepository : IUnternehmenRepository
         // Damit bleiben z. B. Apostrophe im Firmennamen normale Daten und können keinen SQL-Befehl verändern.
         // RETURNING liefert die wirklich gespeicherte Zeile einschließlich der neu vergebenen Id zurück.
         // Der Protokolleintrag entsteht im selben Befehl: Entweder ist beides gespeichert oder nichts.
+        // Jede neue Firma bekommt gleich eine „Hauptabteilung“, weil jede Tour eine Abteilung braucht.
+        // Der Kundenadmin kann sie in K05 umbenennen oder weitere Abteilungen anlegen.
         var query = $"""
             WITH gespeichert AS (
                 INSERT INTO public.unternehmen
@@ -70,6 +72,9 @@ public sealed class UnternehmenRepository : IUnternehmenRepository
                      kontaktperson, passwortregeln)
                 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, 'Mindestens 8 Zeichen')
                 RETURNING *
+            ), hauptabteilung AS (
+                INSERT INTO public.abteilung (bezeichnung, unternehmen_id)
+                SELECT 'Hauptabteilung', g.unternehmen_id FROM gespeichert g
             ), protokoll AS (
                 INSERT INTO public.aktionsprotokoll (akteur_art, aktion, ergebnis, detail, unternehmen_id, benutzer_id)
                 SELECT $11, 'Unternehmen angelegt', 'Gespeichert',
