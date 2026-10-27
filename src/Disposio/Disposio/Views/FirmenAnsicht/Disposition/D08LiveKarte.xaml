@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- D08 „Live-Karte & Verkehr“: OpenStreetMap-Karte (Leaflet) im WebView2 mit Verkehrslage von TomTom.
+     Startet auf Nürnberg. Fahrzeugpositionen kommen in einem späteren Schritt dazu. -->
+<UserControl
+    x:Class="Disposio.Views.D08LiveKarte"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+    <StackPanel Spacing="18">
+        <!-- Status links, Schalter für die beiden Verkehrsebenen rechts -->
+        <Grid ColumnSpacing="24">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+            <StackPanel Orientation="Horizontal" Spacing="12" VerticalAlignment="Center">
+                <ProgressRing x:Name="LadeAnzeige" Width="20" Height="20" IsActive="True" />
+                <TextBlock x:Name="StatusText" Style="{StaticResource HinweisText}" VerticalAlignment="Center"
+                           TextWrapping="Wrap" Text="Karte wird geladen …" />
+            </StackPanel>
+            <ToggleSwitch x:Name="FlussSchalter" Grid.Column="1" IsOn="True" IsEnabled="False"
+                          Header="Verkehrsfluss" OnContent="An" OffContent="Aus"
+                          Toggled="EbenenSchalter_Toggled" AutomationProperties.Name="Verkehrsfluss anzeigen" />
+            <ToggleSwitch x:Name="StoerungenSchalter" Grid.Column="2" IsOn="True" IsEnabled="False"
+                          Header="Störungen" OnContent="An" OffContent="Aus"
+                          Toggled="EbenenSchalter_Toggled" AutomationProperties.Name="Verkehrsstörungen anzeigen" />
+        </Grid>
+
+        <Border x:Name="KarteRahmen" Style="{StaticResource KarteStyle}">
+            <StackPanel Spacing="12">
+                <TextBlock Text="Karte" Style="{StaticResource UeberschriftText}" />
+                <!-- Die Seite liegt in einem ScrollViewer, deshalb braucht die Karte eine feste Höhe. -->
+                <WebView2 x:Name="Karte" Height="600" HorizontalAlignment="Stretch" />
+            </StackPanel>
+        </Border>
+    </StackPanel>
+</UserControl>
