@@ -161,6 +161,16 @@ namespace Disposio.Views
             }
         }
 
+        private void Eingabe_KeyDown(object sender, KeyRoutedEventArgs e)
+        {
+            // Enter in einem Eingabefeld startet die Anmeldung wie ein Klick auf "Anmelden".
+            if (e.Key == Windows.System.VirtualKey.Enter)
+            {
+                e.Handled = true;
+                LoginButton_Click(LoginButton, new RoutedEventArgs());
+            }
+        }
+
         private async void LoginButton_Click(object sender, RoutedEventArgs e)
         {
             // await lässt das Fenster weiter reagieren. Deshalb sperren wir vor dem Warten
