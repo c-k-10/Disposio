@@ -57,7 +57,7 @@ Wie man die App lokal startet, steht in [`docs/00_Admin/Disposio-lokal-starten.m
 ## Team
 
 | Name | 
-|---|---|
+|---|
 | Christina Kiesl |
 | Niklas Bäricke |
 | Pavlos Laskaridis|
