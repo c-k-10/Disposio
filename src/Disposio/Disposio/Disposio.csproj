@@ -14,6 +14,10 @@
     <Nullable>enable</Nullable>
   </PropertyGroup>
   <ItemGroup>
+    <!-- Fenster-Icon (Titelleiste), wird in App.xaml.cs mit AppWindow.SetIcon gesetzt. -->
+    <Content Include="Assets\disposio.ico">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
     <Content Include="Assets\miseur_kofferfell.png">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </Content>

@@ -57,6 +57,8 @@ namespace Disposio
 #endif
 
             _window = new MainWindow(start);
+            // Icon in der Titelleiste: der Kopf des Maskottchens (Assets/disposio.ico).
+            _window.AppWindow.SetIcon(System.IO.Path.Combine(AppContext.BaseDirectory, "Assets", "disposio.ico"));
             _window.Activate();
 
             // Die App startet maximiert (wie ein Doppelklick auf die Titelleiste). Titelleiste und Taskleiste
