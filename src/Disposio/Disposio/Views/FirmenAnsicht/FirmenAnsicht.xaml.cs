@@ -56,8 +56,8 @@ namespace Disposio.Views
                 : BenutzerSitzung.AktuellerBenutzer?.FirmenRollen ?? Array.Empty<FirmenRolle>();
             _rollen = rollen.Where(rolle => rolle != FirmenRolle.Fahrer).ToArray();
             _eigeneRollen = EigeneRollenDerSitzung();
+            // Ohne Standardrolle und ohne Menüpunkt aus einer eigenen Rolle bleibt nichts anzuzeigen.
             if (_rollen.Count == 0 && EigeneMenuepunkteGesamt() == 0)
-                if (_rollen.Count == 0)
             {
                 // Erst nach der laufenden Navigation zurück, damit WinUI nicht verschachtelt navigiert.
                 _returningToLogin = true;
@@ -168,14 +168,31 @@ namespace Disposio.Views
             CrumbText.Text = $"{FirmenRollenKatalog.Bezeichnung(ansicht.Rolle)} / {ansicht.Titel} · {ansicht.Id}";
             PageTitle.Text = ansicht.Titel;
             PurposeText.Text = ansicht.Zweck;
-            ViewHost.Child = ansicht.Id switch
+
+            var kontext = new FirmenAnsichtKontext(ansicht, _rollen, BenutzerSitzung.IstFirmenVorschau, parameter, Open,
+                () => ReturnToLogin("Ihr Zugriff ist nicht mehr verfügbar. Bitte melden Sie sich erneut an."));
+            try
             {
-                "K01" => CreateUsersView(),
-                "K02" => CreateUserEditView(),
-                "K03" => CreateRollenUndRechteView(),
-                "K04" => CreatePasswordPolicyView(),
-                _ => CreatePlaceholder(ansicht)
-            };
+                // K01–K04 baut die Firmenansicht selbst (FirmenAnsicht.Kundenadmin.cs, FirmenAnsicht.EigeneRollen.cs).
+                // Alle anderen Ansichten kommen aus der Datei ihres Rollenbereichs, zum Beispiel F01 und F02.
+                ViewHost.Child = ansicht.Id switch
+                {
+                    "K01" => CreateUsersView(),
+                    "K02" => CreateUserEditView(),
+                    "K03" => CreateRollenUndRechteView(kontext),
+                    "K04" => CreatePasswordPolicyView(),
+                    _ => CreateView(kontext) ?? CreatePlaceholder(ansicht)
+                };
+            }
+            catch (Exception)
+            {
+                // Ein Fehler in einer einzelnen Ansicht soll nicht die ganze Firmenansicht beenden.
+                var content = new StackPanel { Spacing = 18 };
+                content.Children.Add(Text("Diese Ansicht konnte nicht geöffnet werden. Bitte versuchen Sie es erneut."));
+                content.Children.Add(GoButton("Zur Startansicht", StartId(), primary: false));
+                ViewHost.Child = Card(content);
+            }
+
             // Bei Unteransichten (zum Beispiel K02) bleibt ihr Menüpunkt (K01) markiert.
             BuildMenu(ansicht.Oberansicht ?? ansicht.Id);
             ContentScroll.ChangeView(null, 0, null, true);
@@ -279,6 +296,16 @@ namespace Disposio.Views
         }
 
         // ── Kleine Bausteine ─────────────────────────────────────────────────────────────
+
+        // Tabellenzelle für die Listen in K01 und K03.
+        private TextBlock Cell(string text, bool header, bool bold) => new()
+        {
+            Text = text,
+            FontSize = header ? 14 : 16,
+            FontWeight = header || bold ? FontWeights.SemiBold : FontWeights.Normal,
+            TextWrapping = TextWrapping.Wrap,
+            Foreground = Brush(header ? "MutedTextBrush" : "TextBrush")
+        };
 
         private TextBlock Text(string text) => new()
         {

@@ -46,7 +46,7 @@ namespace Disposio.Views
                 VerticalAlignment = VerticalAlignment.Center,
                 Foreground = Brush("TextBrush")
             };
-            var createButton = new Button { Content = "+ Benutzer anlegen", Style = (Style)Resources["PrimaryButton"] };
+            var createButton = new Button { Content = "+ Benutzer anlegen", Style = Stil("PrimaryButton") };
             createButton.Click += (_, _) => OpenUserEditor(null);
             root.Children.Add(InfoBar(summaryText, createButton));
 
@@ -62,7 +62,7 @@ namespace Disposio.Views
             var filterButton = new Button
             {
                 Content = "Filter anwenden",
-                Style = (Style)Resources["DashboardButton"],
+                Style = Stil("DashboardButton"),
                 VerticalAlignment = VerticalAlignment.Bottom
             };
 
@@ -131,7 +131,7 @@ namespace Disposio.Views
                     loadText.Text = exception is InvalidOperationException
                         ? exception.Message
                         : "Die Benutzer konnten nicht geladen werden. Prüfe die Verbindung.";
-                    var retry = new Button { Content = "Erneut laden", Style = (Style)Resources["DashboardButton"] };
+                    var retry = new Button { Content = "Erneut laden", Style = Stil("DashboardButton") };
                     retry.Click += async (_, _) => await LoadAsync();
                     tableHost.Child = retry;
                 }
@@ -182,7 +182,7 @@ namespace Disposio.Views
                 var bearbeiten = new Button
                 {
                     Content = "Bearbeiten",
-                    Style = (Style)Resources["DashboardButton"],
+                    Style = Stil("DashboardButton"),
                     MinHeight = 36,
                     Padding = new Thickness(14, 4, 14, 4)
                 };
@@ -308,8 +308,8 @@ namespace Disposio.Views
                 Visibility = Visibility.Collapsed
             };
 
-            var cancelButton = new Button { Content = "Abbrechen", Style = (Style)Resources["DashboardButton"] };
-            var saveButton = new Button { Content = "Speichern", Style = (Style)Resources["PrimaryButton"], IsEnabled = false };
+            var cancelButton = new Button { Content = "Abbrechen", Style = Stil("DashboardButton") };
+            var saveButton = new Button { Content = "Speichern", Style = Stil("PrimaryButton"), IsEnabled = false };
             var buttons = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 10, HorizontalAlignment = HorizontalAlignment.Right };
             buttons.Children.Add(cancelButton);
             buttons.Children.Add(saveButton);
@@ -326,7 +326,7 @@ namespace Disposio.Views
                 statusButton = new Button
                 {
                     Content = benutzer.Aktiv ? "Konto deaktivieren" : "Konto aktivieren",
-                    Style = (Style)Resources["DashboardButton"],
+                    Style = Stil("DashboardButton"),
                     IsEnabled = !eigenesKonto
                 };
                 root.Children.Add(InfoBar(Text(benutzer.Aktiv
@@ -587,8 +587,8 @@ namespace Disposio.Views
             var messageText = new TextBlock { FontSize = 15, TextWrapping = TextWrapping.Wrap, Visibility = Visibility.Collapsed };
             root.Children.Add(messageText);
 
-            var cancelButton = new Button { Content = "Abbrechen", Style = (Style)Resources["DashboardButton"], IsEnabled = false };
-            var saveButton = new Button { Content = "Richtlinie speichern", Style = (Style)Resources["PrimaryButton"], IsEnabled = false };
+            var cancelButton = new Button { Content = "Abbrechen", Style = Stil("DashboardButton"), IsEnabled = false };
+            var saveButton = new Button { Content = "Richtlinie speichern", Style = Stil("PrimaryButton"), IsEnabled = false };
             var buttons = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 10, HorizontalAlignment = HorizontalAlignment.Right };
             buttons.Children.Add(cancelButton);
             buttons.Children.Add(saveButton);

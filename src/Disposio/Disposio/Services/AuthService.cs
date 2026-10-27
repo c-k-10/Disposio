@@ -60,7 +60,8 @@ public static class AuthService
     public const string MegakrasserAdminRolle = "SuperKrasserAdmin";
 
     // Reihenfolge der Spalten: 0 id, 1 vorname, 2 nachname, 3 sprache, 4 unternehmen_id,
-    // 5 auth_user_id, 6 passwort_hash, 7 Rollen als JSON.
+    // 5 auth_user_id, 6 passwort_hash, 7 Standardrollen als JSON, 8 eigene Rollen als JSON.
+    // Die Login-Abfragen hängen 9 Firmenname und 10 Abteilung an.
     private const string BenutzerSpalten = """
         b.benutzer_id, b.vorname, b.nachname, b.sprache, b.unternehmen_id, b.auth_user_id, b.passwort_hash,
         COALESCE((SELECT json_agg(r.bezeichnung ORDER BY r.bezeichnung)
@@ -186,8 +187,8 @@ public static class AuthService
         }
 
         cancellationToken.ThrowIfCancellationRequested();
-        var rollen = JsonSerializer.Deserialize<string[]>(Required(row, 6)) ?? Array.Empty<string>();
-        var eigeneRollen = JsonSerializer.Deserialize<EigeneRolle[]>(Required(row, 7),
+        var rollen = JsonSerializer.Deserialize<string[]>(Required(row, 7)) ?? Array.Empty<string>();
+        var eigeneRollen = JsonSerializer.Deserialize<EigeneRolle[]>(Required(row, 8),
         new JsonSerializerOptions(JsonSerializerDefaults.Web)) ?? Array.Empty<EigeneRolle>();
         var benutzer = new AngemeldeterBenutzer(
             long.Parse(benutzerId, CultureInfo.InvariantCulture),
@@ -195,8 +196,8 @@ public static class AuthService
             row[4] is null ? null : long.Parse(Required(row, 4), CultureInfo.InvariantCulture),
             Array.AsReadOnly(rollen))
         {
-            Firmenname = row[8],
-            Abteilung = row[9],
+            Firmenname = row[9],
+            Abteilung = row[10],
             EigeneRollen = Array.AsReadOnly(eigeneRollen)
         };
 

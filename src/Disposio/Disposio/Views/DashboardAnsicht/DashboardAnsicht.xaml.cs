@@ -1038,6 +1038,40 @@ namespace Disposio.Views
                 ReturnToLogin();
         }
 
+        // ── Aktionsprotokoll ─────────────────────────────────────────────────────────────
+
+        private void KundenMenu_Tapped(object sender, Microsoft.UI.Xaml.Input.TappedRoutedEventArgs e) => ZeigeBereich(protokoll: false);
+
+        private void ProtokollMenu_Tapped(object sender, Microsoft.UI.Xaml.Input.TappedRoutedEventArgs e) => ZeigeBereich(protokoll: true);
+
+        // Wechselt zwischen der Kundenliste und dem Aktionsprotokoll aller Firmen.
+        private void ZeigeBereich(bool protokoll)
+        {
+            if (_dialogOpen || !EnsureDashboardAccess())
+                return;
+
+            Visibility kunden = protokoll ? Visibility.Collapsed : Visibility.Visible;
+            CustomerStatusRow.Visibility = StatsGrid.Visibility = CustomerListCard.Visibility = CustomerFooterText.Visibility = kunden;
+            ProtokollHost.Visibility = protokoll ? Visibility.Visible : Visibility.Collapsed;
+            PageTitle.Text = protokoll ? "Aktionsprotokoll" : "Unsere Kunden";
+            PageSubtitle.Text = protokoll
+                ? "Nachvollziehen, wer wann was geändert hat, über alle Kunden."
+                : "Kunden anlegen, bearbeiten und in ihre Ansicht springen.";
+
+            // Der aktive Menüpunkt bekommt die Fläche, wie bisher „Kunden“.
+            var durchsichtig = new SolidColorBrush(Microsoft.UI.Colors.Transparent);
+            KundenMenu.Background = protokoll ? durchsichtig : Brush("SurfaceBrush");
+            KundenMenu.BorderBrush = protokoll ? durchsichtig : Brush("BorderBrush");
+            ProtokollMenu.Background = protokoll ? Brush("SurfaceBrush") : durchsichtig;
+            ProtokollMenu.BorderBrush = protokoll ? Brush("BorderBrush") : durchsichtig;
+
+            // Bei jedem Öffnen neu laden, damit neue Einträge sofort sichtbar sind.
+            ProtokollHost.Child = protokoll
+                ? new AktionsprotokollAnsicht(alleFirmen: true, key => Resources[key],
+                    () => ReturnToLogin("Die Dashboard-Berechtigung ist nicht mehr vorhanden. Bitte erneut anmelden."))
+                : null;
+        }
+
     }
 
     // Diese beiden Einstellungen werden beim Wechsel zwischen Login und Dashboard mitgegeben.
