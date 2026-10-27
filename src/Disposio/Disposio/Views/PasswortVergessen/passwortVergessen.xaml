@@ -1,45 +1,138 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- x:Class an den Namen aus deiner angelegten Datei anpassen, falls er abweicht -->
 <Page
     x:Class="Disposio.Views.PasswortVergessen.passwortVergessen"
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
     xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
-    mc:Ignorable="d">
+    mc:Ignorable="d"
+    RequestedTheme="Dark">
 
-    <Grid Padding="24">
-        <StackPanel MaxWidth="400" Spacing="16" VerticalAlignment="Center" HorizontalAlignment="Center">
+    <Page.Resources>
+        <!-- Gleiche Farben wie auf der LoginPage. Akzentfarbe und Light/Dark Mode
+             werden beim Öffnen im Code-Behind (OnNavigatedTo) übernommen. -->
+        <LinearGradientBrush x:Key="AppBackground" StartPoint="0,0" EndPoint="0,1">
+            <GradientStop Color="#0B0D12" Offset="0"/>
+            <GradientStop Color="#13161A" Offset="1"/>
+        </LinearGradientBrush>
+        <SolidColorBrush x:Key="PrimaryBrush" Color="#FF004D" />
+        <SolidColorBrush x:Key="PanelDarkBrush" Color="#1B1E23" />
+        <SolidColorBrush x:Key="CardBorder" Color="#2A2C31" />
+        <SolidColorBrush x:Key="TextMain" Color="#E6E9F0" />
+        <SolidColorBrush x:Key="TextMuted" Color="#9CA3AF" />
+        <SolidColorBrush x:Key="ButtonTextOnPrimary" Color="#FFFFFFFF" />
+        <SolidColorBrush x:Key="InputBackground" Color="#FF222426" />
+        <SolidColorBrush x:Key="InputBorder" Color="#FF2F313A" />
 
-            <TextBlock Text="Passwort vergessen" Style="{ThemeResource TitleTextBlockStyle}" />
+        <!-- Eigener Button im Disposio-Stil statt Windows-11-Akzentbutton -->
+        <Style x:Key="DisposioPrimaryButton" TargetType="Button">
+            <Setter Property="Background" Value="{StaticResource PrimaryBrush}" />
+            <Setter Property="Foreground" Value="{StaticResource ButtonTextOnPrimary}" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="HorizontalAlignment" Value="Stretch" />
+            <Setter Property="Height" Value="48" />
+            <Setter Property="CornerRadius" Value="10" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="Root"
+                                Background="{TemplateBinding Background}"
+                                CornerRadius="{TemplateBinding CornerRadius}">
+                            <VisualStateManager.VisualStateGroups>
+                                <VisualStateGroup x:Name="CommonStates">
+                                    <VisualState x:Name="Normal" />
+                                    <VisualState x:Name="PointerOver">
+                                        <VisualState.Setters>
+                                            <Setter Target="Root.Opacity" Value="0.85" />
+                                        </VisualState.Setters>
+                                    </VisualState>
+                                    <VisualState x:Name="Pressed">
+                                        <VisualState.Setters>
+                                            <Setter Target="Root.Opacity" Value="0.7" />
+                                        </VisualState.Setters>
+                                    </VisualState>
+                                    <VisualState x:Name="Disabled">
+                                        <VisualState.Setters>
+                                            <Setter Target="Root.Opacity" Value="0.45" />
+                                        </VisualState.Setters>
+                                    </VisualState>
+                                </VisualStateGroup>
+                            </VisualStateManager.VisualStateGroups>
+                            <ContentPresenter Content="{TemplateBinding Content}"
+                                              Foreground="{TemplateBinding Foreground}"
+                                              HorizontalAlignment="Center"
+                                              VerticalAlignment="Center" />
+                        </Border>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+    </Page.Resources>
 
-            <!-- Schritt 1: E-Mail eingeben -->
-            <StackPanel x:Name="SchrittEmail" Spacing="12">
-                <TextBlock Text="Geben Sie Ihre E-Mail-Adresse ein. Wir schicken Ihnen einen Code zum Zurücksetzen."
-                           TextWrapping="Wrap" />
-                <TextBox x:Name="EmailBox" Header="E-Mail" PlaceholderText="name@firma.de"
-                         InputScope="EmailSmtpAddress" KeyDown="EmailBox_KeyDown" />
-                <Button x:Name="CodeSendenButton" Content="Code senden"
-                        Style="{ThemeResource AccentButtonStyle}" Click="CodeSendenButton_Click" />
+    <Grid Background="{StaticResource AppBackground}">
+        <Border Width="480" CornerRadius="12" Padding="36"
+                HorizontalAlignment="Center" VerticalAlignment="Center"
+                Background="{StaticResource PanelDarkBrush}" BorderBrush="{StaticResource CardBorder}" BorderThickness="1">
+            <StackPanel Spacing="10">
+
+                <!-- Kopfbereich wie beim Login -->
+                <TextBlock Text="DISPOSIO" FontSize="28" FontWeight="Bold" Foreground="{StaticResource PrimaryBrush}" />
+                <TextBlock Text="UNTERNEHMENSPORTAL" FontSize="12" Foreground="{StaticResource TextMuted}" Margin="0,-2,0,0" />
+
+                <TextBlock Text="Passwort vergessen" FontSize="22" FontWeight="SemiBold"
+                           Foreground="{StaticResource TextMain}" Margin="0,18,0,0" />
+
+                <!-- Schritt 1: E-Mail eingeben -->
+                <StackPanel x:Name="SchrittEmail" Spacing="10">
+                    <TextBlock Text="Geben Sie Ihre E-Mail-Adresse ein. Wir schicken Ihnen einen Code zum Zurücksetzen."
+                               TextWrapping="Wrap" FontSize="13" Foreground="{StaticResource TextMuted}" Margin="0,0,0,8" />
+
+                    <TextBlock Text="E‑Mail‑Adresse *" FontSize="12" Foreground="{StaticResource TextMain}" />
+                    <TextBox x:Name="EmailBox" PlaceholderText="name@firma.de"
+                             InputScope="EmailSmtpAddress" KeyDown="EmailBox_KeyDown"
+                             Background="{StaticResource InputBackground}" Foreground="{StaticResource TextMain}"
+                             BorderBrush="{StaticResource InputBorder}" CornerRadius="8" Height="40" />
+
+                    <Button x:Name="CodeSendenButton" Content="Code senden" Margin="0,12,0,0"
+                            Style="{StaticResource DisposioPrimaryButton}" Click="CodeSendenButton_Click" />
+                </StackPanel>
+
+                <!-- Schritt 2: Code + neues Passwort -->
+                <StackPanel x:Name="SchrittCode" Spacing="10" Visibility="Collapsed">
+                    <TextBlock x:Name="CodeHinweis" TextWrapping="Wrap" FontSize="13"
+                               Foreground="{StaticResource TextMuted}" Margin="0,0,0,8" />
+
+                    <TextBlock Text="Code aus der E-Mail *" FontSize="12" Foreground="{StaticResource TextMain}" />
+                    <TextBox x:Name="CodeBox" MaxLength="12"
+                             Background="{StaticResource InputBackground}" Foreground="{StaticResource TextMain}"
+                             BorderBrush="{StaticResource InputBorder}" CornerRadius="8" Height="40" />
+
+                    <TextBlock Text="Neues Passwort *" FontSize="12" Foreground="{StaticResource TextMain}" Margin="0,8,0,0" />
+                    <PasswordBox x:Name="PasswortBox" PlaceholderText="••••••••"
+                                 Background="{StaticResource InputBackground}" Foreground="{StaticResource TextMain}"
+                                 BorderBrush="{StaticResource InputBorder}" CornerRadius="8" Height="40" />
+
+                    <TextBlock Text="Neues Passwort wiederholen *" FontSize="12" Foreground="{StaticResource TextMain}" Margin="0,8,0,0" />
+                    <PasswordBox x:Name="PasswortWiederholenBox" PlaceholderText="••••••••"
+                                 KeyDown="PasswortWiederholenBox_KeyDown"
+                                 Background="{StaticResource InputBackground}" Foreground="{StaticResource TextMain}"
+                                 BorderBrush="{StaticResource InputBorder}" CornerRadius="8" Height="40" />
+
+                    <Button x:Name="ZuruecksetzenButton" Content="Passwort zurücksetzen" Margin="0,12,0,0"
+                            Style="{StaticResource DisposioPrimaryButton}" Click="ZuruecksetzenButton_Click" />
+
+                    <HyperlinkButton Content="Neuen Code anfordern" Click="NeuerCode_Click" Padding="0"
+                                     Foreground="{StaticResource PrimaryBrush}" FontSize="13" />
+                </StackPanel>
+
+                <ProgressRing x:Name="Laedt" IsActive="False" Width="24" Height="24"
+                              HorizontalAlignment="Left" Foreground="{StaticResource PrimaryBrush}" />
+
+                <InfoBar x:Name="Meldung" IsOpen="False" IsClosable="False" CornerRadius="8" />
+
+                <HyperlinkButton Content="← Zurück zur Anmeldung" Click="Zurueck_Click" Padding="0" Margin="0,8,0,0"
+                                 Foreground="{StaticResource TextMuted}" FontSize="13" />
             </StackPanel>
-
-            <!-- Schritt 2: Code + neues Passwort -->
-            <StackPanel x:Name="SchrittCode" Spacing="12" Visibility="Collapsed">
-                <TextBlock x:Name="CodeHinweis" TextWrapping="Wrap" />
-                <TextBox x:Name="CodeBox" Header="Code aus der E-Mail" MaxLength="12" />
-                <PasswordBox x:Name="PasswortBox" Header="Neues Passwort" />
-                <PasswordBox x:Name="PasswortWiederholenBox" Header="Neues Passwort wiederholen"
-                             KeyDown="PasswortWiederholenBox_KeyDown" />
-                <Button x:Name="ZuruecksetzenButton" Content="Passwort zurücksetzen"
-                        Style="{ThemeResource AccentButtonStyle}" Click="ZuruecksetzenButton_Click" />
-                <HyperlinkButton Content="Neuen Code anfordern" Click="NeuerCode_Click" Padding="0" />
-            </StackPanel>
-
-            <ProgressRing x:Name="Laedt" IsActive="False" Width="24" Height="24" HorizontalAlignment="Left" />
-
-            <InfoBar x:Name="Meldung" IsOpen="False" IsClosable="False" />
-
-            <HyperlinkButton Content="Zurück zur Anmeldung" Click="Zurueck_Click" Padding="0" />
-        </StackPanel>
+        </Border>
     </Grid>
 </Page>
