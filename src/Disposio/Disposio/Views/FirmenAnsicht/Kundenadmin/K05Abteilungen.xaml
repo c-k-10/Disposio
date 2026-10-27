@@ -1,0 +1,102 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- K05 „Abteilungen verwalten“: Abteilungen der eigenen Firma anlegen, umbenennen und (de)aktivieren.
+     Abteilungen werden nicht gelöscht, weil Benutzer, Fahrzeuge und Touren auf sie verweisen. -->
+<UserControl
+    x:Class="Disposio.Views.K05Abteilungen"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:local="using:Disposio.Views">
+
+    <StackPanel Spacing="18">
+        <!-- Neue Abteilung: Leiste mit Akzentstreifen wie in K01 -->
+        <Border Background="{StaticResource SurfaceBrush}" BorderBrush="{StaticResource BorderBrush}"
+                BorderThickness="1" CornerRadius="12">
+            <Grid ColumnSpacing="14" Padding="0,14,18,14">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <Border Width="5" Margin="0,-14,8,-14" Background="{StaticResource AccentBrush}" CornerRadius="12,0,0,12" />
+                <TextBox x:Name="NeuBox" Grid.Column="1" Style="{StaticResource FormTextBox}" MaxLength="100"
+                         PlaceholderText="Name der neuen Abteilung, z. B. Frische" KeyDown="NeuBox_KeyDown"
+                         AutomationProperties.Name="Name der neuen Abteilung" />
+                <Button x:Name="AnlegenButton" Grid.Column="2" Content="+ Abteilung anlegen" Style="{StaticResource PrimaryButton}"
+                        Click="Anlegen_Click" />
+            </Grid>
+        </Border>
+
+        <StackPanel Spacing="6">
+            <StackPanel Orientation="Horizontal" Spacing="12">
+                <ProgressRing x:Name="LadeAnzeige" Width="20" Height="20" IsActive="False" Visibility="Collapsed" />
+                <TextBlock x:Name="StatusText" Style="{StaticResource HinweisText}" VerticalAlignment="Center" />
+            </StackPanel>
+            <TextBlock x:Name="FehlerText" Style="{StaticResource FehlerText}" Visibility="Collapsed" />
+        </StackPanel>
+
+        <Border Style="{StaticResource KarteStyle}">
+            <StackPanel Spacing="12">
+                <TextBlock Text="Abteilungen" Style="{StaticResource UeberschriftText}" />
+
+                <!-- Kopfzeile und Zeilen haben dieselben Spaltenbreiten. -->
+                <Border BorderBrush="{StaticResource BorderBrush}" BorderThickness="0,0,0,1" Padding="0,0,0,10">
+                    <Grid ColumnSpacing="16">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="2*" />
+                            <ColumnDefinition Width="0.8*" />
+                            <ColumnDefinition Width="0.8*" />
+                            <ColumnDefinition Width="0.9*" />
+                            <ColumnDefinition Width="0.9*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Text="Abteilung" Style="{StaticResource HinweisText}" FontWeight="SemiBold" />
+                        <TextBlock Grid.Column="1" Text="Benutzer" Style="{StaticResource HinweisText}" FontWeight="SemiBold" />
+                        <TextBlock Grid.Column="2" Text="Fahrzeuge" Style="{StaticResource HinweisText}" FontWeight="SemiBold" />
+                        <TextBlock Grid.Column="3" Text="Offene Touren" Style="{StaticResource HinweisText}" FontWeight="SemiBold" />
+                        <TextBlock Grid.Column="4" Text="Status" Style="{StaticResource HinweisText}" FontWeight="SemiBold" />
+                        <TextBlock Grid.Column="5" Text="Aktionen" Width="250" Style="{StaticResource HinweisText}" FontWeight="SemiBold" />
+                    </Grid>
+                </Border>
+
+                <ItemsControl x:Name="AbteilungListe">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate x:DataType="local:AbteilungZeile">
+                            <Border BorderBrush="{StaticResource BorderBrush}" BorderThickness="0,0,0,1" Padding="0,12"
+                                    Opacity="{x:Bind Deckkraft}">
+                                <Grid ColumnSpacing="16">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="2*" />
+                                        <ColumnDefinition Width="0.8*" />
+                                        <ColumnDefinition Width="0.8*" />
+                                        <ColumnDefinition Width="0.9*" />
+                                        <ColumnDefinition Width="0.9*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Text="{x:Bind Bezeichnung}" Style="{StaticResource NormalText}" FontWeight="SemiBold" VerticalAlignment="Center" />
+                                    <TextBlock Grid.Column="1" Text="{x:Bind Benutzer}" Style="{StaticResource NormalText}" VerticalAlignment="Center" />
+                                    <TextBlock Grid.Column="2" Text="{x:Bind Fahrzeuge}" Style="{StaticResource NormalText}" VerticalAlignment="Center" />
+                                    <TextBlock Grid.Column="3" Text="{x:Bind OffeneTouren}" Style="{StaticResource NormalText}" VerticalAlignment="Center" />
+                                    <Border Grid.Column="4" BorderBrush="{StaticResource BorderBrush}" BorderThickness="1"
+                                            CornerRadius="14" Padding="10,3" HorizontalAlignment="Left" VerticalAlignment="Center">
+                                        <TextBlock Text="{x:Bind StatusText}" FontSize="13" Foreground="{StaticResource TextBrush}" />
+                                    </Border>
+                                    <StackPanel Grid.Column="5" Orientation="Horizontal" Spacing="8" Width="250" VerticalAlignment="Center">
+                                        <Button Content="Umbenennen" Tag="{x:Bind Id}" Click="Umbenennen_Click"
+                                                Style="{StaticResource DashboardButton}" MinHeight="36" Padding="14,4" />
+                                        <Button Content="{x:Bind UmschaltText}" Tag="{x:Bind Id}" Click="Umschalten_Click"
+                                                Style="{StaticResource DashboardButton}" MinHeight="36" Padding="14,4" />
+                                    </StackPanel>
+                                </Grid>
+                            </Border>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+
+                <TextBlock x:Name="LeerText" Visibility="Collapsed" Style="{StaticResource HinweisText}"
+                           Text="Noch keine Abteilungen. Legen Sie oben die erste Abteilung an." />
+                <TextBlock Style="{StaticResource HinweisText}" Margin="0,6,0,0"
+                           Text="Abteilungen werden nicht gelöscht, sondern deaktiviert: Benutzer, Fahrzeuge und Touren behalten ihre Zuordnung. Deaktivierte Abteilungen werden für neue Touren nicht mehr angeboten. Mindestens eine Abteilung muss aktiv bleiben." />
+            </StackPanel>
+        </Border>
+    </StackPanel>
+</UserControl>
