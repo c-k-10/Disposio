@@ -12,6 +12,7 @@ namespace Disposio.Views
         {
             "K03" => new K03RollenUndRechte(kontext),
             "K05" => new K05Abteilungen(kontext),
+            "K05" => new AktionsprotokollAnsicht(alleFirmen: false, key => Application.Current.Resources[key], kontext.ZugriffBeenden),
             _ => null
         };
     }

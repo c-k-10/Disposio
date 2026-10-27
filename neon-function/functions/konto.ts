@@ -1,7 +1,7 @@
 // Neon Function: legt Neon-Auth-Konten an (und entfernt sie bei Bedarf wieder).
 //
 // Wer darf aufrufen: nur angemeldete Nutzer, die in der Tabelle "benutzer" aktiv sind und entweder
-//   - Kundenadmin einer Firma sind (Standardrolle, unternehmen_id der Rolle ist NULL) oder
+//   - Kundenadmin einer nicht gesperrten Firma sind (Standardrolle, unternehmen_id der Rolle ist NULL) oder
 //   - Plattform-Admin (SuperKrasserAdmin) ohne Firma.
 // Die Funktion prüft das JWT von Neon Auth und danach die Rolle in der Datenbank. Sie vertraut
 // nie Angaben der App über Rolle oder Firma.
@@ -37,10 +37,14 @@ async function aufrufer(request: Request): Promise<string | null> {
 }
 
 // 2. Darf diese Person Konten anlegen? Die Antwort kommt aus der Datenbank, nicht aus der App.
+//    Ein Kundenadmin einer gesperrten Firma (unternehmen.status = 'Inaktiv') darf es nicht.
 async function darfKontenAnlegen(authId: string): Promise<boolean> {
   const rows = await sql`
     SELECT 1 FROM public.benutzer b
     WHERE b.auth_user_id = ${authId} AND b.aktiv = true
+      AND (b.unternehmen_id IS NULL OR EXISTS (
+        SELECT 1 FROM public.unternehmen u
+        WHERE u.unternehmen_id = b.unternehmen_id AND u.status <> 'Inaktiv'))
       AND EXISTS (
         SELECT 1 FROM public.benutzer_rolle br
         JOIN public.rolle r ON r.rollen_id = br.rollen_id

@@ -23,8 +23,13 @@ namespace Disposio.Views
             "#FF004D", "#007BFF", "#00C853", "#FF9100", "#7B2CBF"
         };
 
+        // Die Monatsstatistik. Bei gesperrter Firma ist sie die einzige erreichbare Ansicht.
+        private const string StatistikId = "G02";
+
         // Nur Büro-Rollen. Fahrer haben am PC keinen Arbeitsbereich.
         private IReadOnlyList<FirmenRolle> _rollen = Array.Empty<FirmenRolle>();
+        // Firma im Admin-Dashboard auf „Inaktiv“ gesetzt: Geschäftsführung und Kundenadmin sehen nur noch G02.
+        private bool _nurStatistik;
         private bool _returningToLogin;
         private bool _isLight;
         private string _accentHex = "#7B2CBF";
@@ -56,6 +61,10 @@ namespace Disposio.Views
                 : BenutzerSitzung.AktuellerBenutzer?.FirmenRollen ?? Array.Empty<FirmenRolle>();
             _rollen = rollen.Where(rolle => rolle != FirmenRolle.Fahrer).ToArray();
             _eigeneRollen = EigeneRollenDerSitzung();
+            // Gesperrte Firma: keine eigenen Rollen, nur die Statistik. Der Admin-Zugang sieht weiter alles.
+            _nurStatistik = BenutzerSitzung.Firmenzugang is null && BenutzerSitzung.AktuellerBenutzer?.FirmaGesperrt == true;
+            if (_nurStatistik)
+                _eigeneRollen = Array.Empty<EigeneRolle>();
             // Ohne Standardrolle und ohne Menüpunkt aus einer eigenen Rolle bleibt nichts anzuzeigen.
             if (_rollen.Count == 0 && EigeneMenuepunkteGesamt() == 0)
             {
@@ -71,8 +80,9 @@ namespace Disposio.Views
         }
 
         // Startansicht: der erste Menüpunkt der ersten Rolle (bei Disponenten die Tagesübersicht).
-        // Wer nur eine eigene Rolle hat, startet bei deren erstem Menüpunkt.
-        private string StartId() => _rollen.Count > 0 ? AnsichtenKatalog.Menue(_rollen[0])[0].Id : ErsteEigeneAnsicht();
+        // Wer nur eine eigene Rolle hat, startet bei deren erstem Menüpunkt. Bei gesperrter Firma: die Statistik.
+        private string StartId() => _nurStatistik ? StatistikId
+            : _rollen.Count > 0 ? AnsichtenKatalog.Menue(_rollen[0])[0].Id : ErsteEigeneAnsicht();
 
         private void UpdateAccountDisplay()
         {
@@ -106,6 +116,14 @@ namespace Disposio.Views
                 : "Eigenes Unternehmen";
             AccountNameText.Text = user?.Anzeigename ?? "";
             AccountRoleText.Text = string.Join(", ", (user?.FirmenRollen ?? _rollen).Select(FirmenRollenKatalog.Bezeichnung));
+
+            if (_nurStatistik)
+            {
+                AdminAccessText.Text = "Ihr Unternehmen ist bei Disposio zurzeit gesperrt. Sie können nur noch die " +
+                    "Monatsstatistik ansehen und als PDF herunterladen. Bitte wenden Sie sich an Disposio.";
+                BannerDashboardButton.Visibility = Visibility.Collapsed;
+                AdminAccessBanner.Visibility = Visibility.Visible;
+            }
         }
 
         private bool EnsureAccess()
@@ -159,13 +177,17 @@ namespace Disposio.Views
             // Auch eine Ansicht, die nicht im Menü steht, öffnet sich nur mit der passenden Rolle.
             AnsichtInfo? ansicht = AnsichtenKatalog.Finden(id);
             // Eine Ansicht öffnet sich über die passende Standardrolle oder eine eigene Rolle mit dieser Berechtigung.
-            if (ansicht is null || (!_rollen.Contains(ansicht.Rolle) && !EigeneRollenRegeln.Erlaubt(_eigeneRollen, ansicht)))
+            // Bei gesperrter Firma nur die Statistik, auch für den Kundenadmin.
+            if (ansicht is null || !(_nurStatistik
+                    ? ansicht.Id == StatistikId
+                    : _rollen.Contains(ansicht.Rolle) || EigeneRollenRegeln.Erlaubt(_eigeneRollen, ansicht)))
             {
                 ShowNoAccess();
                 return;
             }
 
-            CrumbText.Text = $"{FirmenRollenKatalog.Bezeichnung(ansicht.Rolle)} / {ansicht.Titel} · {ansicht.Id}";
+            string bereich = _nurStatistik ? "Nur Statistik" : FirmenRollenKatalog.Bezeichnung(ansicht.Rolle);
+            CrumbText.Text = $"{bereich} / {ansicht.Titel} · {ansicht.Id}";
             PageTitle.Text = ansicht.Titel;
             PurposeText.Text = ansicht.Zweck;
 
@@ -213,36 +235,47 @@ namespace Disposio.Views
         private void BuildMenu(string activeId)
         {
             MenuPanel.Children.Clear();
-            foreach (FirmenRolle rolle in _rollen)
+            if (_nurStatistik)
             {
-                MenuPanel.Children.Add(new TextBlock
-                {
-                    Text = FirmenRollenKatalog.Bezeichnung(rolle).ToUpper(CultureInfo.CurrentCulture),
-                    FontSize = 12,
-                    CharacterSpacing = 100,
-                    TextWrapping = TextWrapping.Wrap,
-                    Foreground = Brush("MutedTextBrush"),
-                    Margin = new Thickness(4, MenuPanel.Children.Count == 0 ? 0 : 18, 0, 6)
-                });
-
-                foreach (AnsichtInfo item in AnsichtenKatalog.Menue(rolle))
-                {
-                    var button = new Button { Content = item.Menuename, Style = Stil("MenuButton") };
-                    if (item.Id == activeId)
-                    {
-                        button.Background = Brush("AccentBrush");
-                        button.Foreground = Brush("AccentTextBrush");
-                        button.FontWeight = FontWeights.SemiBold;
-                        // In kleinen Fenstern scrollt das Menü, bis der aktive Punkt sichtbar ist.
-                        button.Loaded += (_, _) => button.StartBringIntoView();
-                    }
-                    button.Click += (_, _) => Open(item.Id);
-                    MenuPanel.Children.Add(button);
-                }
+                // Gesperrte Firma: ein einziger Menüpunkt, unabhängig von den Rollen.
+                MenueAbschnitt("Nur Statistik", new[] { AnsichtenKatalog.Finden(StatistikId)! }, activeId);
+                return;
             }
+
+            foreach (FirmenRolle rolle in _rollen)
+                MenueAbschnitt(FirmenRollenKatalog.Bezeichnung(rolle), AnsichtenKatalog.Menue(rolle), activeId);
 
             // Danach je eigene Rolle ein eigener Menüabschnitt (FirmenAnsicht.EigeneRollen.cs).
             EigeneRollenMenue(activeId);
+        }
+
+        // Überschrift und Menüpunkte eines Abschnitts. Der aktive Menüpunkt bekommt die Akzentfarbe.
+        private void MenueAbschnitt(string titel, IEnumerable<AnsichtInfo> menuepunkte, string activeId)
+        {
+            MenuPanel.Children.Add(new TextBlock
+            {
+                Text = titel.ToUpper(CultureInfo.CurrentCulture),
+                FontSize = 12,
+                CharacterSpacing = 100,
+                TextWrapping = TextWrapping.Wrap,
+                Foreground = Brush("MutedTextBrush"),
+                Margin = new Thickness(4, MenuPanel.Children.Count == 0 ? 0 : 18, 0, 6)
+            });
+
+            foreach (AnsichtInfo item in menuepunkte)
+            {
+                var button = new Button { Content = item.Menuename, Style = Stil("MenuButton") };
+                if (item.Id == activeId)
+                {
+                    button.Background = Brush("AccentBrush");
+                    button.Foreground = Brush("AccentTextBrush");
+                    button.FontWeight = FontWeights.SemiBold;
+                    // In kleinen Fenstern scrollt das Menü, bis der aktive Punkt sichtbar ist.
+                    button.Loaded += (_, _) => button.StartBringIntoView();
+                }
+                button.Click += (_, _) => Open(item.Id);
+                MenuPanel.Children.Add(button);
+            }
         }
 
         // S03: nachvollziehbarer Hinweis statt einer leeren Seite.

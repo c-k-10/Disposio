@@ -24,6 +24,7 @@ public static class AnsichtenKatalog
         new("K05", "Abteilungen", "Abteilungen verwalten", "Bereiche des Unternehmens anlegen, umbenennen und deaktivieren.", FirmenRolle.Kundenadmin),
         new("K03", "Rollen & Rechte", "Rollen & Rechte", "Zugriffsbereiche verständlich erklären.", FirmenRolle.Kundenadmin),
         new("K04", "Passwort-Richtlinien", "Passwort-Richtlinien", "Unternehmensweite Anmeldevorgaben konfigurieren.", FirmenRolle.Kundenadmin),
+        new("K05", "Aktionsprotokoll", "Aktionsprotokoll", "Nachvollziehen, wer im Unternehmen wann was geändert hat.", FirmenRolle.Kundenadmin),
 
         // Inhaber / Geschäftsführer
         new("G01", "Unternehmensübersicht", "Unternehmensübersicht", "Unternehmensweite Leistung und auffällige Bereiche erkennen.", FirmenRolle.Inhaber),

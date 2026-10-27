@@ -201,6 +201,12 @@ namespace Disposio.Views
                 {
                     user = await AuthService.LoginAsync(company, email, password);
                 }
+                catch (MandantInaktivException exception)
+                {
+                    // Passwort stimmt, aber die Firma ist im Admin-Dashboard gesperrt.
+                    ShowLoginStatus(exception.Message);
+                    return;
+                }
                 catch (Exception)
                 {
                     // Eine unterbrochene Verbindung ist etwas anderes als falsche Zugangsdaten.

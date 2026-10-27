@@ -25,6 +25,16 @@ liest die Tabelle `public.unternehmen`; sie legt keine Beispieldaten beim Start 
   Unternehmenskennung, E-Mail des Kundenadmins, Adresse, PLZ, Ort, Telefon und Kontaktperson.
   Der Status ist „Testphase“ oder „Aktiv“. Die Kontakt-E-Mail ist optional; bleibt sie leer,
   wird die E-Mail des Kundenadmins verwendet.
+- **Mandant sperren:** Beim Bearbeiten gibt es zusätzlich den Status **„Inaktiv“**. Ein Hinweis im
+  Formular nennt die Folgen. Danach können sich nur noch **Inhaber/Geschäftsführer und Kundenadmin**
+  anmelden, und zwar nur für die Monatsstatistik (G02) mit PDF-Download. Alle anderen Konten sehen
+  „Ihr Unternehmen ist bei Disposio zurzeit gesperrt“. Diese Meldung kommt erst nach dem richtigen
+  Passwort, damit Fremde nichts über die Firma erfahren. Wer gerade angemeldet ist, wird bei der
+  nächsten Aktion mit Firmendaten abgemeldet. Daten werden nicht gelöscht; „Aktiv“ oder „Testphase“
+  schaltet die Firma wieder frei. Gesperrte Kunden erscheinen in der Liste blasser, und das
+  Aktionsprotokoll vermerkt „Status Aktiv → Inaktiv“. „Einloggen“ als MegakrasserAdmin bleibt auch
+  bei einer gesperrten Firma uneingeschränkt möglich. Voraussetzung: `Services/005_unternehmen_inaktiv.sql`
+  wurde in Neon ausgeführt.
 - „Speichern“ prüft die Eingaben und wartet auf die Bestätigung aus Neon. Erst danach ändern
   sich die Liste und die Kennzahlen. Währenddessen ist ein zweites Speichern gesperrt.
 - Bei einem Speicherfehler bleiben die Eingaben erhalten. Bei einem Verbindungsabbruch kann
@@ -78,6 +88,7 @@ oder diese Dokumentation. Danach im normalen Disposio-Login **„MegakrassenAdmi
 | `Services/Database.cs` | Stellt die bereits vorhandene Verbindungseinstellung bereit. |
 | `Services/001_unternehmen_dashboard.sql` | Enthält die einmalige Ergänzung der vorhandenen Tabelle. |
 | `Services/002_plattform_admin.sql` | Erlaubt Plattformkonten ohne Firma und verhindert doppelte Plattform-E-Mails. Verwendet die vorhandene Admin-Rolle. |
+| `Services/005_unternehmen_inaktiv.sql` | Erlaubt den Status „Inaktiv“ (Mandant gesperrt). |
 | `tools/AdminKontoEinrichten` | Erstellt das neue Admin-Konto mit einer ausschließlich lokalen Passworteingabe. |
 
 Der Ablauf bei der Anmeldung lässt sich so merken:
@@ -97,6 +108,12 @@ Vor jedem Laden oder Speichern: aktive Admin-Rolle erneut in Neon prüfen
     ↓
 Rolle entfernt oder Konto deaktiviert → Zugriff ablehnen und zum Login zurückkehren
 ```
+
+Bei Firmenkonten prüft der Login nach dem Passwort zusätzlich den Status der Firma. Ist er
+„Inaktiv“, startet nur für Inhaber/Geschäftsführer und Kundenadmin eine Sitzung im Nur-Statistik-Modus.
+Dieselbe Sperre hängt an jeder Rechteprüfung für Firmendaten (`AuthService.FirmaNichtGesperrt`) und an
+der Neon Function `neon-function/functions/konto.ts`. Nur die Statistik prüft mit
+`AuthService.StatistikZugriffPruefenAsync` ohne diese Sperre; sie liest nur und ändert nichts.
 
 Die Kontoauswahl in der Oberfläche erteilt keine Rechte. Sie sagt dem Dienst nur, welche Art
 von Konto gesucht werden soll. Auch eine direkte Navigation zur Dashboard-Seite reicht nicht:

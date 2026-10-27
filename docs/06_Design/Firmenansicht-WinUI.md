@@ -12,11 +12,21 @@ Ansicht. Die Ansichten tragen dieselben Wireframe-IDs wie der Prototyp (K01, D04
   Die eigenen Rollen des angemeldeten Kontos sind markiert. K03 liegt in einer eigenen Datei und
   ist das Beispiel dafür, wie eine fertige Ansicht aufgebaut ist.
 - **F01 „Fuhrparkübersicht“** lädt die Fahrzeuge der Firma aus `public.fahrzeug`. **F02** legt ein
-  Fahrzeug an (Bearbeiten folgt). Kennzeichen werden einheitlich gespeichert (Großbuchstaben, ohne
-  doppelte Leerzeichen); ein Kennzeichen, das es in der Firma schon gibt, lehnt die Datenbank ab.
-  Jedes neue Fahrzeug erzeugt einen Eintrag „Fahrzeug angelegt“ im Aktionsprotokoll.
+  Fahrzeug an oder bearbeitet es („Bearbeiten“ in F01 öffnet F02 mit der Fahrzeug-Id). Kennzeichen
+  werden einheitlich gespeichert (Großbuchstaben, ohne doppelte Leerzeichen); ein Kennzeichen, das es
+  in der Firma schon gibt, lehnt die Datenbank ab. Fahrzeuge werden nie gelöscht, sondern in F01
+  **inaktiv gesetzt** (Spalte `fahrzeug.aktiv`, getrennt vom Status), damit Touren, Wartungen und
+  Tankvorgänge erhalten bleiben. Inaktive Fahrzeuge sind in F01 zuerst ausgeblendet. Im
+  Aktionsprotokoll stehen „Fahrzeug angelegt“, „Fahrzeug geändert“, „Fahrzeug inaktiv gesetzt“ und
+  „Fahrzeug aktiviert“. Voraussetzung: `Services/004_fahrzeug_aktiv.sql` wurde in Neon ausgeführt.
 - Alle anderen Ansichten sind Platzhalter. Sie zeigen Titel, Zweck und Wireframe-ID und werden
   einzeln mit Inhalt gefüllt (siehe „So legt man eine neue Ansicht an“).
+- **G02 „Kennzahlen & Statistik“** zeigt je Kalendermonat Touren, Aufträge, Tankvorgänge (Liter,
+  Kosten), Wartungen, Schäden, Gesamtkosten und protokollierte Aktionen. Unter „Downloads“ steht jeder
+  Monat (zum Beispiel „Okt 26“) mit „PDF herunterladen“; die Datei landet im Ordner „Downloads“.
+  Das PDF erzeugt `Services/StatistikPdf.cs` ohne zusätzliche Bibliothek.
+- **Gesperrte Firma** (Status „Inaktiv“ im Admin-Dashboard): Inhaber/Geschäftsführer und Kundenadmin
+  sehen nur noch G02 („Nur Statistik“), alle anderen Konten werden beim Login abgewiesen.
 - Jede Ansicht, die Firmendaten lädt oder speichert, prüft vorher mit
   `AuthService.FirmenZugriffPruefenAsync` die Rolle erneut in der Datenbank.
 
@@ -157,17 +167,20 @@ alle Büro-Rollen, ohne dass ein Testkonto nötig ist. Wie beim Dashboard gilt d
 | `Themes/FirmenStil.xaml` | Gemeinsame Farben und Stile aller Firmenansichten, in `App.xaml` eingebunden. |
 | `Services/AuthService.cs` | Liefert bei Firmenkonten Firmenname, Abteilung und Firmenrollen. `FirmenZugriffPruefenAsync` prüft vor jedem Datenzugriff die Rolle. |
 | `Services/BenutzerSitzung.cs` | `FirmenansichtErlaubt`, der Admin-Zugang `Firmenzugang` und die Debug-Vorschau `FirmenVorschauStarten`. |
+| `Services/StatistikRepository.cs`, `Services/StatistikPdf.cs`, `Models/Statistik.cs` | Monatsstatistik laden (auch bei gesperrter Firma, nur lesend) und als PDF speichern. |
+| `Views/FirmenAnsicht/Geschaeftsfuehrung/G02Statistik.xaml` | Kennzahlen je Monat und die Download-Liste. |
 | `Services/UnternehmenRepository.cs` | `FirmenzugangOeffnenAsync`: Rolle prüfen, Firma lesen und den Admin-Zugang protokollieren. |
 | `Views/DashboardAnsicht/DashboardAnsicht.xaml.cs` | „Einloggen“ öffnet nach Bestätigung die Firmenansicht der gewählten Firma. |
 | `Models/Fahrzeug.cs` | Fahrzeug, Formulareingaben (`FahrzeugEntwurf`) und die Auswahllisten für Klasse, Aufbau und Status. |
-| `Services/FahrzeugRepository.cs` | Fahrzeuge und Abteilungen laden, Fahrzeug anlegen. Prüft Rolle und Eingaben, protokolliert das Anlegen. |
-| `Views/FirmenAnsicht/Fuhrpark/F01Fuhrpark.xaml` | Fahrzeugliste mit „Erneut laden“ und „+ Fahrzeug anlegen“. |
-| `Views/FirmenAnsicht/Fuhrpark/F02FahrzeugFormular.xaml` | Formular „Fahrzeug anlegen“ mit Pflichtfeldprüfung. |
+| `Services/FahrzeugRepository.cs` | Fahrzeuge und Abteilungen laden, Fahrzeug anlegen, ändern und inaktiv setzen. Prüft Rolle und Eingaben, protokolliert jede Änderung. |
+| `Services/004_fahrzeug_aktiv.sql` | Ergänzt die Spalte `fahrzeug.aktiv` (Standard: aktiv). |
+| `Views/FirmenAnsicht/Fuhrpark/F01Fuhrpark.xaml` | Fahrzeugliste mit „Erneut laden“, „+ Fahrzeug anlegen“, „Inaktive anzeigen“ und je Zeile „Bearbeiten“ und „Inaktiv setzen“ / „Aktivieren“. |
+| `Views/FirmenAnsicht/Fuhrpark/F02FahrzeugFormular.xaml` | Formular „Fahrzeug anlegen / bearbeiten“ mit Pflichtfeldprüfung. |
 
 ## Nächste Schritte
 
-- Die Ansichten einzeln mit Daten füllen: K01–K04 (Benutzer verwalten) und F02 „Bearbeiten“
-  als Nächstes, weil Touren Fahrer und Fahrzeuge brauchen.
+- Die Ansichten einzeln mit Daten füllen: K01–K04 (Benutzer verwalten) als Nächstes, weil Touren
+  Fahrer und Fahrzeuge brauchen. Die Tourenplanung darf nur aktive Fahrzeuge (`aktiv = true`) anbieten.
 - Jede Tour gehört zu einer Abteilung (`tour.abteilung_id` ist Pflicht). Abteilungen anzulegen
   passt zum Kundenadmin (K02 „Abteilungszugriff“).
 - Für echte Anmeldetests je Rolle Testkonten anlegen (Schreibzugriff auf Neon, vorher absprechen).
