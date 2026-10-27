@@ -161,6 +161,16 @@ namespace Disposio.Views
             }
         }
 
+        private void Eingabe_KeyDown(object sender, KeyRoutedEventArgs e)
+        {
+            // Enter in einem Eingabefeld startet die Anmeldung wie ein Klick auf "Anmelden".
+            if (e.Key == Windows.System.VirtualKey.Enter)
+            {
+                e.Handled = true;
+                LoginButton_Click(LoginButton, new RoutedEventArgs());
+            }
+        }
+
         private async void LoginButton_Click(object sender, RoutedEventArgs e)
         {
             // await lässt das Fenster weiter reagieren. Deshalb sperren wir vor dem Warten
@@ -190,6 +200,12 @@ namespace Disposio.Views
                 try
                 {
                     user = await AuthService.LoginAsync(company, email, password);
+                }
+                catch (MandantInaktivException exception)
+                {
+                    // Passwort stimmt, aber die Firma ist im Admin-Dashboard gesperrt.
+                    ShowLoginStatus(exception.Message);
+                    return;
                 }
                 catch (Exception)
                 {
@@ -252,7 +268,10 @@ namespace Disposio.Views
 
         private void PasswortVergessen_Click(object sender, RoutedEventArgs e)
             {
-                Frame.Navigate(typeof(passwortVergessen));
+                // Farbe und Light/Dark Mode an die Passwort-vergessen-Seite weitergeben.
+                var accentHex = (ColorCombo.SelectedItem as ComboBoxItem)?.Tag as string ?? "#FF004D";
+                var appearance = new DashboardAppearance { AccentHex = accentHex, IsLight = ModeSwitch.IsOn };
+                Frame.Navigate(typeof(passwortVergessen), appearance);
             }
 
 }

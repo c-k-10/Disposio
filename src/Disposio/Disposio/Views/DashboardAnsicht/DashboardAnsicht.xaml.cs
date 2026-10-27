@@ -412,9 +412,37 @@ namespace Disposio.Views
                     Style = (Style)Resources["FormComboBox"],
                     HorizontalAlignment = HorizontalAlignment.Stretch
                 };
-                statusBox.Items.Add(new ComboBoxItem { Content = "Testphase", Tag = "Testphase" });
-                statusBox.Items.Add(new ComboBoxItem { Content = "Aktiv", Tag = "Aktiv" });
-                statusBox.SelectedIndex = customer?.Status == "Aktiv" ? 1 : 0;
+                statusBox.Items.Add(new ComboBoxItem { Content = UnternehmenStatus.Testphase, Tag = UnternehmenStatus.Testphase });
+                statusBox.Items.Add(new ComboBoxItem { Content = UnternehmenStatus.Aktiv, Tag = UnternehmenStatus.Aktiv });
+                // „Inaktiv“ sperrt einen vorhandenen Kunden. Ein neuer Kunde startet nie gesperrt.
+                if (customer is not null)
+                    statusBox.Items.Add(new ComboBoxItem { Content = UnternehmenStatus.Inaktiv, Tag = UnternehmenStatus.Inaktiv });
+                // Den gespeicherten Status auswählen. Sonst würde schon das Ändern der Adresse
+                // einen gesperrten Kunden unbemerkt wieder freischalten.
+                statusBox.SelectedIndex = customer?.Status switch
+                {
+                    UnternehmenStatus.Aktiv => 1,
+                    UnternehmenStatus.Inaktiv => 2,
+                    _ => 0
+                };
+
+                // Solange „Inaktiv“ gewählt ist, erklärt dieser Hinweis die Folgen für alle Konten der Firma.
+                var lockWarning = new TextBlock
+                {
+                    Text = $"Inaktiv sperrt die Firma ({customer?.Benutzer ?? 0} Benutzer): Nur Geschäftsführung und Kundenadmin " +
+                        "können sich noch anmelden und dann nur die Monatsstatistik ansehen und als PDF herunterladen. Alle " +
+                        "anderen sind gesperrt; wer gerade angemeldet ist, wird bei der nächsten Aktion abgemeldet. Alle Daten " +
+                        "bleiben erhalten. Mit „Aktiv“ oder „Testphase“ ist die Firma wieder freigeschaltet.",
+                    FontSize = 14,
+                    TextWrapping = TextWrapping.Wrap,
+                    Foreground = new SolidColorBrush(ParseColor(_isLight ? "#B91C1C" : "#FF939B"))
+                };
+                void UpdateLockWarning() => lockWarning.Visibility =
+                    (statusBox.SelectedItem as ComboBoxItem)?.Tag as string == UnternehmenStatus.Inaktiv
+                        ? Visibility.Visible
+                        : Visibility.Collapsed;
+                statusBox.SelectionChanged += (_, _) => UpdateLockWarning();
+                UpdateLockWarning();
 
                 var errorText = new TextBlock
                 {
@@ -432,6 +460,7 @@ namespace Disposio.Views
                 AddField(form, "Unternehmenskennung (für die Anmeldung)", identifierBox);
                 AddField(form, "E-Mail des Kundenadmins", emailBox);
                 AddField(form, "Status", statusBox);
+                form.Children.Add(lockWarning);
                 form.Children.Add(new TextBlock
                 {
                     Text = "Kontakt und Anschrift",
@@ -579,13 +608,17 @@ namespace Disposio.Views
 
                         // Erst NACH der Bestätigung aus Neon ändern wir die Anzeige.
                         // Bei einem Fehler bleiben die alte Liste und alle Formulareingaben erhalten.
+                        bool nowLocked = saved.Status == UnternehmenStatus.Inaktiv &&
+                            customer?.Status != UnternehmenStatus.Inaktiv;
                         if (customer is null)
                             Kunden.Add(CreateDisplayedCustomer(saved));
                         else
                             customer.ApplySavedCompany(saved);
 
                         EmptyCustomersText.Visibility = Visibility.Collapsed;
-                        DatabaseStatusText.Text = "Unternehmen wurde gespeichert.";
+                        DatabaseStatusText.Text = nowLocked
+                            ? $"{saved.Firmenname} ist jetzt inaktiv. Nur Geschäftsführung und Kundenadmin sehen noch die Statistik."
+                            : "Unternehmen wurde gespeichert.";
                         isSaving = false;
                         dialog.Hide();
                     }
@@ -1136,11 +1169,17 @@ namespace Disposio.Views
             set
             {
                 if (Set(ref _status, value))
+                {
                     PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(StatusBorderBrush)));
+                    PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(Deckkraft)));
+                }
             }
         }
 
         public Brush StatusBorderBrush => Status == "Testphase" ? _accentBrush : _borderBrush;
+
+        // Gesperrte Kunden erscheinen blasser. Status und Knöpfe bleiben gut lesbar.
+        public double Deckkraft => Status == UnternehmenStatus.Inaktiv ? 0.55 : 1;
 
         public event PropertyChangedEventHandler? PropertyChanged;
 

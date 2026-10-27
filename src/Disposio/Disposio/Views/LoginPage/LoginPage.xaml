@@ -68,16 +68,16 @@
                                 <!-- Ein Plattformkonto gehört keiner Firma. In diesem Modus wird die Firmenkennung ausgeblendet. -->
                                 <StackPanel x:Name="CompanyField" Spacing="10">
                                     <TextBlock Text="Unternehmenskennung *" Foreground="{StaticResource TextMain}" FontSize="12" />
-                                    <TextBox x:Name="CompanyBox" PlaceholderText="z. B. nordlog" MaxLength="100" AutomationProperties.Name="Unternehmenskennung"
+                                    <TextBox x:Name="CompanyBox" KeyDown="Eingabe_KeyDown" PlaceholderText="z. B. nordlog" MaxLength="100" AutomationProperties.Name="Unternehmenskennung"
                                              Background="{StaticResource InputBackground}" Foreground="{StaticResource TextMain}" BorderBrush="{StaticResource InputBorder}" CornerRadius="8" Height="40"/>
                                 </StackPanel>
 
                                 <TextBlock Text="E‑Mail‑Adresse *" Foreground="{StaticResource TextMain}" FontSize="12" Margin="0,8,0,0" />
-                                <TextBox x:Name="EmailBox" PlaceholderText="name@beispiel.de" MaxLength="254" AutomationProperties.Name="E-Mail-Adresse"
+                                <TextBox x:Name="EmailBox" KeyDown="Eingabe_KeyDown" PlaceholderText="name@beispiel.de" MaxLength="254" AutomationProperties.Name="E-Mail-Adresse"
                                          Background="{StaticResource InputBackground}" Foreground="{StaticResource TextMain}" BorderBrush="{StaticResource InputBorder}" CornerRadius="8" Height="40"/>
 
                                 <TextBlock Text="Passwort *" Foreground="{StaticResource TextMain}" FontSize="12" Margin="0,8,0,0" />
-                                <PasswordBox x:Name="PasswordBox" PlaceholderText="••••••••" MaxLength="1024" AutomationProperties.Name="Passwort"
+                                <PasswordBox x:Name="PasswordBox" KeyDown="Eingabe_KeyDown" PlaceholderText="••••••••" MaxLength="1024" AutomationProperties.Name="Passwort"
                                              Background="{StaticResource InputBackground}" Foreground="{StaticResource TextMain}" BorderBrush="{StaticResource InputBorder}" CornerRadius="8" Height="40"/>
                             </StackPanel>
                             </ScrollViewer>
@@ -92,6 +92,8 @@
 
 									<Button x:Name="LoginButton"
 											Content="Anmelden"
+                                            HorizontalAlignment="Stretch"
+                                            VerticalAlignment="Stretch"
 											Background="Transparent"
 											Foreground="{StaticResource ButtonTextOnPrimary}"
 											FontWeight="SemiBold"
@@ -139,9 +141,7 @@
                                     <Grid.RenderTransform>
                                         <TranslateTransform Y="-80" />
                                     </Grid.RenderTransform>
-                                    <Border Background="{StaticResource SpeechBubbleBackground}" BorderBrush="{StaticResource SpeechBorderBrush}" BorderThickness="1" CornerRadius="12" Padding="12,10" Margin="-100,0,0,0" HorizontalAlignment="Left" >
-                                        <Button Content="Passwort vergessen?" Foreground="{StaticResource TextMain}" FontSize="13" Click="PasswortVergessen_Click"/>
-                                    </Border>
+                                    <Button Content="Passwort vergessen?" Foreground="{StaticResource TextMain}" FontSize="13" Margin="-100,0,0,0" HorizontalAlignment="Left" Click="PasswortVergessen_Click"/>
                                 </Grid>
                             </Grid>
 

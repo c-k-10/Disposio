@@ -108,7 +108,12 @@ public sealed class KundenadminRepository
         if (richtlinie.PasswortFehler(eingaben.Passwort!) is string passwortFehler)
             throw new ArgumentException(passwortFehler);
 
-        // BCrypt kostet bewusst Rechenzeit. Task.Run hält währenddessen das Fenster bedienbar.
+        // Ist die E-Mail in dieser Firma schon vergeben? Dann legen wir gar kein Neon-Auth-Konto an.
+        if (await EmailVergebenAsync(firmaId, null, eingaben.Email, cancellationToken))
+            throw new BenutzerEmailVergebenException(null);
+
+        // Das Passwort wird bei Neon Auth gespeichert. Der BCrypt-Hash bleibt vorerst nur, weil die
+        // Spalte passwort_hash noch gefüllt sein darf. Sobald die Spalte gelöscht wird, entfällt er.
         string hash = await Task.Run(() => BCrypt.Net.BCrypt.HashPassword(eingaben.Passwort, workFactor: 12),
             cancellationToken);
 
@@ -126,8 +131,8 @@ public sealed class KundenadminRepository
                     WHERE a.abteilung_id = $6::bigint AND a.unternehmen_id = $5::bigint)
             ), neuer_benutzer AS (
                 INSERT INTO public.benutzer
-                    (vorname, nachname, email, passwort_hash, unternehmen_id, abteilung_id, sprache, aktiv)
-                SELECT $1, $2, $3, $4, $5::bigint, $6::bigint, $7, $8::boolean
+                    (vorname, nachname, email, passwort_hash, unternehmen_id, abteilung_id, sprache, aktiv, auth_user_id)
+                SELECT $1, $2, $3, $4, $5::bigint, $6::bigint, $7, $8::boolean, $13::text
                 FROM firmenrolle CROSS JOIN abteilung_ok
                 WHERE NOT EXISTS (SELECT 1 FROM public.benutzer b
                                   WHERE b.unternehmen_id = $5::bigint AND lower(btrim(b.email)) = lower($3))
@@ -144,19 +149,36 @@ public sealed class KundenadminRepository
             )
             SELECT benutzer_id FROM neue_zuordnung
             """;
+        // Neon-Auth-Konto über die Neon Function anlegen. Die Funktion prüft selbst, ob die angemeldete
+        // Person Kundenadmin ist. Danach gehört die Id des Kontos in die Spalte auth_user_id.
+        string authId = await BenutzerKontoDienst.KontoAnlegenAsync(eingaben.Email,
+            $"{eingaben.Vorname} {eingaben.Nachname}", eingaben.Passwort!, cancellationToken);
+
         var (akteurArt, akteurId) = Akteur();
         var parameters = new string?[]
         {
             eingaben.Vorname, eingaben.Nachname, eingaben.Email, hash, Text(firmaId),
             eingaben.AbteilungId is long abteilung ? Text(abteilung) : null,
             eingaben.Sprache, eingaben.Aktiv ? "true" : "false", Text(eingaben.RollenId),
-            akteurArt, akteurId, TextArray(VergebbareRollen)
+            akteurArt, akteurId, TextArray(VergebbareRollen), authId
         };
 
-        var rows = await SchreibenAsync(query, parameters, cancellationToken);
+        IReadOnlyList<string?[]> rows;
+        try
+        {
+            rows = await SchreibenAsync(query, parameters, cancellationToken);
+        }
+        catch
+        {
+            // Speichern gescheitert: das eben angelegte Neon-Auth-Konto wieder aufräumen.
+            await BenutzerKontoDienst.KontoEntfernenAsync(authId);
+            throw;
+        }
+
         if (rows.Count == 1)
             return long.Parse(Required(rows[0], 0), CultureInfo.InvariantCulture);
 
+        await BenutzerKontoDienst.KontoEntfernenAsync(authId);
         if (await EmailVergebenAsync(firmaId, null, eingaben.Email, cancellationToken))
             throw new BenutzerEmailVergebenException(null);
         throw new InvalidOperationException("Die Datenbank hat das neue Konto nicht bestätigt. Bitte die Seite neu laden.");
@@ -507,9 +529,11 @@ public sealed class KundenadminRepository
             throw new UnauthorizedAccessException("Für diese Ansicht ist die Rolle Kundenadmin erforderlich.");
 
         // r.unternehmen_id IS NULL: nur die echte Standardrolle zählt, keine gleichnamige eigene Rolle.
-        const string query = """
+        // Eine im Dashboard gesperrte Firma (Status „Inaktiv“) bekommt keine Daten mehr.
+        const string query = $"""
             SELECT b.benutzer_id FROM public.benutzer b
             WHERE b.benutzer_id = $1::bigint AND b.unternehmen_id = $2::bigint AND b.aktiv = true
+              AND {AuthService.FirmaNichtGesperrt}
               AND EXISTS (SELECT 1 FROM public.benutzer_rolle br
                           JOIN public.rolle r ON r.rollen_id = br.rollen_id
                           WHERE br.benutzer_id = b.benutzer_id AND r.bezeichnung = $3 AND r.unternehmen_id IS NULL)

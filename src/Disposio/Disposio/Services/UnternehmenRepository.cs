@@ -57,7 +57,7 @@ public sealed class UnternehmenRepository : IUnternehmenRepository
         CancellationToken cancellationToken = default)
     {
         await AuthService.DashboardZugriffPruefenAsync(cancellationToken);
-        var eingaben = ValidateAndTrim(entwurf);
+        var eingaben = ValidateAndTrim(entwurf, inaktivErlaubt: false);
 
         // $1 bis $10 sind Platzhalter. Eingaben werden als Parameter übertragen und NICHT in SQL eingesetzt.
         // Damit bleiben z. B. Apostrophe im Firmennamen normale Daten und können keinen SQL-Befehl verändern.
@@ -102,7 +102,9 @@ public sealed class UnternehmenRepository : IUnternehmenRepository
         CancellationToken cancellationToken = default)
     {
         await AuthService.DashboardZugriffPruefenAsync(cancellationToken);
-        var eingaben = ValidateAndTrim(entwurf);
+        // Status „Inaktiv“ sperrt alle Konten der Firma (siehe AuthService). Das Protokoll nennt dann
+        // „Status Aktiv → Inaktiv“, beim Entsperren umgekehrt.
+        var eingaben = ValidateAndTrim(entwurf, inaktivErlaubt: true);
         if (id <= 0)
         {
             throw new ArgumentOutOfRangeException(nameof(id), "Ein gespeichertes Unternehmen braucht eine gültige Id.");
@@ -243,7 +245,7 @@ public sealed class UnternehmenRepository : IUnternehmenRepository
         new string?[] { entwurf.Firmenname, entwurf.Kennung, entwurf.AdminEmail, entwurf.Status,
             entwurf.Adresse, entwurf.Plz, entwurf.Ort, entwurf.Telefon, entwurf.KontaktEmail, entwurf.Kontaktperson };
 
-    private static UnternehmenEntwurf ValidateAndTrim(UnternehmenEntwurf entwurf)
+    private static UnternehmenEntwurf ValidateAndTrim(UnternehmenEntwurf entwurf, bool inaktivErlaubt)
     {
         ArgumentNullException.ThrowIfNull(entwurf);
         var firmenname = RequiredText(entwurf.Firmenname, "Firmenname", 200);
@@ -260,9 +262,13 @@ public sealed class UnternehmenRepository : IUnternehmenRepository
             ? adminEmail : entwurf.KontaktEmail, "Firmen-E-Mail");
 
         // Auch der Datenzugriff prüft die Eingaben: Eine spätere andere Oberfläche braucht dieselben Regeln.
-        if (status is not ("Aktiv" or "Testphase"))
+        // Inaktiv nur beim Bearbeiten: Ein neues Unternehmen startet nicht gesperrt.
+        if (status is not (UnternehmenStatus.Aktiv or UnternehmenStatus.Testphase) &&
+            !(inaktivErlaubt && status == UnternehmenStatus.Inaktiv))
         {
-            throw new ArgumentException("Als Status sind Aktiv und Testphase erlaubt.");
+            throw new ArgumentException(inaktivErlaubt
+                ? "Als Status sind Aktiv, Testphase und Inaktiv erlaubt."
+                : "Als Status sind Aktiv und Testphase erlaubt.");
         }
 
         return new UnternehmenEntwurf(firmenname, kennung, adminEmail, status, adresse, plz, ort,

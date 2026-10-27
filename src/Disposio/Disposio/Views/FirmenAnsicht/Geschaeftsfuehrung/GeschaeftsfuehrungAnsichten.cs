@@ -10,6 +10,7 @@ namespace Disposio.Views
     {
         public static UIElement? Erstellen(FirmenAnsichtKontext kontext) => kontext.Ansicht.Id switch
         {
+            "G02" => new G02Statistik(kontext),
             _ => null
         };
     }

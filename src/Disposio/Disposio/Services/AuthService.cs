@@ -35,6 +35,12 @@ public sealed record AngemeldeterBenutzer(long Id, string Vorname, string Nachna
     // Eigene Rollen aus K03 mit ihren freigeschalteten Ansichten. Plattformkonten haben keine.
     public IReadOnlyList<EigeneRolle> EigeneRollen { get; init; } = Array.Empty<EigeneRolle>();
 
+    // Die Firma ist im Admin-Dashboard auf „Inaktiv“ gesetzt. Dann dürfen nur noch Inhaber/Geschäftsführer
+    // und Kundenadmin hinein, und zwar nur in die Monatsstatistik (G02). Alles andere ist gesperrt.
+    public bool FirmaGesperrt { get; init; }
+
+    public bool DarfStatistikSehen => FirmenRollen.Contains(FirmenRolle.Inhaber) || FirmenRollen.Contains(FirmenRolle.Kundenadmin);
+
     // Fahrer arbeiten in der Fahrer-App. Am PC braucht es mindestens eine Büro-Rolle
     // oder eine eigene Rolle mit mindestens einer freigeschalteten Ansicht.
     public bool HatFirmenArbeitsbereich => FirmenRollen.Any(rolle => rolle != FirmenRolle.Fahrer) ||
@@ -59,9 +65,18 @@ public static class AuthService
 {
     public const string MegakrasserAdminRolle = "SuperKrasserAdmin";
 
+    /// <summary>
+    /// SQL-Bedingung für Abfragen auf public.benutzer b: Die Firma des Kontos ist nicht gesperrt
+    /// (Status „Inaktiv“). Gilt für Firmenkonten; jede Rechteprüfung für Firmendaten hängt sie an.
+    /// </summary>
+    public const string FirmaNichtGesperrt = """
+        EXISTS (SELECT 1 FROM public.unternehmen u
+                WHERE u.unternehmen_id = b.unternehmen_id AND u.status <> 'Inaktiv')
+        """;
+
     // Reihenfolge der Spalten: 0 id, 1 vorname, 2 nachname, 3 sprache, 4 unternehmen_id,
     // 5 auth_user_id, 6 passwort_hash, 7 Standardrollen als JSON, 8 eigene Rollen als JSON.
-    // Die Login-Abfragen hängen 9 Firmenname und 10 Abteilung an.
+    // Die Login-Abfragen hängen 9 Firmenname, 10 Abteilung und 11 Firmenstatus an.
     private const string BenutzerSpalten = """
         b.benutzer_id, b.vorname, b.nachname, b.sprache, b.unternehmen_id, b.auth_user_id, b.passwort_hash,
         COALESCE((SELECT json_agg(r.bezeichnung ORDER BY r.bezeichnung)
@@ -101,7 +116,7 @@ public static class AuthService
         {
             // Projektbesitzer erhalten KEINE erfundene Firma. EXISTS verlangt ihre Admin-Rolle.
             query = $"""
-                SELECT {BenutzerSpalten}, NULL::text, NULL::text
+                SELECT {BenutzerSpalten}, NULL::text, NULL::text, NULL::text
                 FROM public.benutzer b
                 WHERE b.unternehmen_id IS NULL AND b.aktiv = true
                   AND lower(btrim(b.email)) = lower($1)
@@ -120,7 +135,8 @@ public static class AuthService
             query = $"""
                 SELECT {BenutzerSpalten}, u.firmenname,
                        (SELECT a.bezeichnung FROM public.abteilung a
-                        WHERE a.abteilung_id = b.abteilung_id AND a.unternehmen_id = b.unternehmen_id)
+                        WHERE a.abteilung_id = b.abteilung_id AND a.unternehmen_id = b.unternehmen_id),
+                       u.status
                 FROM public.benutzer b
                 JOIN public.unternehmen u ON u.unternehmen_id = b.unternehmen_id
                 WHERE b.aktiv = true AND lower(btrim(b.email)) = lower($1)
@@ -198,8 +214,17 @@ public static class AuthService
         {
             Firmenname = row[9],
             Abteilung = row[10],
-            EigeneRollen = Array.AsReadOnly(eigeneRollen)
+            EigeneRollen = Array.AsReadOnly(eigeneRollen),
+            FirmaGesperrt = row[11] == UnternehmenStatus.Inaktiv
         };
+
+        // 3. Erst nach dem Passwortbeweis: Ist die Firma gesperrt, gibt es nur für Geschäftsführung und
+        // Kundenadmin eine Sitzung (nur Statistik). Die eigene Meldung verrät einem Fremden nichts,
+        // weil er dafür schon das richtige Passwort kennen müsste.
+        if (benutzer.FirmaGesperrt && !benutzer.DarfStatistikSehen)
+        {
+            throw new MandantInaktivException();
+        }
 
         return firmenkennung.Length == 0 && !benutzer.IstMegakrasserAdmin ? null : benutzer;
     }
@@ -248,7 +273,7 @@ public static class AuthService
     /// stattdessen die MegakrasserAdmin-Rolle geprüft. Jede Firmenansicht mit Daten ruft das zuerst auf
     /// und verwendet danach nur die zurückgegebene UnternehmenId in ihren SQL-Abfragen.
     /// </summary>
-    /// <exception cref="UnauthorizedAccessException">Rolle entzogen, Konto deaktiviert oder abgemeldet.</exception>
+    /// <exception cref="UnauthorizedAccessException">Rolle entzogen, Konto deaktiviert, Firma gesperrt oder abgemeldet.</exception>
     /// <exception cref="InvalidOperationException">Debug-Vorschau ohne Firma: Es gibt keine Firmendaten.</exception>
     public static async Task<FirmenZugriff> FirmenZugriffPruefenAsync(FirmenRolle rolle,
         CancellationToken cancellationToken = default)
@@ -277,11 +302,14 @@ public static class AuthService
             throw new UnauthorizedAccessException("Für diese Ansicht fehlt Ihrem Konto die passende Rolle.");
         }
 
-        // Konto aktiv, gleiche Firma und Rolle noch vorhanden? Die Abteilung wird für die Ansichten
-        // des Abteilungsleiters mitgeliefert, damit sie nur die eigene Abteilung zeigen.
-        const string query = """
+        // Konto aktiv, Firma nicht gesperrt, gleiche Firma und Rolle noch vorhanden? Wird eine Firma
+        // gesperrt, endet so auch eine schon laufende Sitzung bei der nächsten Aktion.
+        // Die Abteilung wird für die Ansichten des Abteilungsleiters mitgeliefert, damit sie nur die
+        // eigene Abteilung zeigen.
+        const string query = $"""
             SELECT b.unternehmen_id, b.abteilung_id FROM public.benutzer b
             WHERE b.benutzer_id = $1::bigint AND b.aktiv = true AND b.unternehmen_id = $2::bigint
+              AND {FirmaNichtGesperrt}
               AND EXISTS (SELECT 1 FROM public.benutzer_rolle br
                           JOIN public.rolle r ON r.rollen_id = br.rollen_id
                           WHERE br.benutzer_id = b.benutzer_id AND r.bezeichnung = $3)
@@ -301,6 +329,62 @@ public static class AuthService
 
         long? abteilungId = rows[0][1] is string abteilung ? long.Parse(abteilung, CultureInfo.InvariantCulture) : null;
         return new FirmenZugriff(unternehmenId, abteilungId);
+    }
+
+    /// <summary>
+    /// Rechteprüfung nur für die Monatsstatistik (G02): Inhaber/Geschäftsführer oder Kundenadmin der eigenen
+    /// Firma, und zwar auch dann, wenn die Firma gesperrt ist. Die Statistik liest nur und ändert nichts.
+    /// Beim Admin-Zugang gilt wie überall die MegakrasserAdmin-Rolle.
+    /// </summary>
+    /// <exception cref="UnauthorizedAccessException">Rolle entzogen, Konto deaktiviert oder abgemeldet.</exception>
+    /// <exception cref="InvalidOperationException">Debug-Vorschau ohne Firma: Es gibt keine Firmendaten.</exception>
+    public static async Task<FirmenZugriff> StatistikZugriffPruefenAsync(CancellationToken cancellationToken = default)
+    {
+        if (BenutzerSitzung.IstFirmenVorschau)
+        {
+            throw new InvalidOperationException("In der Vorschau ohne Anmeldung werden keine Firmendaten geladen.");
+        }
+
+        if (BenutzerSitzung.Firmenzugang is AdminFirmenzugang zugang)
+        {
+            await DashboardZugriffPruefenAsync(cancellationToken).ConfigureAwait(false);
+            if (!ReferenceEquals(zugang, BenutzerSitzung.Firmenzugang))
+            {
+                throw new UnauthorizedAccessException("Der Admin-Zugang zu dieser Firma ist beendet.");
+            }
+
+            return new FirmenZugriff(zugang.UnternehmenId, null);
+        }
+
+        var benutzer = BenutzerSitzung.AktuellerBenutzer;
+        if (benutzer?.UnternehmenId is not long unternehmenId || !benutzer.DarfStatistikSehen)
+        {
+            throw new UnauthorizedAccessException("Für die Statistik fehlt Ihrem Konto die passende Rolle.");
+        }
+
+        // Absichtlich ohne FirmaNichtGesperrt. r.unternehmen_id IS NULL: nur die echten Standardrollen zählen.
+        const string query = """
+            SELECT b.unternehmen_id FROM public.benutzer b
+            WHERE b.benutzer_id = $1::bigint AND b.aktiv = true AND b.unternehmen_id = $2::bigint
+              AND EXISTS (SELECT 1 FROM public.benutzer_rolle br
+                          JOIN public.rolle r ON r.rollen_id = br.rollen_id
+                          WHERE br.benutzer_id = b.benutzer_id AND r.unternehmen_id IS NULL
+                            AND r.bezeichnung IN ($3, $4))
+            """;
+        var rows = await new NeonSqlClient().QueryAsync(query, new string?[]
+        {
+            benutzer.Id.ToString(CultureInfo.InvariantCulture),
+            unternehmenId.ToString(CultureInfo.InvariantCulture),
+            FirmenRollenKatalog.DatenbankName(FirmenRolle.Inhaber),
+            FirmenRollenKatalog.DatenbankName(FirmenRolle.Kundenadmin)
+        }, cancellationToken).ConfigureAwait(false);
+        if (rows.Count != 1 || !ReferenceEquals(benutzer, BenutzerSitzung.AktuellerBenutzer) ||
+            BenutzerSitzung.Firmenzugang is not null)
+        {
+            throw new UnauthorizedAccessException("Die Berechtigung für die Statistik ist nicht mehr vorhanden. Bitte melden Sie sich erneut an.");
+        }
+
+        return new FirmenZugriff(unternehmenId, null);
     }
 
     private static bool PasswortPasst(string passwort, string hash)
@@ -335,4 +419,15 @@ public static class AuthService
 
     private static string Required(string?[] row, int index) => row[index]
         ?? throw new InvalidOperationException("In einem Pflichtfeld des Benutzerkontos fehlt ein Wert.");
+}
+
+/// <summary>
+/// Passwort richtig, aber die Firma ist im Admin-Dashboard auf „Inaktiv“ gesetzt und das Konto ist weder
+/// Inhaber/Geschäftsführer noch Kundenadmin. Es wird keine Sitzung gestartet.
+/// </summary>
+public sealed class MandantInaktivException : Exception
+{
+    public MandantInaktivException()
+        : base("Ihr Unternehmen ist bei Disposio zurzeit gesperrt. Nur Geschäftsführung und Kundenadmin können sich " +
+            "noch anmelden, um Statistiken anzusehen.") { }
 }

@@ -1,0 +1,424 @@
+diff --git a/.gitignore b/.gitignore
+index 657de9b..ea32a2c 100644
+--- a/.gitignore
++++ b/.gitignore
+@@ -13,3 +13,6 @@
+ # Obsidian: personal window layout
+ .obsidian/workspace.json
+ .obsidian/workspace-mobile.json
++
++# Neon Function: npm-Pakete
++node_modules/
+diff --git a/neon-function/functions/konto.ts b/neon-function/functions/konto.ts
+new file mode 100644
+index 0000000..b29537c
+--- /dev/null
++++ b/neon-function/functions/konto.ts
+@@ -0,0 +1,139 @@
++// Neon Function: legt Neon-Auth-Konten an (und entfernt sie bei Bedarf wieder).
++//
++// Wer darf aufrufen: nur angemeldete Nutzer, die in der Tabelle "benutzer" aktiv sind und entweder
++//   - Kundenadmin einer Firma sind (Standardrolle, unternehmen_id der Rolle ist NULL) oder
++//   - Plattform-Admin (SuperKrasserAdmin) ohne Firma.
++// Die Funktion prüft das JWT von Neon Auth und danach die Rolle in der Datenbank. Sie vertraut
++// nie Angaben der App über Rolle oder Firma.
++//
++// Geheimnisse (nur beim Deploy mit --env setzen, nie in den Code schreiben):
++//   DIENST_ADMIN_EMAIL, DIENST_ADMIN_PASSWORT  -> Konto mit Admin-Rolle in Neon Auth,
++//                                                  das NICHT in der Tabelle "benutzer" steht.
++// Von Neon automatisch gesetzt: DATABASE_URL, NEON_AUTH_BASE_URL, NEON_AUTH_JWKS_URL.
++
++import { createRemoteJWKSet, jwtVerify } from 'jose';
++import { neon } from '@neondatabase/serverless';
++
++const AUTH_BASE = process.env.NEON_AUTH_BASE_URL!.replace(/\/$/, '');
++const jwks = createRemoteJWKSet(new URL(process.env.NEON_AUTH_JWKS_URL!));
++const issuer = new URL(AUTH_BASE).origin;
++const sql = neon(process.env.DATABASE_URL!);
++
++// Neon Auth prüft den Origin. localhost ist laut Neon-Doku immer erlaubt.
++const ORIGIN = process.env.AUTH_ORIGIN ?? 'http://localhost:3000';
++
++const antwort = (status: number, body: unknown) => Response.json(body, { status });
++
++// 1. Wer ruft auf? JWT prüfen und die Nutzer-ID (sub) lesen.
++async function aufrufer(request: Request): Promise<string | null> {
++  const header = request.headers.get('authorization');
++  if (!header?.toLowerCase().startsWith('bearer ')) return null;
++  try {
++    const { payload } = await jwtVerify(header.slice(7), jwks, { issuer });
++    return typeof payload.sub === 'string' ? payload.sub : null;
++  } catch {
++    return null;
++  }
++}
++
++// 2. Darf diese Person Konten anlegen? Die Antwort kommt aus der Datenbank, nicht aus der App.
++async function darfKontenAnlegen(authId: string): Promise<boolean> {
++  const rows = await sql`
++    SELECT 1 FROM public.benutzer b
++    WHERE b.auth_user_id = ${authId} AND b.aktiv = true
++      AND EXISTS (
++        SELECT 1 FROM public.benutzer_rolle br
++        JOIN public.rolle r ON r.rollen_id = br.rollen_id
++        WHERE br.benutzer_id = b.benutzer_id AND r.unternehmen_id IS NULL
++          AND ((b.unternehmen_id IS NOT NULL AND r.bezeichnung = 'Kundenadmin')
++            OR (b.unternehmen_id IS NULL AND r.bezeichnung = 'SuperKrasserAdmin')))
++    LIMIT 1`;
++  return rows.length === 1;
++}
++
++// 3. Die Funktion meldet sich mit dem Dienst-Admin bei Neon Auth an (Cookie-Sitzung).
++async function dienstAdmin(): Promise<{ cookie: string; id: string }> {
++  const res = await fetch(`${AUTH_BASE}/sign-in/email`, {
++    method: 'POST',
++    headers: { 'content-type': 'application/json', origin: ORIGIN },
++    body: JSON.stringify({
++      email: process.env.DIENST_ADMIN_EMAIL,
++      password: process.env.DIENST_ADMIN_PASSWORT,
++    }),
++  });
++  if (!res.ok) throw new Error('Dienst-Admin-Anmeldung fehlgeschlagen');
++  const cookie = res.headers
++    .getSetCookie()
++    .map((c) => c.split(';')[0])
++    .join('; ');
++  const data: any = await res.json();
++  return { cookie, id: data.user.id };
++}
++
++async function anlegen(b: any): Promise<Response> {
++  const email = String(b.email ?? '').trim().toLowerCase();
++  const name = String(b.name ?? '').trim();
++  const passwort = String(b.passwort ?? '');
++  if (email.length > 254 || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email))
++    return antwort(400, { fehler: 'Ungültige E-Mail-Adresse.' });
++  if (!name || name.length > 200) return antwort(400, { fehler: 'Name fehlt oder ist zu lang.' });
++  if (passwort.length < 8 || passwort.length > 128)
++    return antwort(400, { fehler: 'Das Passwort muss 8 bis 128 Zeichen lang sein.' });
++
++  const dienst = await dienstAdmin();
++  const res = await fetch(`${AUTH_BASE}/admin/create-user`, {
++    method: 'POST',
++    headers: { 'content-type': 'application/json', origin: ORIGIN, cookie: dienst.cookie },
++    // role "user": Das neue Konto bekommt in Neon Auth keine Admin-Rechte.
++    body: JSON.stringify({ email, password: passwort, name, role: 'user' }),
++  });
++  const data: any = await res.json().catch(() => ({}));
++  if (!res.ok || !data?.user?.id) {
++    return antwort(res.status >= 500 ? 502 : 400, {
++      fehler: data?.message ?? 'Das Konto konnte nicht angelegt werden.',
++    });
++  }
++  return antwort(200, { authId: data.user.id });
++}
++
++// Entfernt nur Konten, die in "benutzer" nicht vorkommen (übrig gebliebene Reste nach einem
++// fehlgeschlagenen Speichern). Bestehende Konten und der Dienst-Admin sind geschützt.
++async function entfernen(b: any): Promise<Response> {
++  const authId = String(b.authId ?? '');
++  if (!authId) return antwort(400, { fehler: 'authId fehlt.' });
++
++  const benutzt = await sql`SELECT 1 FROM public.benutzer WHERE auth_user_id = ${authId} LIMIT 1`;
++  if (benutzt.length > 0) return antwort(409, { fehler: 'Das Konto wird verwendet.' });
++
++  const dienst = await dienstAdmin();
++  if (authId === dienst.id) return antwort(403, { fehler: 'Nicht erlaubt.' });
++
++  const res = await fetch(`${AUTH_BASE}/admin/remove-user`, {
++    method: 'POST',
++    headers: { 'content-type': 'application/json', origin: ORIGIN, cookie: dienst.cookie },
++    body: JSON.stringify({ userId: authId }),
++  });
++  return res.ok ? antwort(200, { ok: true }) : antwort(502, { fehler: 'Entfernen fehlgeschlagen.' });
++}
++
++export default {
++  async fetch(request: Request): Promise<Response> {
++    if (request.method !== 'POST') return antwort(405, { fehler: 'Nur POST.' });
++
++    const authId = await aufrufer(request);
++    if (!authId) return antwort(401, { fehler: 'Nicht angemeldet.' });
++
++    try {
++      if (!(await darfKontenAnlegen(authId))) return antwort(403, { fehler: 'Keine Berechtigung.' });
++
++      const body: any = await request.json().catch(() => null);
++      if (body?.aktion === 'anlegen') return await anlegen(body);
++      if (body?.aktion === 'entfernen') return await entfernen(body);
++      return antwort(400, { fehler: 'Unbekannte Aktion.' });
++    } catch (fehler) {
++      // Absichtlich ohne Request-Inhalt loggen: Das Startpasswort darf nirgends auftauchen.
++      console.error('konto-funktion:', (fehler as Error)?.message);
++      return antwort(502, { fehler: 'Interner Fehler.' });
++    }
++  },
++};
+diff --git a/src/Disposio/Disposio/Services/BenutzerKontoDienst.cs b/src/Disposio/Disposio/Services/BenutzerKontoDienst.cs
+new file mode 100644
+index 0000000..db8f00f
+--- /dev/null
++++ b/src/Disposio/Disposio/Services/BenutzerKontoDienst.cs
+@@ -0,0 +1,103 @@
++using System;
++using System.Net;
++using System.Net.Http;
++using System.Net.Http.Headers;
++using System.Net.Http.Json;
++using System.Text.Json;
++using System.Threading;
++using System.Threading.Tasks;
++
++namespace Disposio.Services;
++
++/// <summary>
++/// Ruft die Neon Function auf, die Neon-Auth-Konten anlegt. Die Funktion prüft selbst, ob die
++/// aufrufende Person Kundenadmin (oder Plattform-Admin) ist. Das Startpasswort geht nur per HTTPS
++/// an die Funktion und wird nirgends gespeichert oder ausgegeben.
++/// Fehlermeldungen sind absichtlich lesbar: KundenadminRepository gibt sie an die Oberfläche weiter.
++/// </summary>
++public static class BenutzerKontoDienst
++{
++    // Nach dem Deploy mit "neon functions get konto" ausgeben lassen und hier eintragen.
++    private const string FunktionsUrl = "HIER_URL_DER_NEON_FUNCTION_EINTRAGEN";
++
++    private static readonly HttpClient Http = new() { Timeout = TimeSpan.FromSeconds(30) };
++
++    /// <summary>Legt das Konto bei Neon Auth an und liefert dessen Id (für benutzer.auth_user_id).</summary>
++    public static async Task<string> KontoAnlegenAsync(string email, string name, string passwort,
++        CancellationToken cancellationToken = default)
++    {
++        using var antwort = await SendenAsync(new { aktion = "anlegen", email, name, passwort }, cancellationToken);
++        string text = await antwort.Content.ReadAsStringAsync(cancellationToken);
++
++        if (antwort.IsSuccessStatusCode)
++        {
++            try
++            {
++                using var doc = JsonDocument.Parse(text);
++                string? id = doc.RootElement.GetProperty("authId").GetString();
++                if (!string.IsNullOrEmpty(id))
++                    return id;
++            }
++            catch (Exception ex) when (ex is JsonException or KeyNotFoundException) { }
++            throw new InvalidOperationException("Die Antwort des Servers war unvollständig. Bitte erneut versuchen.");
++        }
++
++        throw FehlerAus(antwort.StatusCode, text);
++    }
++
++    /// <summary>Räumt ein Konto wieder auf, wenn das Speichern in der Datenbank gescheitert ist.</summary>
++    public static async Task KontoEntfernenAsync(string authId)
++    {
++        try
++        {
++            using var antwort = await SendenAsync(new { aktion = "entfernen", authId }, CancellationToken.None);
++        }
++        catch
++        {
++            // Aufräumen ist nur ein Versuch. Ein übrig gebliebenes Konto ohne Eintrag in "benutzer"
++            // kann sich nicht anmelden und lässt sich später entfernen.
++        }
++    }
++
++    private static async Task<HttpResponseMessage> SendenAsync(object body, CancellationToken cancellationToken)
++    {
++        string? jwt = await NeonAuthClient.Instanz.JwtHolenAsync(cancellationToken);
++        if (string.IsNullOrEmpty(jwt))
++            throw new UnauthorizedAccessException("Die Sitzung ist abgelaufen. Bitte melden Sie sich erneut an.");
++
++        using var anfrage = new HttpRequestMessage(HttpMethod.Post, FunktionsUrl)
++        {
++            Content = JsonContent.Create(body)
++        };
++        anfrage.Headers.Authorization = new AuthenticationHeaderValue("Bearer", jwt);
++
++        try
++        {
++            return await Http.SendAsync(anfrage, cancellationToken);
++        }
++        catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException)
++        {
++            throw new InvalidOperationException(
++                "Der Server für neue Konten ist gerade nicht erreichbar. Bitte kurz warten und erneut versuchen.", ex);
++        }
++    }
++
++    private static Exception FehlerAus(HttpStatusCode status, string text)
++    {
++        if (status == HttpStatusCode.Unauthorized)
++            return new UnauthorizedAccessException("Die Sitzung ist abgelaufen. Bitte melden Sie sich erneut an.");
++        if (status == HttpStatusCode.Forbidden)
++            return new InvalidOperationException("Für das Anlegen von Konten fehlt die Berechtigung.");
++
++        string meldung = "Das Konto konnte nicht angelegt werden.";
++        try
++        {
++            using var doc = JsonDocument.Parse(text);
++            if (doc.RootElement.TryGetProperty("fehler", out var f) && f.ValueKind == JsonValueKind.String)
++                meldung = f.GetString() ?? meldung;
++        }
++        catch (JsonException) { }
++
++        return new InvalidOperationException(meldung);
++    }
++}
+diff --git a/src/Disposio/Disposio/Services/BenutzerSitzung.cs b/src/Disposio/Disposio/Services/BenutzerSitzung.cs
+index fcb9a76..9c2fb62 100644
+--- a/src/Disposio/Disposio/Services/BenutzerSitzung.cs
++++ b/src/Disposio/Disposio/Services/BenutzerSitzung.cs
+@@ -44,6 +44,8 @@ public static class BenutzerSitzung
+ 
+     public static void Abmelden()
+     {
++        // Die Neon-Auth-Sitzung (Cookie) endet mit der Abmeldung. Sonst bliebe eine Admin-Sitzung hängen.
++        NeonAuthClient.Instanz.SitzungVerwerfen();
+         AktuellerBenutzer = null;
+         IstEntwicklungsansicht = false;
+         IstFirmenVorschau = false;
+diff --git a/src/Disposio/Disposio/Services/KundenadminRepository.cs b/src/Disposio/Disposio/Services/KundenadminRepository.cs
+index c1cccb5..b9a3a5d 100644
+--- a/src/Disposio/Disposio/Services/KundenadminRepository.cs
++++ b/src/Disposio/Disposio/Services/KundenadminRepository.cs
+@@ -108,7 +108,12 @@ public sealed class KundenadminRepository
+         if (richtlinie.PasswortFehler(eingaben.Passwort!) is string passwortFehler)
+             throw new ArgumentException(passwortFehler);
+ 
+-        // BCrypt kostet bewusst Rechenzeit. Task.Run hält währenddessen das Fenster bedienbar.
++        // Ist die E-Mail in dieser Firma schon vergeben? Dann legen wir gar kein Neon-Auth-Konto an.
++        if (await EmailVergebenAsync(firmaId, null, eingaben.Email, cancellationToken))
++            throw new BenutzerEmailVergebenException(null);
++
++        // Das Passwort wird bei Neon Auth gespeichert. Der BCrypt-Hash bleibt vorerst nur, weil die
++        // Spalte passwort_hash noch gefüllt sein darf. Sobald die Spalte gelöscht wird, entfällt er.
+         string hash = await Task.Run(() => BCrypt.Net.BCrypt.HashPassword(eingaben.Passwort, workFactor: 12),
+             cancellationToken);
+ 
+@@ -126,8 +131,8 @@ public sealed class KundenadminRepository
+                     WHERE a.abteilung_id = $6::bigint AND a.unternehmen_id = $5::bigint)
+             ), neuer_benutzer AS (
+                 INSERT INTO public.benutzer
+-                    (vorname, nachname, email, passwort_hash, unternehmen_id, abteilung_id, sprache, aktiv)
+-                SELECT $1, $2, $3, $4, $5::bigint, $6::bigint, $7, $8::boolean
++                    (vorname, nachname, email, passwort_hash, unternehmen_id, abteilung_id, sprache, aktiv, auth_user_id)
++                SELECT $1, $2, $3, $4, $5::bigint, $6::bigint, $7, $8::boolean, $13::text
+                 FROM firmenrolle CROSS JOIN abteilung_ok
+                 WHERE NOT EXISTS (SELECT 1 FROM public.benutzer b
+                                   WHERE b.unternehmen_id = $5::bigint AND lower(btrim(b.email)) = lower($3))
+@@ -144,19 +149,36 @@ public sealed class KundenadminRepository
+             )
+             SELECT benutzer_id FROM neue_zuordnung
+             """;
++        // Neon-Auth-Konto über die Neon Function anlegen. Die Funktion prüft selbst, ob die angemeldete
++        // Person Kundenadmin ist. Danach gehört die Id des Kontos in die Spalte auth_user_id.
++        string authId = await BenutzerKontoDienst.KontoAnlegenAsync(eingaben.Email,
++            $"{eingaben.Vorname} {eingaben.Nachname}", eingaben.Passwort!, cancellationToken);
++
+         var (akteurArt, akteurId) = Akteur();
+         var parameters = new string?[]
+         {
+             eingaben.Vorname, eingaben.Nachname, eingaben.Email, hash, Text(firmaId),
+             eingaben.AbteilungId is long abteilung ? Text(abteilung) : null,
+             eingaben.Sprache, eingaben.Aktiv ? "true" : "false", Text(eingaben.RollenId),
+-            akteurArt, akteurId, TextArray(VergebbareRollen)
++            akteurArt, akteurId, TextArray(VergebbareRollen), authId
+         };
+ 
+-        var rows = await SchreibenAsync(query, parameters, cancellationToken);
++        IReadOnlyList<string?[]> rows;
++        try
++        {
++            rows = await SchreibenAsync(query, parameters, cancellationToken);
++        }
++        catch
++        {
++            // Speichern gescheitert: das eben angelegte Neon-Auth-Konto wieder aufräumen.
++            await BenutzerKontoDienst.KontoEntfernenAsync(authId);
++            throw;
++        }
++
+         if (rows.Count == 1)
+             return long.Parse(Required(rows[0], 0), CultureInfo.InvariantCulture);
+ 
++        await BenutzerKontoDienst.KontoEntfernenAsync(authId);
+         if (await EmailVergebenAsync(firmaId, null, eingaben.Email, cancellationToken))
+             throw new BenutzerEmailVergebenException(null);
+         throw new InvalidOperationException("Die Datenbank hat das neue Konto nicht bestätigt. Bitte die Seite neu laden.");
+diff --git a/src/Disposio/Disposio/Services/NeonAuthClient.cs b/src/Disposio/Disposio/Services/NeonAuthClient.cs
+index 979145a..e8265af 100644
+--- a/src/Disposio/Disposio/Services/NeonAuthClient.cs
++++ b/src/Disposio/Disposio/Services/NeonAuthClient.cs
+@@ -1,5 +1,6 @@
+ ﻿using System;
+ using System.Collections.Generic;
++using System.Linq;
+ using System.Net;
+ using System.Net.Http;
+ using System.Net.Http.Json;
+@@ -97,6 +98,33 @@ public sealed class NeonAuthClient
+         }
+     }
+ 
++    /// <summary>
++    /// Holt ein kurzlebiges JWT (laut Neon-Doku 15 Minuten gültig) für die angemeldete Sitzung.
++    /// Das JWT beweist der Neon Function, wer anfragt. Null, wenn keine Sitzung besteht.
++    /// </summary>
++    public async Task<string?> JwtHolenAsync(CancellationToken cancellationToken = default)
++    {
++        try
++        {
++            // Laut Neon-Doku steht das JWT im Header "set-auth-jwt" der get-session-Antwort.
++            using var sitzung = await _http.GetAsync("get-session", cancellationToken);
++            if (sitzung.IsSuccessStatusCode && sitzung.Headers.TryGetValues("set-auth-jwt", out var werte))
++                return werte.FirstOrDefault();
++
++            // Ersatzweg: Better-Auth-JWT-Plugin, Route "token".
++            using var tokenAntwort = await _http.GetAsync("token", cancellationToken);
++            if (!tokenAntwort.IsSuccessStatusCode)
++                return null;
++            using var doc = JsonDocument.Parse(await tokenAntwort.Content.ReadAsStringAsync(cancellationToken));
++            return doc.RootElement.GetProperty("token").GetString();
++        }
++        catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException
++                                      or JsonException or KeyNotFoundException)
++        {
++            return null;
++        }
++    }
++
+     /// <summary>
+     /// Legt einen Nutzer bei Neon Auth an, mit festem Startpasswort. Funktioniert nur, wenn der
+     /// aktuell angemeldete Nutzer in Neon Auth die Rolle "admin" hat. Das prüft Neon, nicht die App.
+diff --git a/src/Disposio/Disposio/Views/FirmenAnsicht/FirmenAnsicht.Kundenadmin.cs b/src/Disposio/Disposio/Views/FirmenAnsicht/FirmenAnsicht.Kundenadmin.cs
+index b52bba1..1da3b09 100644
+--- a/src/Disposio/Disposio/Views/FirmenAnsicht/FirmenAnsicht.Kundenadmin.cs
++++ b/src/Disposio/Disposio/Views/FirmenAnsicht/FirmenAnsicht.Kundenadmin.cs
+@@ -247,6 +247,9 @@ namespace Disposio.Views
+             var emailBox = Eingabe(benutzer?.Email ?? "", "name@firma.de");
+             firstNameBox.MaxLength = lastNameBox.MaxLength = 100;
+             emailBox.MaxLength = 254;
++            // Die E-Mail gehört zum Neon-Auth-Konto. Eine Änderung nur in unserer Tabelle würde den Login brechen.
++            if (!neu)
++                emailBox.IsEnabled = false;
+ 
+             // Rollen (Standard + eigene aus K03) und Abteilungen werden gleich aus Neon geladen.
+             // „Keine Abteilung“ gilt für unternehmensweite Rollen.
+@@ -279,7 +282,7 @@ namespace Disposio.Views
+             if (neu)
+             {
+                 // Einladungen werden im Prototyp nicht versendet. Deshalb vergibt der Kundenadmin ein
+-                // Startpasswort, wie beim Anlegen des Kundenadmins im Dashboard. Gespeichert wird nur der Hash.
++                // Startpasswort, wie beim Anlegen des Kundenadmins im Dashboard. Das Passwort wird bei Neon Auth gespeichert, nicht in unserer Tabelle.
+                 Platzieren(form, Feld("Startpasswort *", passwordBox), 4, 0);
+                 Platzieren(form, Feld("Startpasswort wiederholen *", repeatBox), 4, 1);
+             }
+@@ -338,7 +341,8 @@ namespace Disposio.Views
+             bool isSaving = false;
+             void SetEnabled(bool enabled)
+             {
+-                firstNameBox.IsEnabled = lastNameBox.IsEnabled = emailBox.IsEnabled = enabled;
++                firstNameBox.IsEnabled = lastNameBox.IsEnabled = enabled;
++                emailBox.IsEnabled = enabled && neu;
+                 departmentBox.IsEnabled = languageBox.IsEnabled = enabled;
+                 roleBox.IsEnabled = statusBox.IsEnabled = enabled && !eigenesKonto;
+                 passwordBox.IsEnabled = repeatBox.IsEnabled = enabled;

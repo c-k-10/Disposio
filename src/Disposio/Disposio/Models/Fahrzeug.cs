@@ -27,7 +27,11 @@ public sealed record FahrzeugEntwurf(
     decimal? SolltemperaturC,
     long? AbteilungId);
 
-/// <summary>Ein gespeichertes Fahrzeug aus public.fahrzeug, wie es die Fahrzeugliste (F01) anzeigt.</summary>
+/// <summary>
+/// Ein gespeichertes Fahrzeug aus public.fahrzeug. Die Fahrzeugliste (F01) zeigt es an, das Formular (F02)
+/// füllt damit beim Bearbeiten seine Felder. Aktiv = false heißt ausgemustert: Das Fahrzeug wird nicht
+/// gelöscht, damit Touren, Wartungen und Tankvorgänge ihm weiter zugeordnet bleiben.
+/// </summary>
 public sealed record Fahrzeug(
     long Id,
     string Kennzeichen,
@@ -40,13 +44,15 @@ public sealed record Fahrzeug(
     DateOnly TuevDatum,
     string Aufbau,
     decimal NutzlastKg,
+    decimal NutzbareLaengeM,
+    decimal InnenbreiteM,
+    decimal InnenhoeheM,
     decimal NutzbareLademeter,
     int EpStellplaetze,
     decimal? SolltemperaturC,
-    string? Abteilung);
-
-/// <summary>Eine Abteilung zur Auswahl im Fahrzeugformular.</summary>
-public sealed record AbteilungAuswahl(long Id, string Bezeichnung);
+    long? AbteilungId,
+    string? Abteilung,
+    bool Aktiv);
 
 /// <summary>
 /// Die festen Auswahllisten des Fahrzeugformulars. Sie folgen dem Wireframe F02
@@ -60,8 +66,9 @@ public static class FahrzeugWerte
     public const string Kuehlaufbau = "Frische";
     public static readonly IReadOnlyList<string> Aufbauten = new[] { "Trockengut", Kuehlaufbau };
 
-    // „Im Einsatz“ setzt später die Tourenplanung. Ein neues Fahrzeug startet in einem dieser Zustände.
-    public static readonly IReadOnlyList<string> StatusBeimAnlegen = new[] { "Verfügbar", "Wartung", "Gesperrt" };
+    // „Im Einsatz“ setzt später die Tourenplanung. Im Formular (Anlegen und Bearbeiten) sind nur diese Zustände wählbar.
+    // „Inaktiv“ ist kein Status, sondern die eigene Spalte aktiv (siehe Fahrzeug.Aktiv).
+    public static readonly IReadOnlyList<string> StatusImFormular = new[] { "Verfügbar", "Wartung", "Gesperrt" };
 
     /// <summary>
     /// Einheitliche Schreibweise für Kennzeichen: Großbuchstaben, keine äußeren Leerzeichen,

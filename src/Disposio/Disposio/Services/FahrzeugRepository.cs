@@ -11,13 +11,17 @@ namespace Disposio.Services;
 public interface IFahrzeugRepository
 {
     Task<IReadOnlyList<Fahrzeug>> LadenAsync(CancellationToken cancellationToken = default);
+    Task<Fahrzeug?> LadenAsync(long fahrzeugId, CancellationToken cancellationToken = default);
     Task<IReadOnlyList<AbteilungAuswahl>> AbteilungenLadenAsync(CancellationToken cancellationToken = default);
     Task<Fahrzeug> AnlegenAsync(FahrzeugEntwurf entwurf, CancellationToken cancellationToken = default);
+    Task<Fahrzeug> AendernAsync(long fahrzeugId, FahrzeugEntwurf entwurf, CancellationToken cancellationToken = default);
+    Task<bool> AktivSetzenAsync(long fahrzeugId, bool aktiv, CancellationToken cancellationToken = default);
 }
 
 /// <summary>
 /// SQL für public.fahrzeug. Jede Methode prüft zuerst die Rolle Fuhrparkmanager (beim Admin-Zugang die
 /// Admin-Rolle) und verwendet danach nur die Firma aus dieser Prüfung, nie eine Id aus der Oberfläche.
+/// Voraussetzung: 004_fahrzeug_aktiv.sql wurde in Neon ausgeführt.
 /// </summary>
 public sealed class FahrzeugRepository : IFahrzeugRepository
 {
@@ -29,8 +33,20 @@ public sealed class FahrzeugRepository : IFahrzeugRepository
     // Alle SELECTs haben dieselbe Spaltenreihenfolge. ReadFahrzeug liest genau diese Positionen.
     private const string Spalten = """
         f.fahrzeug_id, f.kennzeichen, f.fahrzeugtyp, f.hersteller, f.modell, f.baujahr, f.kilometerstand,
-        f.status, f.tuev_datum, f.aufbau, f.nutzlast_kg, f.nutzbare_lademeter, f.ep_stellplaetze,
-        f.solltemperatur_c, (SELECT a.bezeichnung FROM public.abteilung a WHERE a.abteilung_id = f.abteilung_id)
+        f.status, f.tuev_datum, f.aufbau, f.nutzlast_kg, f.nutzbare_laenge_m, f.innenbreite_m, f.innenhoehe_m,
+        f.nutzbare_lademeter, f.ep_stellplaetze, f.solltemperatur_c, f.abteilung_id,
+        (SELECT a.bezeichnung FROM public.abteilung a WHERE a.abteilung_id = f.abteilung_id), f.aktiv
+        """;
+
+    // Die gewählte Abteilung muss zur selben Firma gehören ($16 Abteilung, $17 Firma). Sonst liefert
+    // „abteilung“ keine Zeile, und Anlegen bzw. Ändern speichert nichts.
+    private const string AbteilungPruefen = """
+        abteilung AS (
+            SELECT $16::bigint AS abteilung_id
+            WHERE $16::bigint IS NULL
+               OR EXISTS (SELECT 1 FROM public.abteilung a
+                          WHERE a.abteilung_id = $16::bigint AND a.unternehmen_id = $17::bigint)
+        )
         """;
 
     public async Task<IReadOnlyList<Fahrzeug>> LadenAsync(CancellationToken cancellationToken = default)
@@ -47,6 +63,16 @@ public sealed class FahrzeugRepository : IFahrzeugRepository
         }
 
         return fahrzeuge;
+    }
+
+    /// <summary>Ein Fahrzeug für das Formular „Bearbeiten“. Null, wenn es nicht (mehr) zur Firma gehört.</summary>
+    public async Task<Fahrzeug?> LadenAsync(long fahrzeugId, CancellationToken cancellationToken = default)
+    {
+        FirmenZugriff zugriff = await AuthService.FirmenZugriffPruefenAsync(Rolle, cancellationToken);
+        var rows = await _client.Value.QueryAsync(
+            $"SELECT {Spalten} FROM public.fahrzeug f WHERE f.fahrzeug_id = $1::bigint AND f.unternehmen_id = $2::bigint",
+            new string?[] { Text(fahrzeugId), Text(zugriff.UnternehmenId) }, cancellationToken);
+        return rows.Count == 1 ? ReadFahrzeug(rows[0]) : null;
     }
 
     public async Task<IReadOnlyList<AbteilungAuswahl>> AbteilungenLadenAsync(CancellationToken cancellationToken = default)
@@ -71,15 +97,10 @@ public sealed class FahrzeugRepository : IFahrzeugRepository
         var eingaben = Pruefen(entwurf);
         FirmenZugriff zugriff = await AuthService.FirmenZugriffPruefenAsync(Rolle, cancellationToken);
 
-        // Die Abteilung muss zur selben Firma gehören. Sonst liefert „abteilung“ keine Zeile und es wird nichts
-        // gespeichert. Fahrzeug und Protokolleintrag entstehen im selben Befehl: entweder beides oder nichts.
+        // Fahrzeug und Protokolleintrag entstehen im selben Befehl: entweder beides oder nichts.
+        // Ein neues Fahrzeug ist aktiv (Standardwert der Spalte).
         const string query = $"""
-            WITH abteilung AS (
-                SELECT $16::bigint AS abteilung_id
-                WHERE $16::bigint IS NULL
-                   OR EXISTS (SELECT 1 FROM public.abteilung a
-                              WHERE a.abteilung_id = $16::bigint AND a.unternehmen_id = $17::bigint)
-            ), gespeichert AS (
+            WITH {AbteilungPruefen}, gespeichert AS (
                 INSERT INTO public.fahrzeug
                     (kennzeichen, fahrzeugtyp, hersteller, modell, baujahr, kilometerstand, status, tuev_datum,
                      aufbau, nutzlast_kg, nutzbare_laenge_m, innenbreite_m, innenhoehe_m, nutzbare_lademeter,
@@ -98,21 +119,87 @@ public sealed class FahrzeugRepository : IFahrzeugRepository
             )
             SELECT {Spalten} FROM gespeichert f
             """;
-        var parameters = new string?[]
-        {
-            eingaben.Kennzeichen, eingaben.Fahrzeugtyp, eingaben.Hersteller, eingaben.Modell,
-            Text(eingaben.Baujahr), Text(eingaben.Kilometerstand), eingaben.Status,
-            eingaben.TuevDatum.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture), eingaben.Aufbau,
-            Text(eingaben.NutzlastKg), Text(eingaben.NutzbareLaengeM), Text(eingaben.InnenbreiteM),
-            Text(eingaben.InnenhoeheM), Text(eingaben.NutzbareLademeter), Text(eingaben.EpStellplaetze),
-            eingaben.AbteilungId is long abteilungId ? Text(abteilungId) : null,
-            Text(zugriff.UnternehmenId),
-            eingaben.SolltemperaturC is decimal temperatur ? Text(temperatur) : null,
-            // Wer speichert: das angemeldete Konto (beim Admin-Zugang der MegakrasserAdmin selbst).
-            // Nur die Dashboard-Entwicklungsansicht (Debug-Build) hat kein Konto.
-            BenutzerSitzung.AktuellerBenutzer is { } benutzer ? Text(benutzer.Id) : null
-        };
 
+        // Keine Zeile: Die gewählte Abteilung gehört nicht (mehr) zu dieser Firma.
+        return await SpeichernAsync(query, EntwurfParameter(eingaben, zugriff),
+            "Die gewählte Abteilung gibt es nicht mehr. Bitte laden Sie das Formular neu.", cancellationToken);
+    }
+
+    /// <summary>„Bearbeiten“ aus F02. Dieselben Prüfungen wie beim Anlegen; das Kennzeichen bleibt je Firma eindeutig.</summary>
+    public async Task<Fahrzeug> AendernAsync(long fahrzeugId, FahrzeugEntwurf entwurf, CancellationToken cancellationToken = default)
+    {
+        var eingaben = Pruefen(entwurf);
+        FirmenZugriff zugriff = await AuthService.FirmenZugriffPruefenAsync(Rolle, cancellationToken);
+
+        // „vorher“ sieht noch das alte Kennzeichen. So steht im Protokoll auch, wenn es geändert wurde.
+        // Fremde Fahrzeuge findet „vorher“ nicht, weil es die Firma aus der Rechteprüfung verwendet ($17).
+        const string query = $"""
+            WITH {AbteilungPruefen}, vorher AS (
+                SELECT fahrzeug_id, kennzeichen FROM public.fahrzeug
+                WHERE fahrzeug_id = $20::bigint AND unternehmen_id = $17::bigint
+            ), geaendert AS (
+                UPDATE public.fahrzeug f
+                SET kennzeichen = $1, fahrzeugtyp = $2, hersteller = $3, modell = $4, baujahr = $5::integer,
+                    kilometerstand = $6::integer, status = $7, tuev_datum = $8::date, aufbau = $9,
+                    nutzlast_kg = $10::numeric, nutzbare_laenge_m = $11::numeric, innenbreite_m = $12::numeric,
+                    innenhoehe_m = $13::numeric, nutzbare_lademeter = $14::numeric, ep_stellplaetze = $15::integer,
+                    solltemperatur_c = $18::numeric, abteilung_id = a.abteilung_id
+                FROM abteilung a, vorher v
+                WHERE f.fahrzeug_id = v.fahrzeug_id
+                RETURNING f.*
+            ), protokoll AS (
+                INSERT INTO public.aktionsprotokoll (akteur_art, aktion, ergebnis, detail, unternehmen_id, abteilung_id, benutzer_id)
+                SELECT CASE WHEN $19::bigint IS NULL THEN 'Entwicklungsansicht' ELSE 'Benutzer' END,
+                       'Fahrzeug geändert', 'Gespeichert',
+                       CASE WHEN v.kennzeichen = g.kennzeichen THEN 'Kennzeichen ' || g.kennzeichen
+                            ELSE 'Kennzeichen ' || v.kennzeichen || ' → ' || g.kennzeichen END,
+                       g.unternehmen_id, g.abteilung_id, $19::bigint
+                FROM geaendert g JOIN vorher v ON v.fahrzeug_id = g.fahrzeug_id
+            )
+            SELECT {Spalten} FROM geaendert f
+            """;
+        var parameters = new List<string?>(EntwurfParameter(eingaben, zugriff)) { Text(fahrzeugId) };
+
+        // Keine Zeile: Das Fahrzeug oder die Abteilung gehört nicht (mehr) zu dieser Firma.
+        return await SpeichernAsync(query, parameters.ToArray(),
+            "Das Fahrzeug oder die gewählte Abteilung gibt es nicht mehr. Bitte laden Sie die Fahrzeugliste neu.",
+            cancellationToken);
+    }
+
+    /// <summary>
+    /// „Inaktiv setzen“ bzw. „Aktivieren“ aus F01. Fahrzeuge werden nie gelöscht, damit ihre Touren, Wartungen
+    /// und Tankvorgänge erhalten bleiben. Liefert false, wenn sich nichts geändert hat: Das Fahrzeug gehört
+    /// nicht (mehr) zur Firma oder hatte diesen Zustand schon, zum Beispiel weil jemand anderes schneller war.
+    /// </summary>
+    public async Task<bool> AktivSetzenAsync(long fahrzeugId, bool aktiv, CancellationToken cancellationToken = default)
+    {
+        FirmenZugriff zugriff = await AuthService.FirmenZugriffPruefenAsync(Rolle, cancellationToken);
+
+        // Nur ein echter Wechsel ändert die Zeile. So entsteht auch kein doppelter Protokolleintrag.
+        const string query = """
+            WITH geaendert AS (
+                UPDATE public.fahrzeug SET aktiv = $3::boolean
+                WHERE fahrzeug_id = $1::bigint AND unternehmen_id = $2::bigint AND aktiv <> $3::boolean
+                RETURNING fahrzeug_id, kennzeichen, unternehmen_id, abteilung_id
+            ), protokoll AS (
+                INSERT INTO public.aktionsprotokoll (akteur_art, aktion, ergebnis, detail, unternehmen_id, abteilung_id, benutzer_id)
+                SELECT CASE WHEN $4::bigint IS NULL THEN 'Entwicklungsansicht' ELSE 'Benutzer' END,
+                       CASE WHEN $3::boolean THEN 'Fahrzeug aktiviert' ELSE 'Fahrzeug inaktiv gesetzt' END,
+                       'Gespeichert', 'Kennzeichen ' || g.kennzeichen, g.unternehmen_id, g.abteilung_id, $4::bigint
+                FROM geaendert g
+            )
+            SELECT fahrzeug_id FROM geaendert
+            """;
+        var rows = await _client.Value.QueryAsync(query,
+            new string?[] { Text(fahrzeugId), Text(zugriff.UnternehmenId), aktiv ? "true" : "false", BenutzerId() },
+            cancellationToken);
+        return rows.Count == 1;
+    }
+
+    // Führt Anlegen oder Ändern aus. Genau eine Zeile kommt zurück, sonst gilt meldungOhneZeile.
+    private async Task<Fahrzeug> SpeichernAsync(string query, string?[] parameters, string meldungOhneZeile,
+        CancellationToken cancellationToken)
+    {
         try
         {
             var rows = await _client.Value.QueryAsync(query, parameters, cancellationToken);
@@ -121,8 +208,7 @@ public sealed class FahrzeugRepository : IFahrzeugRepository
                 return ReadFahrzeug(rows[0]);
             }
 
-            // Keine Zeile: Die gewählte Abteilung gehört nicht (mehr) zu dieser Firma.
-            throw new ArgumentException("Die gewählte Abteilung gibt es nicht mehr. Bitte laden Sie das Formular neu.");
+            throw new ArgumentException(meldungOhneZeile);
         }
         catch (NeonSqlException exception) when (exception.Code == "23505" &&
             exception.ConstraintName == "fahrzeug_unternehmen_kennzeichen_uq")
@@ -131,6 +217,24 @@ public sealed class FahrzeugRepository : IFahrzeugRepository
             throw new FahrzeugKennzeichenVergebenException(exception);
         }
     }
+
+    // $1 bis $19 für Anlegen und Ändern, in dieser festen Reihenfolge.
+    private static string?[] EntwurfParameter(FahrzeugEntwurf eingaben, FirmenZugriff zugriff) => new string?[]
+    {
+        eingaben.Kennzeichen, eingaben.Fahrzeugtyp, eingaben.Hersteller, eingaben.Modell,
+        Text(eingaben.Baujahr), Text(eingaben.Kilometerstand), eingaben.Status,
+        eingaben.TuevDatum.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture), eingaben.Aufbau,
+        Text(eingaben.NutzlastKg), Text(eingaben.NutzbareLaengeM), Text(eingaben.InnenbreiteM),
+        Text(eingaben.InnenhoeheM), Text(eingaben.NutzbareLademeter), Text(eingaben.EpStellplaetze),
+        eingaben.AbteilungId is long abteilungId ? Text(abteilungId) : null,
+        Text(zugriff.UnternehmenId),
+        eingaben.SolltemperaturC is decimal temperatur ? Text(temperatur) : null,
+        BenutzerId()
+    };
+
+    // Wer speichert: das angemeldete Konto (beim Admin-Zugang der MegakrasserAdmin selbst).
+    // Nur die Dashboard-Entwicklungsansicht (Debug-Build) hat kein Konto.
+    private static string? BenutzerId() => BenutzerSitzung.AktuellerBenutzer is { } benutzer ? Text(benutzer.Id) : null;
 
     /// <summary>
     /// Prüft die Eingaben noch einmal unabhängig von der Oberfläche. Die Meldungen sind für die Anzeige gedacht.
@@ -148,7 +252,7 @@ public sealed class FahrzeugRepository : IFahrzeugRepository
             throw new ArgumentException("Bitte eine Fahrzeugklasse auswählen.");
         if (!Enthaelt(FahrzeugWerte.Aufbauten, entwurf.Aufbau))
             throw new ArgumentException("Bitte einen Aufbau auswählen.");
-        if (!Enthaelt(FahrzeugWerte.StatusBeimAnlegen, entwurf.Status))
+        if (!Enthaelt(FahrzeugWerte.StatusImFormular, entwurf.Status))
             throw new ArgumentException("Bitte einen Status auswählen.");
 
         int naechstesJahr = DateTime.Today.Year + 1;
@@ -207,7 +311,8 @@ public sealed class FahrzeugRepository : IFahrzeugRepository
 
     private static Fahrzeug ReadFahrzeug(string?[] row)
     {
-        // Neon liefert alle Werte als Text, Zahlen mit Punkt als Dezimaltrenner. Deshalb InvariantCulture.
+        // Neon liefert alle Werte als Text, Zahlen mit Punkt als Dezimaltrenner und Wahrheitswerte als „t“/„f“.
+        // Deshalb InvariantCulture.
         return new Fahrzeug(
             long.Parse(Required(row, 0), CultureInfo.InvariantCulture),
             Required(row, 1), Required(row, 2), Required(row, 3), Required(row, 4),
@@ -218,9 +323,14 @@ public sealed class FahrzeugRepository : IFahrzeugRepository
             Required(row, 9),
             decimal.Parse(Required(row, 10), CultureInfo.InvariantCulture),
             decimal.Parse(Required(row, 11), CultureInfo.InvariantCulture),
-            int.Parse(Required(row, 12), CultureInfo.InvariantCulture),
-            row[13] is string temperatur ? decimal.Parse(temperatur, CultureInfo.InvariantCulture) : null,
-            row[14]);
+            decimal.Parse(Required(row, 12), CultureInfo.InvariantCulture),
+            decimal.Parse(Required(row, 13), CultureInfo.InvariantCulture),
+            decimal.Parse(Required(row, 14), CultureInfo.InvariantCulture),
+            int.Parse(Required(row, 15), CultureInfo.InvariantCulture),
+            row[16] is string temperatur ? decimal.Parse(temperatur, CultureInfo.InvariantCulture) : null,
+            row[17] is string abteilungId ? long.Parse(abteilungId, CultureInfo.InvariantCulture) : null,
+            row[18],
+            Required(row, 19) == "t");
     }
 
     private static string Text(long wert) => wert.ToString(CultureInfo.InvariantCulture);

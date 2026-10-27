@@ -378,17 +378,18 @@
                                                         <ColumnDefinition Width="120" />
                                                         <ColumnDefinition Width="500" />
                                                     </Grid.ColumnDefinitions>
-                                                    <StackPanel VerticalAlignment="Center" Spacing="2">
+                                                    <!-- Opacity: Gesperrte Kunden (Status „Inaktiv“) erscheinen blasser. -->
+                                                    <StackPanel VerticalAlignment="Center" Spacing="2" Opacity="{Binding Deckkraft}">
                                                         <TextBlock Text="{Binding Firmenname}" FontSize="18" FontWeight="SemiBold"
                                                                    TextTrimming="CharacterEllipsis" Foreground="{StaticResource TextBrush}"
                                                                    ToolTipService.ToolTip="{Binding Firmenname}" />
                                                         <TextBlock Text="{Binding Kennung}" FontSize="14" TextTrimming="CharacterEllipsis"
                                                                    Foreground="{StaticResource MutedTextBrush}" ToolTipService.ToolTip="{Binding Kennung}" />
                                                     </StackPanel>
-                                                    <TextBlock Grid.Column="1" Text="{Binding AdminEmail}" FontSize="17"
+                                                    <TextBlock Grid.Column="1" Text="{Binding AdminEmail}" FontSize="17" Opacity="{Binding Deckkraft}"
                                                                VerticalAlignment="Center" TextTrimming="CharacterEllipsis"
                                                                Foreground="{StaticResource TextBrush}" ToolTipService.ToolTip="{Binding AdminEmail}" />
-                                                    <TextBlock Grid.Column="2" Text="{Binding Benutzer}" FontSize="17"
+                                                    <TextBlock Grid.Column="2" Text="{Binding Benutzer}" FontSize="17" Opacity="{Binding Deckkraft}"
                                                                VerticalAlignment="Center" Foreground="{StaticResource TextBrush}" />
                                                     <Border Grid.Column="3" BorderBrush="{Binding StatusBorderBrush}" BorderThickness="1"
                                                             CornerRadius="18" Padding="14,5" HorizontalAlignment="Left" VerticalAlignment="Center">
