@@ -3,7 +3,7 @@
 Disposio ist ein Dispositionssystem für **kleine Speditionen mit 2–20 Lkw und 1–3 Disponenten**.
 Es bringt Disponenten und Fahrer in einem System zusammen: Touren planen, Fahrerstatus sehen und einfacher miteinander kommunizieren.
 
-Das Projekt entsteht als Teamprojekt im Rahmen unserer Ausbildung in Wirtschaftsinformatik.
+Das Projekt entsteht als Teamprojekt im Rahmen unserer Weiterbildung als Wirtschaftsinformatiker.
 
 ## Worum es geht
 
@@ -56,11 +56,11 @@ Wie man die App lokal startet, steht in [`docs/00_Admin/Disposio-lokal-starten.m
 
 ## Team
 
-| Name | Schwerpunkt |
+| Name | 
 |---|---|
-| Christina Kiesl | … |
-| … | … |
-| … | … |
+| Christina Kiesl |
+| Niklas Bäricke |
+| Pavlos Laskaridis|
 
 ## Arbeitsweise
 
