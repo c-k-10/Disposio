@@ -17,6 +17,12 @@ Ansicht. Die Ansichten tragen dieselben Wireframe-IDs wie der Prototyp (K01, D04
   Jedes neue Fahrzeug erzeugt einen Eintrag „Fahrzeug angelegt“ im Aktionsprotokoll.
 - Alle anderen Ansichten sind Platzhalter. Sie zeigen Titel, Zweck und Wireframe-ID und werden
   einzeln mit Inhalt gefüllt (siehe „So legt man eine neue Ansicht an“).
+- **G02 „Kennzahlen & Statistik“** zeigt je Kalendermonat Touren, Aufträge, Tankvorgänge (Liter,
+  Kosten), Wartungen, Schäden, Gesamtkosten und protokollierte Aktionen. Unter „Downloads“ steht jeder
+  Monat (zum Beispiel „Okt 26“) mit „PDF herunterladen“; die Datei landet im Ordner „Downloads“.
+  Das PDF erzeugt `Services/StatistikPdf.cs` ohne zusätzliche Bibliothek.
+- **Gesperrte Firma** (Status „Inaktiv“ im Admin-Dashboard): Inhaber/Geschäftsführer und Kundenadmin
+  sehen nur noch G02 („Nur Statistik“), alle anderen Konten werden beim Login abgewiesen.
 - Jede Ansicht, die Firmendaten lädt oder speichert, prüft vorher mit
   `AuthService.FirmenZugriffPruefenAsync` die Rolle erneut in der Datenbank.
 
@@ -157,6 +163,8 @@ alle Büro-Rollen, ohne dass ein Testkonto nötig ist. Wie beim Dashboard gilt d
 | `Themes/FirmenStil.xaml` | Gemeinsame Farben und Stile aller Firmenansichten, in `App.xaml` eingebunden. |
 | `Services/AuthService.cs` | Liefert bei Firmenkonten Firmenname, Abteilung und Firmenrollen. `FirmenZugriffPruefenAsync` prüft vor jedem Datenzugriff die Rolle. |
 | `Services/BenutzerSitzung.cs` | `FirmenansichtErlaubt`, der Admin-Zugang `Firmenzugang` und die Debug-Vorschau `FirmenVorschauStarten`. |
+| `Services/StatistikRepository.cs`, `Services/StatistikPdf.cs`, `Models/Statistik.cs` | Monatsstatistik laden (auch bei gesperrter Firma, nur lesend) und als PDF speichern. |
+| `Views/FirmenAnsicht/Geschaeftsfuehrung/G02Statistik.xaml` | Kennzahlen je Monat und die Download-Liste. |
 | `Services/UnternehmenRepository.cs` | `FirmenzugangOeffnenAsync`: Rolle prüfen, Firma lesen und den Admin-Zugang protokollieren. |
 | `Views/DashboardAnsicht/DashboardAnsicht.xaml.cs` | „Einloggen“ öffnet nach Bestätigung die Firmenansicht der gewählten Firma. |
 | `Models/Fahrzeug.cs` | Fahrzeug, Formulareingaben (`FahrzeugEntwurf`) und die Auswahllisten für Klasse, Aufbau und Status. |
