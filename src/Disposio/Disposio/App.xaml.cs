@@ -1,4 +1,5 @@
-﻿using Microsoft.UI.Xaml;
+﻿using Microsoft.UI.Windowing;
+using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Controls.Primitives;
 using Microsoft.UI.Xaml.Data;
@@ -57,6 +58,11 @@ namespace Disposio
 
             _window = new MainWindow(start);
             _window.Activate();
+
+            // Die App startet maximiert (wie ein Doppelklick auf die Titelleiste). Titelleiste und Taskleiste
+            // bleiben sichtbar, das Fenster lässt sich weiter verkleinern.
+            if (_window.AppWindow.Presenter is OverlappedPresenter presenter)
+                presenter.Maximize();
         }
     }
 }
