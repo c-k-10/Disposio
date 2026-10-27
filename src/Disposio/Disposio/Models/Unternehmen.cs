@@ -25,6 +25,17 @@ public sealed record Unternehmen(
     string Kontaktperson);
 
 /// <summary>
+/// Die erlaubten Werte von unternehmen.status. „Inaktiv“ sperrt den Mandanten: Seine Konten können sich
+/// nicht mehr anmelden, seine Daten bleiben aber erhalten. Ein neues Unternehmen kann nicht inaktiv starten.
+/// </summary>
+public static class UnternehmenStatus
+{
+    public const string Testphase = "Testphase";
+    public const string Aktiv = "Aktiv";
+    public const string Inaktiv = "Inaktiv";
+}
+
+/// <summary>
 /// Die Eingaben aus dem Anlegen-/Bearbeiten-Dialog. Id, Benutzerzahl und Version kommen aus der Datenbank.
 /// Die Kontaktdaten gehören bereits zur vorhandenen Unternehmen-Tabelle und sind dort Pflichtfelder.
 /// </summary>

@@ -201,6 +201,12 @@ namespace Disposio.Views
                 {
                     user = await AuthService.LoginAsync(company, email, password);
                 }
+                catch (MandantInaktivException exception)
+                {
+                    // Passwort stimmt, aber die Firma ist im Admin-Dashboard gesperrt.
+                    ShowLoginStatus(exception.Message);
+                    return;
+                }
                 catch (Exception)
                 {
                     // Eine unterbrochene Verbindung ist etwas anderes als falsche Zugangsdaten.
@@ -262,7 +268,10 @@ namespace Disposio.Views
 
         private void PasswortVergessen_Click(object sender, RoutedEventArgs e)
             {
-                Frame.Navigate(typeof(passwortVergessen));
+                // Farbe und Light/Dark Mode an die Passwort-vergessen-Seite weitergeben.
+                var accentHex = (ColorCombo.SelectedItem as ComboBoxItem)?.Tag as string ?? "#FF004D";
+                var appearance = new DashboardAppearance { AccentHex = accentHex, IsLight = ModeSwitch.IsOn };
+                Frame.Navigate(typeof(passwortVergessen), appearance);
             }
 
 }

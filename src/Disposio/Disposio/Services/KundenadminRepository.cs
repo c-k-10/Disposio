@@ -497,9 +497,11 @@ public sealed class KundenadminRepository
             throw new UnauthorizedAccessException("Für diese Ansicht ist die Rolle Kundenadmin erforderlich.");
 
         // r.unternehmen_id IS NULL: nur die echte Standardrolle zählt, keine gleichnamige eigene Rolle.
-        const string query = """
+        // Eine im Dashboard gesperrte Firma (Status „Inaktiv“) bekommt keine Daten mehr.
+        const string query = $"""
             SELECT b.benutzer_id FROM public.benutzer b
             WHERE b.benutzer_id = $1::bigint AND b.unternehmen_id = $2::bigint AND b.aktiv = true
+              AND {AuthService.FirmaNichtGesperrt}
               AND EXISTS (SELECT 1 FROM public.benutzer_rolle br
                           JOIN public.rolle r ON r.rollen_id = br.rollen_id
                           WHERE br.benutzer_id = b.benutzer_id AND r.bezeichnung = $3 AND r.unternehmen_id IS NULL)
