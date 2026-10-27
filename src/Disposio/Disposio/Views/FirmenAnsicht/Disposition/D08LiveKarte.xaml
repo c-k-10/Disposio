@@ -1,38 +1,144 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- D08 „Live-Karte & Verkehr“: OpenStreetMap-Karte (Leaflet) im WebView2 mit Verkehrslage von TomTom.
-     Startet auf Nürnberg. Fahrzeugpositionen kommen in einem späteren Schritt dazu. -->
+<!-- D08 „Live-Karte & Verkehr“: links Suche nach Fahrer oder Kennzeichen, rechts die OpenStreetMap-Karte
+     (Leaflet) im WebView2 mit Verkehrslage von TomTom. Positionen kommen später aus der Fahrer-App. -->
 <UserControl
     x:Class="Disposio.Views.D08LiveKarte"
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
-    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:local="using:Disposio.Views">
 
     <StackPanel Spacing="18">
-        <!-- Status links, Schalter für die beiden Verkehrsebenen rechts -->
+        <!-- Status links, Schalter für die beiden Verkehrsebenen und Filter für die Störungsarten rechts -->
         <Grid ColumnSpacing="24">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="*" />
                 <ColumnDefinition Width="Auto" />
                 <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="Auto" />
             </Grid.ColumnDefinitions>
-            <StackPanel Orientation="Horizontal" Spacing="12" VerticalAlignment="Center">
+            <!-- Grid statt waagrechtem StackPanel: So bricht ein langer Status in eine zweite Zeile um,
+                 statt abgeschnitten zu werden. -->
+            <Grid ColumnSpacing="12" VerticalAlignment="Center">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
                 <ProgressRing x:Name="LadeAnzeige" Width="20" Height="20" IsActive="True" />
-                <TextBlock x:Name="StatusText" Style="{StaticResource HinweisText}" VerticalAlignment="Center"
+                <TextBlock x:Name="StatusText" Grid.Column="1" Style="{StaticResource HinweisText}" VerticalAlignment="Center"
                            TextWrapping="Wrap" Text="Karte wird geladen …" />
-            </StackPanel>
-            <ToggleSwitch x:Name="FlussSchalter" Grid.Column="1" IsOn="True" IsEnabled="False"
+            </Grid>
+            <!-- Lädt Verkehrsfluss, Störungen und die Liste Fahrer & Fahrzeuge sofort neu. -->
+            <Button x:Name="AktualisierenKnopf" Grid.Column="1" IsEnabled="False" VerticalAlignment="Bottom"
+                    Style="{StaticResource DashboardButton}" Click="Aktualisieren_Click"
+                    AutomationProperties.Name="Karte und Liste jetzt aktualisieren"
+                    ToolTipService.ToolTip="Verkehrslage, Störungen und Liste jetzt neu laden">
+                <StackPanel Orientation="Horizontal" Spacing="8">
+                    <FontIcon Glyph="&#xE72C;" FontSize="15" />
+                    <TextBlock x:Name="AktualisierenText" Text="Aktualisieren" />
+                </StackPanel>
+            </Button>
+            <ToggleSwitch x:Name="FlussSchalter" Grid.Column="2" IsOn="True" IsEnabled="False"
                           Header="Verkehrsfluss" OnContent="An" OffContent="Aus"
                           Toggled="EbenenSchalter_Toggled" AutomationProperties.Name="Verkehrsfluss anzeigen" />
-            <ToggleSwitch x:Name="StoerungenSchalter" Grid.Column="2" IsOn="True" IsEnabled="False"
+            <ToggleSwitch x:Name="StoerungenSchalter" Grid.Column="3" IsOn="True" IsEnabled="False"
                           Header="Störungen" OnContent="An" OffContent="Aus"
                           Toggled="EbenenSchalter_Toggled" AutomationProperties.Name="Verkehrsstörungen anzeigen" />
+
+            <!-- Welche Störungen gezeigt werden. Gefiltert wird in der Karte, ohne neue TomTom-Abfrage. -->
+            <StackPanel Grid.Column="4" Spacing="4" VerticalAlignment="Center">
+                <TextBlock Text="Störungsarten" FontSize="14" Foreground="{StaticResource TextBrush}" />
+                <DropDownButton x:Name="ArtenKnopf" Content="Alle Arten" IsEnabled="False" Width="190"
+                                MinHeight="36" CornerRadius="10" Background="{StaticResource InputBrush}"
+                                BorderBrush="{StaticResource BorderBrush}" Foreground="{StaticResource TextBrush}"
+                                AutomationProperties.Name="Störungsarten auswählen">
+                    <DropDownButton.Flyout>
+                        <MenuFlyout Placement="BottomEdgeAlignedRight">
+                            <ToggleMenuFlyoutItem x:Name="ArtStau" Text="Stau" Tag="Stau" IsChecked="True" Click="StoerungsArt_Click" />
+                            <ToggleMenuFlyoutItem x:Name="ArtUnfall" Text="Unfälle" Tag="Unfälle" IsChecked="True" Click="StoerungsArt_Click" />
+                            <ToggleMenuFlyoutItem x:Name="ArtBaustelle" Text="Baustellen" Tag="Baustellen" IsChecked="True" Click="StoerungsArt_Click" />
+                            <ToggleMenuFlyoutItem x:Name="ArtSperrung" Text="Sperrungen" Tag="Sperrungen" IsChecked="True" Click="StoerungsArt_Click" />
+                            <ToggleMenuFlyoutItem x:Name="ArtSonstige" Text="Wetter, Gefahren &amp; Pannen" Tag="Sonstige" IsChecked="True" Click="StoerungsArt_Click" />
+                            <MenuFlyoutSeparator />
+                            <MenuFlyoutItem Text="Alle auswählen" Click="AlleArten_Click" />
+                        </MenuFlyout>
+                    </DropDownButton.Flyout>
+                </DropDownButton>
+            </StackPanel>
         </Grid>
 
-        <Border x:Name="KarteRahmen" Style="{StaticResource KarteStyle}">
-            <StackPanel Spacing="12">
-                <TextBlock Text="Karte" Style="{StaticResource UeberschriftText}" />
-                <!-- Die Seite liegt in einem ScrollViewer, deshalb braucht die Karte eine feste Höhe. -->
-                <WebView2 x:Name="Karte" Height="600" HorizontalAlignment="Stretch" />
-            </StackPanel>
-        </Border>
+        <Grid ColumnSpacing="18">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="340" />
+                <ColumnDefinition Width="*" />
+            </Grid.ColumnDefinitions>
+
+            <!-- Suche und Filter -->
+            <Border Style="{StaticResource KarteStyle}" Padding="20,20">
+                <Grid RowSpacing="12">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="*" />
+                        <RowDefinition Height="Auto" />
+                    </Grid.RowDefinitions>
+
+                    <TextBlock Text="Fahrer &amp; Fahrzeuge" Style="{StaticResource UeberschriftText}" />
+
+                    <TextBox x:Name="SuchBox" Grid.Row="1" Style="{StaticResource FormTextBox}"
+                             PlaceholderText="Fahrer oder Kennzeichen suchen …"
+                             TextChanged="Suche_TextChanged" AutomationProperties.Name="Fahrer oder Kennzeichen suchen" />
+
+                    <ComboBox x:Name="ArtAuswahl" Grid.Row="2" Style="{StaticResource FormComboBox}"
+                              HorizontalAlignment="Stretch" SelectedIndex="0"
+                              SelectionChanged="ArtAuswahl_SelectionChanged" AutomationProperties.Name="Anzeigen">
+                        <ComboBoxItem Content="Fahrer und Fahrzeuge" />
+                        <ComboBoxItem Content="Nur Fahrer" />
+                        <ComboBoxItem Content="Nur Fahrzeuge" />
+                    </ComboBox>
+
+                    <TextBlock x:Name="TrefferText" Grid.Row="3" Style="{StaticResource HinweisText}" />
+
+                    <!-- Höhe passend zur Karte rechts. Die Liste scrollt selbst. -->
+                    <ListView x:Name="TrefferListe" Grid.Row="4" Height="430" SelectionMode="Single"
+                              Margin="-12,0" SelectionChanged="TrefferListe_SelectionChanged">
+                        <ListView.ItemTemplate>
+                            <DataTemplate x:DataType="local:KartenZeile">
+                                <Grid ColumnSpacing="12" Padding="0,8">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="*" />
+                                    </Grid.ColumnDefinitions>
+                                    <Border Width="36" Height="36" CornerRadius="18" VerticalAlignment="Center"
+                                            Background="{StaticResource InputBrush}"
+                                            BorderBrush="{StaticResource BorderBrush}" BorderThickness="1">
+                                        <FontIcon Glyph="{x:Bind Symbol}" FontSize="16" Foreground="{StaticResource TextBrush}" />
+                                    </Border>
+                                    <StackPanel Grid.Column="1" Spacing="1" VerticalAlignment="Center">
+                                        <TextBlock Text="{x:Bind Name}" Style="{StaticResource NormalText}" FontWeight="SemiBold" />
+                                        <TextBlock Text="{x:Bind Details}" Style="{StaticResource HinweisText}" FontSize="13" />
+                                        <TextBlock Text="{x:Bind PositionText}" Style="{StaticResource HinweisText}" FontSize="12" Opacity="0.75" />
+                                    </StackPanel>
+                                </Grid>
+                            </DataTemplate>
+                        </ListView.ItemTemplate>
+                    </ListView>
+
+                    <TextBlock x:Name="AuswahlHinweis" Grid.Row="5" Style="{StaticResource HinweisText}"
+                               Visibility="Collapsed" />
+                </Grid>
+            </Border>
+
+            <!-- Karte -->
+            <Border x:Name="KarteRahmen" Grid.Column="1" Style="{StaticResource KarteStyle}">
+                <StackPanel Spacing="12">
+                    <TextBlock Text="Karte" Style="{StaticResource UeberschriftText}" />
+                    <!-- Die Seite liegt in einem ScrollViewer, deshalb braucht die Karte eine feste Höhe. -->
+                    <WebView2 x:Name="Karte" Height="600" HorizontalAlignment="Stretch" />
+                </StackPanel>
+            </Border>
+        </Grid>
     </StackPanel>
 </UserControl>

@@ -1,6 +1,11 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
+using System.Linq;
+using System.Text.Json;
+using System.Threading;
 using System.Threading.Tasks;
+using Disposio.Models;
 using Disposio.Services;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
@@ -13,6 +18,8 @@ namespace Disposio.Views
     // - Verkehrsfluss: Straßen grün/orange/rot eingefärbt (fertige Kartenbilder)
     // - Störungen: eigene runde Symbole mit Popup, geladen über die Incident Details API (echte Daten)
     // Ohne TomTom-Schlüssel erscheint die Karte trotzdem, nur ohne Verkehr.
+    // Links steht eine Suche nach Fahrer oder Kennzeichen. Positionen gibt es erst mit der Fahrer-App;
+    // der Filter wird aber schon jetzt an die Karte übergeben (filterSetzen), damit die Marker ihn später nutzen.
     public sealed partial class D08LiveKarte : UserControl
     {
         // Die Karten-HTML wird über diesen lokalen https-Hostnamen geladen.
@@ -24,14 +31,205 @@ namespace Disposio.Views
         private bool _kartenBereit;
         private bool _hatSchluessel;
 
+        // Fahrer und Fahrzeuge der Firma für die Suche. Gefiltert wird im Speicher, ohne neue Datenbankabfrage.
+        private readonly KartenRepository _repository = new();
+        private IReadOnlyList<KartenObjekt> _objekte = Array.Empty<KartenObjekt>();
+        private IReadOnlyList<KartenObjekt> _treffer = Array.Empty<KartenObjekt>();
+        private CancellationTokenSource? _laden;
+        private bool _objekteGeladen;
+
+        // ---- BEISPIEL-FAHRZEUG ----
+        // Bis die Fahrer-App echte Standorte sendet, steht das erste Fahrzeug der Firma zur Ansicht an einer
+        // festen Stelle in Nürnberg (Hafen). Zum Abschalten einfach auf false setzen.
+        // Gibt es noch kein Fahrzeug (oder in der Vorschau), erscheint ein erfundenes Kennzeichen.
+        private const bool BeispielFahrzeugZeigen = true;
+        private const double BeispielBreite = 49.4106;
+        private const double BeispielLaenge = 11.0487;
+        private const string BeispielOrt = "Nürnberg Hafen";
+        private bool _beispielGezeigt;
+
+        private KartenObjekt? BeispielObjekt => BeispielFahrzeugZeigen
+            ? _objekte.FirstOrDefault(objekt => objekt.Art == KartenObjektArt.Fahrzeug)
+            : null;
+
         public D08LiveKarte(FirmenAnsichtKontext kontext)
         {
             InitializeComponent();
             _kontext = kontext;
-            Loaded += async (_, _) => await StartenAsync();
-            // Beim Verlassen der Ansicht den Browser-Prozess der Karte freigeben.
-            Unloaded += (_, _) => Karte.Close();
+            Loaded += async (_, _) =>
+            {
+                // Karte und Liste laden unabhängig voneinander.
+                Task karte = StartenAsync();
+                Task liste = ObjekteLadenAsync();
+                await Task.WhenAll(karte, liste);
+            };
+            Unloaded += (_, _) =>
+            {
+                // Beim Verlassen der Ansicht Laden abbrechen und den Browser-Prozess der Karte freigeben.
+                _laden?.Cancel();
+                Karte.Close();
+            };
         }
+
+        // ---- Suche nach Fahrer oder Kennzeichen ----
+
+        private async Task ObjekteLadenAsync()
+        {
+            if (_kontext.IstVorschau)
+            {
+                TrefferText.Text = "In der Vorschau ohne Anmeldung werden keine Fahrer und Fahrzeuge geladen.";
+                SuchBox.IsEnabled = false;
+                ArtAuswahl.IsEnabled = false;
+                _objekteGeladen = true;
+                await BeispielZeigenAsync();
+                return;
+            }
+
+            var abbruch = new CancellationTokenSource();
+            _laden = abbruch;
+            TrefferText.Text = "Fahrer und Fahrzeuge werden geladen …";
+            try
+            {
+                _objekte = await _repository.LadenAsync(abbruch.Token);
+                if (abbruch.IsCancellationRequested)
+                    return;
+                _objekteGeladen = true;
+                FilterAnwenden();
+                await BeispielZeigenAsync();
+            }
+            catch (OperationCanceledException) when (abbruch.IsCancellationRequested)
+            {
+            }
+            catch (UnauthorizedAccessException)
+            {
+                // Rolle entzogen oder Konto deaktiviert: Sitzung beenden, Anmeldung zeigen.
+                _kontext.ZugriffBeenden();
+            }
+            catch (Exception)
+            {
+                // Keine technischen Details anzeigen.
+                TrefferText.Text = "Fahrer und Fahrzeuge konnten nicht geladen werden. Bitte prüfen Sie die Verbindung " +
+                                   "und öffnen Sie die Ansicht erneut.";
+            }
+            finally
+            {
+                if (ReferenceEquals(_laden, abbruch))
+                    _laden = null;
+                abbruch.Dispose();
+            }
+        }
+
+        private void Suche_TextChanged(object sender, TextChangedEventArgs e) => FilterAnwenden();
+
+        private void ArtAuswahl_SelectionChanged(object sender, SelectionChangedEventArgs e) => FilterAnwenden();
+
+        private void FilterAnwenden()
+        {
+            // SelectionChanged kann schon beim Aufbau der XAML-Datei ausgelöst werden.
+            if (TrefferListe is null || TrefferText is null || SuchBox is null || ArtAuswahl is null || AuswahlHinweis is null)
+                return;
+
+            KartenObjektArt? art = ArtAuswahl.SelectedIndex switch
+            {
+                1 => KartenObjektArt.Fahrer,
+                2 => KartenObjektArt.Fahrzeug,
+                _ => null
+            };
+            string suche = SuchBox.Text;
+
+            _treffer = _objekte.Where(objekt => (art is null || objekt.Art == art) && objekt.Passt(suche)).ToArray();
+            string? beispiel = BeispielObjekt?.Schluessel;
+            TrefferListe.ItemsSource = _treffer
+                .Select(objekt => new KartenZeile(objekt, objekt.Schluessel == beispiel ? $"Beispielposition · {BeispielOrt}" : null))
+                .ToList();
+            AuswahlHinweis.Visibility = Visibility.Collapsed;
+
+            TrefferText.Text = _objekte.Count == 0
+                ? "Noch keine Fahrer oder Fahrzeuge angelegt."
+                : _treffer.Count == 0
+                    ? "Keine Treffer. Bitte Suche oder Auswahl ändern."
+                    : $"{_treffer.Count} von {_objekte.Count} Einträgen";
+
+            _ = FilterAnKarteAsync();
+        }
+
+        private async void TrefferListe_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            if (TrefferListe.SelectedItem is not KartenZeile zeile)
+            {
+                AuswahlHinweis.Visibility = Visibility.Collapsed;
+                return;
+            }
+
+            // Hat das Objekt einen Marker, zentriert die Karte darauf und öffnet sein Popup.
+            bool gefunden = false;
+            if (_kartenBereit)
+            {
+                try
+                {
+                    string antwort = await Karte.ExecuteScriptAsync($"objektZeigen({JsonSerializer.Serialize(zeile.Schluessel)})");
+                    gefunden = antwort == "true";
+                }
+                catch (Exception)
+                {
+                    // Die Ansicht wurde gerade verlassen.
+                }
+            }
+
+            AuswahlHinweis.Text = gefunden
+                ? $"{zeile.Name} wird auf der Karte gezeigt (Beispielposition, keine echten Standortdaten)."
+                : $"Für {zeile.Name} gibt es noch keine Position. Sie erscheint hier, sobald die Fahrer-App Standorte sendet.";
+            AuswahlHinweis.Visibility = Visibility.Visible;
+        }
+
+        // Setzt das Beispiel-Fahrzeug auf die Karte, sobald Karte und Liste fertig sind.
+        private async Task BeispielZeigenAsync()
+        {
+            if (!BeispielFahrzeugZeigen || _beispielGezeigt || !_kartenBereit || !_objekteGeladen)
+                return;
+            _beispielGezeigt = true;
+
+            KartenObjekt? fahrzeug = BeispielObjekt;
+            var daten = new
+            {
+                schluessel = fahrzeug?.Schluessel ?? "Fahrzeug:beispiel",
+                titel = fahrzeug?.Name ?? "N-DI 2026",
+                details = fahrzeug?.Details ?? "Erfundenes Fahrzeug zur Ansicht",
+                ort = BeispielOrt,
+                breite = BeispielBreite,
+                laenge = BeispielLaenge
+            };
+            try
+            {
+                await Karte.ExecuteScriptAsync($"beispielFahrzeugSetzen({JsonSerializer.Serialize(daten)})");
+                await FilterAnKarteAsync();
+            }
+            catch (Exception)
+            {
+                // Die Ansicht wurde gerade verlassen.
+            }
+        }
+
+        // Übergibt die Schlüssel der Treffer (z. B. ["Fahrer:4","Fahrzeug:12"]) an die Karte.
+        // Ohne Suche und mit „Fahrer und Fahrzeuge“ wird null übergeben: dann wird nichts ausgeblendet.
+        private async Task FilterAnKarteAsync()
+        {
+            if (!_kartenBereit)
+                return;
+
+            bool ohneFilter = string.IsNullOrWhiteSpace(SuchBox.Text) && ArtAuswahl.SelectedIndex <= 0;
+            string schluessel = ohneFilter ? "null" : JsonSerializer.Serialize(_treffer.Select(objekt => objekt.Schluessel));
+            try
+            {
+                await Karte.ExecuteScriptAsync($"filterSetzen({schluessel})");
+            }
+            catch (Exception)
+            {
+                // Die Ansicht wurde gerade verlassen.
+            }
+        }
+
+        // ---- Karte ----
 
         private async Task StartenAsync()
         {
@@ -85,9 +283,13 @@ namespace Disposio.Views
             if (nachricht.StartsWith(AnzahlNachricht, StringComparison.Ordinal))
             {
                 // Die Seite hat die Störungen neu geladen und meldet, wie viele es im Umkreis gibt.
-                if (int.TryParse(nachricht.AsSpan(AnzahlNachricht.Length), out int anzahl))
+                // Format: „stoerungen-anzahl:gezeigt:gesamt“. Gezeigt = nach dem Filter der Störungsarten.
+                string[] teile = nachricht[AnzahlNachricht.Length..].Split(':');
+                if (teile.Length == 2 && int.TryParse(teile[0], out int gezeigt) && int.TryParse(teile[1], out int gesamt))
                 {
-                    string text = anzahl == 1 ? "1 Störung" : $"{anzahl} Störungen";
+                    string text = gezeigt == gesamt
+                        ? (gesamt == 1 ? "1 Störung" : $"{gesamt} Störungen")
+                        : $"{gezeigt} von {gesamt} Störungen";
                     ZeigeStatus($"Karte mit Verkehrslage geladen · {text} im Umkreis (Stand {DateTime.Now:HH:mm} Uhr).");
                 }
                 return;
@@ -97,11 +299,16 @@ namespace Disposio.Views
             {
                 case "bereit":
                     _kartenBereit = true;
+                    AktualisierenKnopf.IsEnabled = true;
+                    await FilterAnKarteAsync();
+                    await BeispielZeigenAsync();
                     if (_hatSchluessel)
                     {
                         ZeigeStatus("Karte mit Verkehrslage geladen. Fahrzeugpositionen folgen in einem späteren Schritt.");
                         FlussSchalter.IsEnabled = true;
                         StoerungenSchalter.IsEnabled = true;
+                        ArtenKnopf.IsEnabled = StoerungenSchalter.IsOn;
+                        await ArtenAnwendenAsync();
                         await EbenenAnwendenAsync();
                     }
                     else
@@ -125,7 +332,102 @@ namespace Disposio.Views
         }
 
         // Beide Schalter nutzen denselben Handler: Es wird immer der Stand beider Schalter übertragen.
-        private async void EbenenSchalter_Toggled(object sender, RoutedEventArgs e) => await EbenenAnwendenAsync();
+        private async void EbenenSchalter_Toggled(object sender, RoutedEventArgs e)
+        {
+            // Die Arten lassen sich nur wählen, wenn Störungen überhaupt angezeigt werden.
+            if (_kartenBereit && _hatSchluessel)
+                ArtenKnopf.IsEnabled = StoerungenSchalter.IsOn;
+            await EbenenAnwendenAsync();
+        }
+
+        // ---- Aktualisieren-Knopf ----
+
+        // Lädt sofort neu: Verkehrsfluss-Bilder, Störungen (ohne auf die 5 Minuten zu warten) und die Liste.
+        // Die automatische Aktualisierung bleibt daneben unverändert.
+        private async void Aktualisieren_Click(object sender, RoutedEventArgs e)
+        {
+            if (!_kartenBereit)
+                return;
+
+            AktualisierenKnopf.IsEnabled = false;
+            AktualisierenText.Text = "Wird aktualisiert …";
+            try
+            {
+                try
+                {
+                    await Karte.ExecuteScriptAsync("allesAktualisieren()");
+                }
+                catch (Exception)
+                {
+                    return; // Die Ansicht wurde gerade verlassen.
+                }
+
+                // Liste neu laden (nicht in der Vorschau und nicht, wenn sie gerade schon lädt).
+                if (!_kontext.IstVorschau && _laden is null)
+                    await ObjekteLadenAsync();
+
+                // Kurz warten, damit ein Doppelklick nicht gleich die nächste Abfrage startet.
+                await Task.Delay(1500);
+            }
+            finally
+            {
+                AktualisierenText.Text = "Aktualisieren";
+                AktualisierenKnopf.IsEnabled = true;
+            }
+        }
+
+        // ---- Filter für die Störungsarten ----
+
+        private async void StoerungsArt_Click(object sender, RoutedEventArgs e) => await ArtenAnwendenAsync();
+
+        private async void AlleArten_Click(object sender, RoutedEventArgs e)
+        {
+            foreach (ToggleMenuFlyoutItem art in ArtenEintraege())
+                art.IsChecked = true;
+            await ArtenAnwendenAsync();
+        }
+
+        private ToggleMenuFlyoutItem[] ArtenEintraege() =>
+            new[] { ArtStau, ArtUnfall, ArtBaustelle, ArtSperrung, ArtSonstige };
+
+        // Welche TomTom-Kategorien (iconCategory) zu welchem Menüpunkt gehören.
+        private static readonly int[] KategorienStau = { 6 };
+        private static readonly int[] KategorienUnfall = { 1 };
+        private static readonly int[] KategorienBaustelle = { 7, 9 };
+        private static readonly int[] KategorienSperrung = { 8 };
+        private static readonly int[] KategorienSonstige = { 0, 2, 3, 4, 5, 10, 11, 14 };
+
+        // Schickt die gewählten Kategorien an die Karte und beschriftet den Knopf.
+        private async Task ArtenAnwendenAsync()
+        {
+            var kategorien = new List<int>();
+            if (ArtStau.IsChecked) kategorien.AddRange(KategorienStau);
+            if (ArtUnfall.IsChecked) kategorien.AddRange(KategorienUnfall);
+            if (ArtBaustelle.IsChecked) kategorien.AddRange(KategorienBaustelle);
+            if (ArtSperrung.IsChecked) kategorien.AddRange(KategorienSperrung);
+            if (ArtSonstige.IsChecked) kategorien.AddRange(KategorienSonstige);
+
+            ToggleMenuFlyoutItem[] gewaehlt = ArtenEintraege().Where(art => art.IsChecked).ToArray();
+            ArtenKnopf.Content = gewaehlt.Length switch
+            {
+                5 => "Alle Arten",
+                0 => "Keine Art",
+                // Kurzname aus Tag, damit der Knopf schmal bleibt (z. B. „Nur Sonstige“).
+                1 => $"Nur {gewaehlt[0].Tag as string ?? gewaehlt[0].Text}",
+                _ => $"{gewaehlt.Length} von 5 Arten"
+            };
+
+            if (!_kartenBereit || !_hatSchluessel)
+                return;
+            try
+            {
+                await Karte.ExecuteScriptAsync($"stoerungsArtenSetzen({JsonSerializer.Serialize(kategorien)})");
+            }
+            catch (Exception)
+            {
+                // Die Ansicht wurde gerade verlassen.
+            }
+        }
 
         // Blendet Verkehrsfluss und Störungen in der Karte einzeln ein oder aus.
         private async Task EbenenAnwendenAsync()
@@ -182,6 +484,21 @@ namespace Disposio.Views
                         cursor: pointer;
                     }
                     .stoerung-symbol svg { width: 16px; height: 16px; }
+
+                    /* Fahrzeug-Marker: blauer Kreis mit Lkw und Kennzeichen daneben */
+                    .fahrzeug-symbol { background: none; border: none; }
+                    .fahrzeug-symbol .fz { display: flex; align-items: center; gap: 6px; white-space: nowrap; cursor: pointer; }
+                    .fahrzeug-symbol .punkt {
+                        width: 30px; height: 30px; border-radius: 50%; background: #1A73E8;
+                        border: 3px solid #fff; box-shadow: 0 1px 5px rgba(0, 0, 0, .45);
+                        display: flex; align-items: center; justify-content: center; flex: none;
+                    }
+                    .fahrzeug-symbol .punkt svg { width: 17px; height: 17px; }
+                    .fahrzeug-symbol .schild {
+                        background: #fff; color: #202124; font-size: 12px; font-weight: 600;
+                        padding: 2px 7px; border-radius: 6px; box-shadow: 0 1px 4px rgba(0, 0, 0, .35);
+                    }
+                    .fahrzeug .hinweis { color: #B3261E; font-size: 12px; margin-top: 4px; }
 
                     /* Popup beim Anklicken */
                     .stoerung { font-size: 13px; line-height: 1.4; min-width: 200px; }
@@ -307,6 +624,8 @@ namespace Disposio.Views
                             let wartet = null;
                             let stoerungenSichtbar = false;
                             let fehlerGemeldet = false;
+                            let letzteListe = [];      // zuletzt geladene Störungen, für den Filter ohne neue Abfrage
+                            let erlaubteArten = null;  // null = alle Arten, sonst Set mit iconCategory-Werten
 
                             // Fläche eines Bereichs in km² (gut genug für Deutschland)
                             const flaeche = b => {
@@ -332,8 +651,11 @@ namespace Disposio.Views
                                 return !geladenBereich.contains(sichtbar);
                             }
 
-                            function zeichnen(liste) {
+                            function zeichnen() {
                                 stoerungen.clearLayers();
+                                const liste = erlaubteArten
+                                    ? letzteListe.filter(s => erlaubteArten.has(s.properties?.iconCategory ?? 0))
+                                    : letzteListe;
                                 for (const s of liste) {
                                     const p = s.properties ?? {};
                                     const g = s.geometry ?? {};
@@ -359,7 +681,7 @@ namespace Disposio.Views
                                     L.marker(mitte, { icon: symbol(p.iconCategory, p.magnitudeOfDelay), keyboard: false })
                                         .bindPopup(inhalt).addTo(stoerungen);
                                 }
-                                melden("stoerungen-anzahl:" + liste.length);
+                                melden(`stoerungen-anzahl:${liste.length}:${letzteListe.length}`);
                             }
 
                             async function stoerungenLaden() {
@@ -387,7 +709,8 @@ namespace Disposio.Views
                                     geladenBereich = bereich;
                                     geladenZeit = Date.now();
                                     fehlerGemeldet = false;
-                                    if (stoerungenSichtbar) zeichnen(daten.incidents ?? []);
+                                    letzteListe = daten.incidents ?? [];
+                                    if (stoerungenSichtbar) zeichnen();
                                 } catch (e) {
                                     // Falscher Schlüssel, Kontingent aufgebraucht oder kein Internet: nur einmal melden.
                                     if (!fehlerGemeldet) { fehlerGemeldet = true; melden("stoerungen-fehler"); }
@@ -400,16 +723,90 @@ namespace Disposio.Views
                             karte.on("moveend", stoerungenLaden);
                             setInterval(stoerungenLaden, 60 * 1000);
 
+                            // Für den Aktualisieren-Knopf: Daten als veraltet markieren und neu laden.
+                            // Die Mindestpause von 15 Sekunden zwischen zwei Abfragen gilt trotzdem.
+                            window.stoerungenNeuLaden = () => {
+                                geladenZeit = 0;
+                                stoerungenLaden();
+                            };
+
+                            // Wird von C# über das Menü „Störungsarten“ aufgerufen, z. B. [6, 7, 9] = Stau und Baustellen.
+                            window.stoerungsArtenSetzen = arten => {
+                                erlaubteArten = arten ? new Set(arten) : null;
+                                if (stoerungenSichtbar && geladenBereich) zeichnen();
+                            };
+
                             window.stoerungenSichtbarSetzen = an => {
                                 stoerungenSichtbar = an;
                                 if (an) {
                                     stoerungen.addTo(karte);
+                                    if (geladenBereich) zeichnen(); // Filter könnte sich geändert haben, während die Ebene aus war
                                     stoerungenLaden();
                                 } else {
                                     karte.removeLayer(stoerungen);
                                 }
                             };
                         }
+
+                        // Filter aus der Suche links. null = alles zeigen, sonst eine Liste von Schlüsseln wie "Fahrzeug:12".
+                        // Noch gibt es keine Fahrer- und Fahrzeugmarker (die Positionen kommen aus der Fahrer-App).
+                        // Später: Jeder Marker bekommt seinen Schlüssel, und hier werden die nicht passenden ausgeblendet.
+                        // Fahrer- und Fahrzeugmarker, je mit Schlüssel. Ausgeblendete Marker bleiben hier gespeichert.
+                        const objekte = new Map();          // Schlüssel → Marker
+                        const objektEbene = L.layerGroup().addTo(karte);
+                        window.kartenFilter = null;
+
+                        const filterAnwenden = () => {
+                            for (const [schluessel, marker] of objekte) {
+                                const sichtbar = !window.kartenFilter || window.kartenFilter.has(schluessel);
+                                if (sichtbar) objektEbene.addLayer(marker); else objektEbene.removeLayer(marker);
+                            }
+                        };
+
+                        window.filterSetzen = schluessel => {
+                            window.kartenFilter = schluessel ? new Set(schluessel) : null;
+                            filterAnwenden();
+                        };
+
+                        // Zentriert auf einen Marker und öffnet sein Popup. Rückgabe: ob es den Marker gibt.
+                        window.objektZeigen = schluessel => {
+                            const marker = objekte.get(schluessel);
+                            if (!marker || !objektEbene.hasLayer(marker)) return false;
+                            karte.setView(marker.getLatLng(), Math.max(karte.getZoom(), 14));
+                            marker.openPopup();
+                            return true;
+                        };
+
+                        // BEISPIEL: ein Fahrzeug an fester Stelle, bis die Fahrer-App echte Standorte liefert.
+                        const LKW = '<path d="M2 6.5h11.5v9H2z" fill="#fff"/><path d="M14.5 9h3.8l3.2 3.4v3.1h-7z" fill="#fff"/>'
+                                  + '<circle cx="6" cy="17.5" r="2.2" fill="#fff" stroke="#1A73E8" stroke-width="1.2"/>'
+                                  + '<circle cx="17.5" cy="17.5" r="2.2" fill="#fff" stroke="#1A73E8" stroke-width="1.2"/>';
+                        window.beispielFahrzeugSetzen = d => {
+                            const symbol = L.divIcon({
+                                className: "fahrzeug-symbol",
+                                html: `<div class="fz"><div class="punkt"><svg viewBox="0 0 24 24">${LKW}</svg></div>`
+                                    + `<span class="schild">${escapeHtml(d.titel)}</span></div>`,
+                                iconSize: null,
+                                iconAnchor: [18, 18],
+                                popupAnchor: [0, -16]
+                            });
+                            const zeit = new Date().toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit" });
+                            const marker = L.marker([d.breite, d.laenge], { icon: symbol, zIndexOffset: 1000, keyboard: false })
+                                .bindPopup(`<div class="stoerung fahrzeug">
+                                    <div class="titel">${escapeHtml(d.titel)}</div>
+                                    <div>${escapeHtml(d.details)}</div>
+                                    <div class="ort">${escapeHtml(d.ort)} · Stand ${zeit} Uhr</div>
+                                    <div class="hinweis">Beispielposition – echte Standorte kommen mit der Fahrer-App.</div>
+                                </div>`);
+                            objekte.set(d.schluessel, marker);
+                            filterAnwenden();
+                        };
+
+                        // Wird von C# über den Knopf „Aktualisieren“ aufgerufen.
+                        window.allesAktualisieren = () => {
+                            if (fluss && karte.hasLayer(fluss)) fluss.redraw(); // Verkehrsfluss-Bilder neu holen
+                            if (window.stoerungenNeuLaden) window.stoerungenNeuLaden();
+                        };
 
                         // Wird von C# über die Schalter „Verkehrsfluss“ und „Störungen“ aufgerufen.
                         window.ebenenAnzeigen = (flussAn, stoerungenAn) => {
@@ -423,5 +820,25 @@ namespace Disposio.Views
             </body>
             </html>
             """;
+    }
+
+    // Eine Zeile in der Trefferliste. Die XAML-Vorlage bindet mit {x:Bind Name} daran.
+    public sealed class KartenZeile
+    {
+        public KartenZeile(KartenObjekt objekt, string? positionText = null)
+        {
+            Schluessel = objekt.Schluessel;
+            Name = objekt.Name;
+            Details = objekt.Details;
+            PositionText = positionText ?? "Noch keine Position";
+            // Segoe-Fluent-Symbole: Person (E77B) für Fahrer, Auto (E804) für Fahrzeuge.
+            Symbol = objekt.Art == KartenObjektArt.Fahrer ? "\uE77B" : "\uE804";
+        }
+
+        public string Schluessel { get; }
+        public string Name { get; }
+        public string Details { get; }
+        public string PositionText { get; }
+        public string Symbol { get; }
     }
 }
