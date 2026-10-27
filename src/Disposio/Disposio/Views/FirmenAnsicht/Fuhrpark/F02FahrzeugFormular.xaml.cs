@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
 using System.Globalization;
+using System.Threading.Tasks;
 using Disposio.Models;
 using Disposio.Services;
 using Microsoft.UI.Xaml;
@@ -9,29 +10,46 @@ using Microsoft.UI.Xaml.Controls;
 
 namespace Disposio.Views
 {
-    // F02 legt ein Fahrzeug an. Das Formular prüft, ob alles ausgefüllt und als Zahl lesbar ist;
-    // Wertebereiche und eindeutige Kennzeichen prüft danach das FahrzeugRepository bzw. die Datenbank.
+    // F02 legt ein Fahrzeug an oder bearbeitet eines (Startwert: Fahrzeug-Id aus F01). Das Formular prüft, ob alles
+    // ausgefüllt und als Zahl lesbar ist; Wertebereiche und eindeutige Kennzeichen prüft danach das
+    // FahrzeugRepository bzw. die Datenbank.
     public sealed partial class F02FahrzeugFormular : UserControl
     {
+        // Beim Bearbeiten stehen Zahlen so in den Feldern, wie man sie eintippt: „13,6“ und „184.250“.
+        private static readonly CultureInfo Deutsch = CultureInfo.GetCultureInfo("de-DE");
+
         private readonly FirmenAnsichtKontext _kontext;
         private readonly IFahrzeugRepository _repository = new FahrzeugRepository();
+        // Null beim Anlegen, sonst das Fahrzeug, das bearbeitet wird.
+        private readonly long? _fahrzeugId;
         private bool _speichert;
 
         public F02FahrzeugFormular(FirmenAnsichtKontext kontext)
         {
             InitializeComponent();
             _kontext = kontext;
+            _fahrzeugId = kontext.Parameter is long fahrzeugId ? fahrzeugId : null;
 
             Fuellen(KlasseBox, FahrzeugWerte.Fahrzeugtypen);
-            Fuellen(StatusBox, FahrzeugWerte.StatusBeimAnlegen);
+            Fuellen(StatusBox, FahrzeugWerte.StatusImFormular);
             Fuellen(AufbauBox, FahrzeugWerte.Aufbauten);
             StatusBox.SelectedIndex = 0;   // „Verfügbar“
             AufbauBox.SelectedIndex = 0;   // „Trockengut“, deshalb ohne Solltemperatur
             AbteilungBox.Items.Add(new ComboBoxItem { Content = "Keine Abteilung", Tag = null });
             AbteilungBox.SelectedIndex = 0;
 
-            Loaded += async (_, _) => await AbteilungenLadenAsync();
+            if (_fahrzeugId is not null)
+            {
+                FormularTitel.Text = "Fahrzeug bearbeiten";
+                SpeichernButton.Content = SpeichernText;
+                // Speichern erst, wenn die gespeicherten Werte in den Feldern stehen.
+                SpeichernButton.IsEnabled = false;
+            }
+
+            Loaded += async (_, _) => await LadenAsync();
         }
+
+        private string SpeichernText => _fahrzeugId is null ? "Fahrzeug speichern" : "Änderungen speichern";
 
         private static void Fuellen(ComboBox box, IReadOnlyList<string> werte)
         {
@@ -39,15 +57,51 @@ namespace Disposio.Views
                 box.Items.Add(new ComboBoxItem { Content = wert, Tag = wert });
         }
 
-        private async System.Threading.Tasks.Task AbteilungenLadenAsync()
+        private async Task LadenAsync()
         {
             if (_kontext.IstVorschau)
                 return;
 
+            // Zuerst die Abteilungen, damit beim Bearbeiten die Abteilung des Fahrzeugs ausgewählt werden kann.
+            if (await AbteilungenLadenAsync() && _fahrzeugId is long fahrzeugId)
+                await FahrzeugLadenAsync(fahrzeugId);
+        }
+
+        // Gibt false zurück, wenn der Zugriff beendet wurde und das Formular nicht weiterladen soll.
+        private async Task<bool> AbteilungenLadenAsync()
+        {
             try
             {
                 foreach (AbteilungAuswahl abteilung in await _repository.AbteilungenLadenAsync())
                     AbteilungBox.Items.Add(new ComboBoxItem { Content = abteilung.Bezeichnung, Tag = abteilung.Id });
+                return true;
+            }
+            catch (UnauthorizedAccessException)
+            {
+                _kontext.ZugriffBeenden();
+                return false;
+            }
+            catch (Exception)
+            {
+                // Ohne Abteilungsliste kann das Fahrzeug trotzdem ohne Abteilung angelegt werden.
+                // Beim Bearbeiten bleibt die bisherige Abteilung erhalten (siehe FelderFuellen).
+                AbteilungBox.IsEnabled = false;
+                return true;
+            }
+        }
+
+        private async Task FahrzeugLadenAsync(long fahrzeugId)
+        {
+            try
+            {
+                if (await _repository.LadenAsync(fahrzeugId) is not Fahrzeug fahrzeug)
+                {
+                    Fehler("Das Fahrzeug wurde nicht gefunden. Bitte gehen Sie zurück und laden Sie die Fahrzeugliste neu.", null);
+                    return;
+                }
+
+                FelderFuellen(fahrzeug);
+                SpeichernButton.IsEnabled = true;
             }
             catch (UnauthorizedAccessException)
             {
@@ -55,10 +109,58 @@ namespace Disposio.Views
             }
             catch (Exception)
             {
-                // Ohne Abteilungsliste kann das Fahrzeug trotzdem ohne Abteilung angelegt werden.
-                AbteilungBox.IsEnabled = false;
+                Fehler("Das Fahrzeug konnte nicht geladen werden. Bitte prüfen Sie die Verbindung und öffnen Sie es erneut.", null);
             }
         }
+
+        // Beim Bearbeiten: die gespeicherten Werte so eintragen, wie man sie auch eintippen würde.
+        private void FelderFuellen(Fahrzeug fahrzeug)
+        {
+            FormularTitel.Text = $"Fahrzeug {fahrzeug.Kennzeichen} bearbeiten";
+            KennzeichenBox.Text = fahrzeug.Kennzeichen;
+            Waehlen(KlasseBox, fahrzeug.Fahrzeugtyp);
+            HerstellerBox.Text = fahrzeug.Hersteller;
+            ModellBox.Text = fahrzeug.Modell;
+            BaujahrBox.Text = fahrzeug.Baujahr.ToString(CultureInfo.InvariantCulture);
+            KilometerBox.Text = fahrzeug.Kilometerstand.ToString("N0", Deutsch);
+            TuevPicker.Date = new DateTimeOffset(fahrzeug.TuevDatum.ToDateTime(TimeOnly.MinValue));
+            Waehlen(StatusBox, fahrzeug.Status);
+            // Erst den Aufbau wählen: Ohne Kühlung leert Aufbau_SelectionChanged die Solltemperatur.
+            Waehlen(AufbauBox, fahrzeug.Aufbau);
+            TemperaturBox.Text = fahrzeug.SolltemperaturC is decimal temperatur ? Zahl(temperatur) : "";
+            NutzlastBox.Text = Zahl(fahrzeug.NutzlastKg);
+            StellplaetzeBox.Text = fahrzeug.EpStellplaetze.ToString(CultureInfo.InvariantCulture);
+            LaengeBox.Text = Zahl(fahrzeug.NutzbareLaengeM);
+            LademeterBox.Text = Zahl(fahrzeug.NutzbareLademeter);
+            BreiteBox.Text = Zahl(fahrzeug.InnenbreiteM);
+            HoeheBox.Text = Zahl(fahrzeug.InnenhoeheM);
+
+            if (fahrzeug.AbteilungId is long abteilungId && !Waehlen(AbteilungBox, abteilungId))
+            {
+                // Die Abteilungsliste fehlt (Ladefehler). Die bisherige Abteilung geht beim Speichern trotzdem nicht verloren.
+                AbteilungBox.Items.Add(new ComboBoxItem { Content = fahrzeug.Abteilung ?? "Bisherige Abteilung", Tag = abteilungId });
+                AbteilungBox.SelectedIndex = AbteilungBox.Items.Count - 1;
+            }
+        }
+
+        // Wählt den Eintrag mit diesem Wert. Gibt es ihn nicht (zum Beispiel ein Status, den das Formular nicht
+        // anbietet), bleibt die Auswahl leer und muss vor dem Speichern neu getroffen werden.
+        private static bool Waehlen(ComboBox box, object wert)
+        {
+            for (int i = 0; i < box.Items.Count; i++)
+            {
+                if (box.Items[i] is ComboBoxItem { Tag: var tag } && Equals(tag, wert))
+                {
+                    box.SelectedIndex = i;
+                    return true;
+                }
+            }
+
+            box.SelectedIndex = -1;
+            return false;
+        }
+
+        private static string Zahl(decimal wert) => wert.ToString("0.##", Deutsch);
 
         // Nur ein gekühlter Aufbau („Frische“) hat eine Solltemperatur.
         private void Aufbau_SelectionChanged(object sender, SelectionChangedEventArgs e)
@@ -91,9 +193,13 @@ namespace Disposio.Views
             SpeichernButton.Content = "Speichert …";
             try
             {
-                Fahrzeug gespeichert = await _repository.AnlegenAsync(entwurf);
+                Fahrzeug gespeichert = _fahrzeugId is long fahrzeugId
+                    ? await _repository.AendernAsync(fahrzeugId, entwurf)
+                    : await _repository.AnlegenAsync(entwurf);
                 // Erst nach der Bestätigung aus Neon zurück zur Liste, mit Erfolgsmeldung.
-                _kontext.Oeffnen("F01", $"Fahrzeug {gespeichert.Kennzeichen} wurde angelegt.");
+                _kontext.Oeffnen("F01", _fahrzeugId is null
+                    ? $"Fahrzeug {gespeichert.Kennzeichen} wurde angelegt."
+                    : $"Änderungen an Fahrzeug {gespeichert.Kennzeichen} wurden gespeichert.");
             }
             catch (UnauthorizedAccessException)
             {
@@ -121,7 +227,7 @@ namespace Disposio.Views
             {
                 _speichert = false;
                 SpeichernButton.IsEnabled = AbbrechenButton.IsEnabled = true;
-                SpeichernButton.Content = "Fahrzeug speichern";
+                SpeichernButton.Content = SpeichernText;
             }
         }
 

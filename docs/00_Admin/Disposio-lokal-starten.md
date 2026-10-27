@@ -41,7 +41,8 @@ mit einer sicheren Fehlermeldung fehl. Es gibt keine eingebauten Ersatz-Zugangsd
 
 Die Anwendung migriert das Datenbankschema nicht automatisch. Prüfe zunächst, welche Migrationen
 bereits ausgeführt wurden. `Services/001_unternehmen_dashboard.sql` ergänzt das Unternehmensschema;
-`Services/002_plattform_admin.sql` ergänzt Plattformkonten ohne Unternehmenszuordnung.
+`Services/002_plattform_admin.sql` ergänzt Plattformkonten ohne Unternehmenszuordnung;
+`Services/004_fahrzeug_aktiv.sql` ergänzt „Fahrzeug inaktiv setzen“ im Fuhrpark.
 Führe die Skripte nur nach Prüfung und Sicherung der Zieldatenbank aus. Die Wiederherstellung
 hat weder Migrationen ausgeführt noch Konten angelegt.
 
