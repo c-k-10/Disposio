@@ -21,7 +21,7 @@ public static class AnsichtenKatalog
         // Kundenadmin
         new("K01", "Benutzer", "Benutzer verwalten", "Konten des eigenen Unternehmens suchen und verwalten.", FirmenRolle.Kundenadmin),
         new("K02", null, "Benutzer anlegen / bearbeiten", "Alle Kontodaten, Rolle und Abteilungszugriff erfassen.", FirmenRolle.Kundenadmin, "K01"),
-        new("K05", "Abteilungen", "Abteilungen verwalten", "Bereiche des Unternehmens anlegen, umbenennen und deaktivieren.", FirmenRolle.Kundenadmin),
+        new("K06", "Abteilungen", "Abteilungen verwalten", "Bereiche des Unternehmens anlegen, umbenennen und deaktivieren.", FirmenRolle.Kundenadmin),
         new("K03", "Rollen & Rechte", "Rollen & Rechte", "Zugriffsbereiche verständlich erklären.", FirmenRolle.Kundenadmin),
         new("K04", "Passwort-Richtlinien", "Passwort-Richtlinien", "Unternehmensweite Anmeldevorgaben konfigurieren.", FirmenRolle.Kundenadmin),
         new("K05", "Aktionsprotokoll", "Aktionsprotokoll", "Nachvollziehen, wer im Unternehmen wann was geändert hat.", FirmenRolle.Kundenadmin),
