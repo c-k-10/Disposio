@@ -191,10 +191,17 @@
                            CharacterSpacing="60" Foreground="{StaticResource AccentBrush}" />
                 <TextBlock Text="ADMIN-BEREICH" FontSize="13" CharacterSpacing="260"
                            Foreground="{StaticResource MutedTextBrush}" Margin="0,22,0,34" />
-                <Border Background="{StaticResource SurfaceBrush}"
+                <!-- Menü: Der aktive Punkt hat die Fläche, der andere ist durchsichtig (siehe ZeigeBereich). -->
+                <Border x:Name="KundenMenu" Background="{StaticResource SurfaceBrush}"
                         BorderBrush="{StaticResource BorderBrush}" BorderThickness="1"
-                        CornerRadius="12" Padding="18,15">
+                        CornerRadius="12" Padding="18,15" Tapped="KundenMenu_Tapped">
                     <TextBlock Text="Kunden" FontSize="18" FontWeight="SemiBold"
+                               Foreground="{StaticResource TextBrush}" />
+                </Border>
+                <Border x:Name="ProtokollMenu" Background="Transparent"
+                        BorderBrush="Transparent" BorderThickness="1" Margin="0,8,0,0"
+                        CornerRadius="12" Padding="18,15" Tapped="ProtokollMenu_Tapped">
+                    <TextBlock Text="Aktionsprotokoll" FontSize="18" FontWeight="SemiBold"
                                Foreground="{StaticResource TextBrush}" />
                 </Border>
                 <StackPanel Margin="0,28,0,0" Spacing="6">
@@ -223,7 +230,7 @@
                     <StackPanel>
                         <TextBlock x:Name="PageTitle" Text="Unsere Kunden" FontSize="38"
                                    FontWeight="SemiBold" Foreground="{StaticResource TextBrush}" />
-                        <TextBlock Text="Kunden anlegen, bearbeiten und in ihre Ansicht springen."
+                        <TextBlock x:Name="PageSubtitle" Text="Kunden anlegen, bearbeiten und in ihre Ansicht springen."
                                    FontSize="18" Foreground="{StaticResource MutedTextBrush}"
                                    TextWrapping="Wrap" Margin="0,10,20,0" />
                     </StackPanel>
@@ -266,7 +273,7 @@
                 </Grid>
 
                 <!-- Der Status erklärt Laden/Fehler. Erneut laden holt den aktuellen Stand aus Neon. -->
-                <Grid ColumnSpacing="16">
+                <Grid x:Name="CustomerStatusRow" ColumnSpacing="16">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="*" />
                         <ColumnDefinition Width="Auto" />
@@ -320,7 +327,7 @@
                     </Border>
                 </Grid>
 
-                <Border Background="{StaticResource SurfaceBrush}" BorderBrush="{StaticResource BorderBrush}"
+                <Border x:Name="CustomerListCard" Background="{StaticResource SurfaceBrush}" BorderBrush="{StaticResource BorderBrush}"
                         BorderThickness="1" CornerRadius="18" Padding="26,24">
                     <StackPanel Spacing="24">
                         <Grid>
@@ -406,8 +413,10 @@
                         </ScrollViewer>
                     </StackPanel>
                 </Border>
-                <TextBlock Text="Unternehmen werden dauerhaft gespeichert."
+                <TextBlock x:Name="CustomerFooterText" Text="Unternehmen werden dauerhaft gespeichert."
                            FontSize="13" Foreground="{StaticResource MutedTextBrush}" TextWrapping="Wrap" />
+                <!-- Aktionsprotokoll aller Firmen. Wird beim Klick auf den Menüpunkt gefüllt. -->
+                <Border x:Name="ProtokollHost" Visibility="Collapsed" />
             </StackPanel>
         </ScrollViewer>
     </Grid>

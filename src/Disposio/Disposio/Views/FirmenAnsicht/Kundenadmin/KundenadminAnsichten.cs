@@ -11,6 +11,7 @@ namespace Disposio.Views
         public static UIElement? Erstellen(FirmenAnsichtKontext kontext) => kontext.Ansicht.Id switch
         {
             "K03" => new K03RollenUndRechte(kontext),
+            "K05" => new AktionsprotokollAnsicht(alleFirmen: false, key => Application.Current.Resources[key], kontext.ZugriffBeenden),
             _ => null
         };
     }
