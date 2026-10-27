@@ -79,7 +79,12 @@ public sealed class FahrzeugRepository : IFahrzeugRepository
     {
         FirmenZugriff zugriff = await AuthService.FirmenZugriffPruefenAsync(Rolle, cancellationToken);
         var rows = await _client.Value.QueryAsync(
-            "SELECT abteilung_id, bezeichnung FROM public.abteilung WHERE unternehmen_id = $1::bigint ORDER BY lower(bezeichnung)",
+            // Deaktivierte Abteilungen (K05) bleiben wählbar, damit bestehende Zuordnungen erhalten bleiben,
+            // stehen aber gekennzeichnet am Ende. Voraussetzung: 006_abteilung_aktiv.sql.
+            """
+            SELECT abteilung_id, CASE WHEN aktiv THEN bezeichnung ELSE bezeichnung || ' (deaktiviert)' END
+            FROM public.abteilung WHERE unternehmen_id = $1::bigint ORDER BY NOT aktiv, lower(bezeichnung)
+            """,
             new string?[] { Text(zugriff.UnternehmenId) }, cancellationToken);
 
         var abteilungen = new List<AbteilungAuswahl>();

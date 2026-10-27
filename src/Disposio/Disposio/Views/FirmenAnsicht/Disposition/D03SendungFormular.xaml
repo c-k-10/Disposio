@@ -1,0 +1,307 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- D03 „Sendung erfassen / bearbeiten“: Kunde (bestehend oder neu), beide Transportorte mit Zeitfenstern und das Ladegut.
+     Ohne Startwert wird eine neue Sendung angelegt, mit der Auftrags-Id aus D02 („Details“) wird sie bearbeitet.
+     Verplante Sendungen werden nur angezeigt. Pflichtfelder sind mit * markiert. -->
+<UserControl
+    x:Class="Disposio.Views.D03SendungFormular"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+    <StackPanel Spacing="18">
+        <StackPanel Orientation="Horizontal" Spacing="12">
+            <ProgressRing x:Name="LadeAnzeige" Width="20" Height="20" IsActive="True" />
+            <TextBlock x:Name="LadeText" Style="{StaticResource HinweisText}" VerticalAlignment="Center"
+                       TextWrapping="Wrap" Text="Formular wird geladen …" />
+        </StackPanel>
+
+        <StackPanel x:Name="FormularBereich" Spacing="18">
+        <Border Style="{StaticResource KarteStyle}">
+            <StackPanel Spacing="16">
+                <TextBlock Text="Auftrag" Style="{StaticResource UeberschriftText}" />
+                <Grid ColumnSpacing="18" RowSpacing="16">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                    </Grid.RowDefinitions>
+                    <StackPanel>
+                        <TextBlock Text="Auftragsnummer *" Style="{StaticResource FeldLabel}" />
+                        <TextBox x:Name="AuftragsnummerBox" Style="{StaticResource FormTextBox}" MaxLength="30"
+                                 PlaceholderText="z. B. A-1001" AutomationProperties.Name="Auftragsnummer" />
+                    </StackPanel>
+                    <StackPanel Grid.Column="1">
+                        <TextBlock Text="Kundenreferenz" Style="{StaticResource FeldLabel}" />
+                        <TextBox x:Name="KundenreferenzBox" Style="{StaticResource FormTextBox}" MaxLength="100"
+                                 PlaceholderText="z. B. KD-4821" AutomationProperties.Name="Kundenreferenz" />
+                    </StackPanel>
+                    <StackPanel Grid.Column="2">
+                        <TextBlock Text="Priorität *" Style="{StaticResource FeldLabel}" />
+                        <ComboBox x:Name="PrioritaetBox" Style="{StaticResource FormComboBox}" PlaceholderText="Bitte wählen"
+                                  AutomationProperties.Name="Priorität" />
+                    </StackPanel>
+                </Grid>
+            </StackPanel>
+        </Border>
+
+        <Border Style="{StaticResource KarteStyle}">
+            <StackPanel Spacing="16">
+                <TextBlock Text="Kunde" Style="{StaticResource UeberschriftText}" />
+                <TextBlock Style="{StaticResource HinweisText}" Text="Wählen Sie einen bestehenden Kunden oder „+ Neuer Kunde“. Ein neuer Kunde wird zusammen mit der Sendung gespeichert." />
+                <StackPanel>
+                    <TextBlock Text="Kunde *" Style="{StaticResource FeldLabel}" />
+                    <ComboBox x:Name="KundeBox" Style="{StaticResource FormComboBox}" PlaceholderText="Bitte wählen"
+                              SelectionChanged="KundeBox_SelectionChanged" AutomationProperties.Name="Kunde" />
+                </StackPanel>
+                <StackPanel x:Name="NeuerKundeBereich" Spacing="16" Visibility="Collapsed">
+                    <TextBlock Text="Neuer Kunde" Style="{StaticResource NormalText}" FontWeight="SemiBold" />
+                    <Grid ColumnSpacing="18" RowSpacing="16">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                    </Grid.RowDefinitions>
+                    <StackPanel>
+                        <TextBlock Text="Kundennummer *" Style="{StaticResource FeldLabel}" />
+                        <TextBox x:Name="KundennummerBox" Style="{StaticResource FormTextBox}" MaxLength="30"
+                                 PlaceholderText="z. B. K-1001" AutomationProperties.Name="Kundennummer" />
+                    </StackPanel>
+                    <StackPanel Grid.Column="1">
+                        <TextBlock Text="Firmenname *" Style="{StaticResource FeldLabel}" />
+                        <TextBox x:Name="FirmennameBox" Style="{StaticResource FormTextBox}" MaxLength="200"
+                                 PlaceholderText="z. B. Markt Nord" AutomationProperties.Name="Firmenname" />
+                    </StackPanel>
+                    <StackPanel Grid.Column="2">
+                        <TextBlock Text="Ansprechpartner *" Style="{StaticResource FeldLabel}" />
+                        <TextBox x:Name="KundeAnsprechpartnerBox" Style="{StaticResource FormTextBox}" MaxLength="200"
+                                 PlaceholderText="Vor- und Nachname" AutomationProperties.Name="Ansprechpartner" />
+                    </StackPanel>
+                    <StackPanel Grid.Row="1">
+                        <TextBlock Text="Straße und Hausnummer *" Style="{StaticResource FeldLabel}" />
+                        <TextBox x:Name="KundeAdresseBox" Style="{StaticResource FormTextBox}" MaxLength="300"
+                                 PlaceholderText="z. B. Hauptstr. 5" AutomationProperties.Name="Straße und Hausnummer" />
+                    </StackPanel>
+                    <StackPanel Grid.Row="1" Grid.Column="1">
+                        <TextBlock Text="PLZ *" Style="{StaticResource FeldLabel}" />
+                        <TextBox x:Name="KundePlzBox" Style="{StaticResource FormTextBox}" MaxLength="10"
+                                 PlaceholderText="z. B. 29221" AutomationProperties.Name="PLZ" />
+                    </StackPanel>
+                    <StackPanel Grid.Row="1" Grid.Column="2">
+                        <TextBlock Text="Ort *" Style="{StaticResource FeldLabel}" />
+                        <TextBox x:Name="KundeOrtBox" Style="{StaticResource FormTextBox}" MaxLength="100"
+                                 PlaceholderText="z. B. Celle" AutomationProperties.Name="Ort" />
+                    </StackPanel>
+                    <StackPanel Grid.Row="2">
+                        <TextBlock Text="Telefon *" Style="{StaticResource FeldLabel}" />
+                        <TextBox x:Name="KundeTelefonBox" Style="{StaticResource FormTextBox}" MaxLength="50"
+                                 PlaceholderText="z. B. 05141 12345" AutomationProperties.Name="Telefon" />
+                    </StackPanel>
+                    <StackPanel Grid.Row="2" Grid.Column="1">
+                        <TextBlock Text="E-Mail *" Style="{StaticResource FeldLabel}" />
+                        <TextBox x:Name="KundeEmailBox" Style="{StaticResource FormTextBox}" MaxLength="254"
+                                 PlaceholderText="name@firma.de" AutomationProperties.Name="E-Mail" />
+                    </StackPanel>
+                </Grid>
+                </StackPanel>
+            </StackPanel>
+        </Border>
+
+        <Border Style="{StaticResource KarteStyle}">
+            <StackPanel Spacing="16">
+                <TextBlock Text="Transportorte" Style="{StaticResource UeberschriftText}" />
+                <Grid ColumnSpacing="18" RowSpacing="16">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                    </Grid.RowDefinitions>
+                    <TextBlock Text="Abholung" Style="{StaticResource NormalText}" FontWeight="SemiBold" />
+                    <TextBlock Grid.Column="1" Text="Zustellung" Style="{StaticResource NormalText}" FontWeight="SemiBold" />
+                    <StackPanel Grid.Row="1">
+                        <TextBlock Text="Adresse *" Style="{StaticResource FeldLabel}" />
+                        <TextBox x:Name="AbholadresseBox" Style="{StaticResource FormTextBox}" MaxLength="300"
+                                 PlaceholderText="Straße Nr., PLZ Ort" AutomationProperties.Name="Adresse" />
+                    </StackPanel>
+                    <StackPanel Grid.Row="1" Grid.Column="1">
+                        <TextBlock Text="Adresse *" Style="{StaticResource FeldLabel}" />
+                        <TextBox x:Name="LieferadresseBox" Style="{StaticResource FormTextBox}" MaxLength="300"
+                                 PlaceholderText="Straße Nr., PLZ Ort" AutomationProperties.Name="Adresse" />
+                    </StackPanel>
+                    <StackPanel Grid.Row="2">
+                        <TextBlock Text="Datum *" Style="{StaticResource FeldLabel}" />
+                        <CalendarDatePicker x:Name="AbholdatumBox" Style="{StaticResource FormDatePicker}" PlaceholderText="Datum wählen"
+                                            DateFormat="{}{day.integer(2)}.{month.integer(2)}.{year.full}"
+                                            FirstDayOfWeek="Monday" AutomationProperties.Name="Datum" />
+                    </StackPanel>
+                    <StackPanel Grid.Row="2" Grid.Column="1">
+                        <TextBlock Text="Datum *" Style="{StaticResource FeldLabel}" />
+                        <CalendarDatePicker x:Name="LieferdatumBox" Style="{StaticResource FormDatePicker}" PlaceholderText="Datum wählen"
+                                            DateFormat="{}{day.integer(2)}.{month.integer(2)}.{year.full}"
+                                            FirstDayOfWeek="Monday" AutomationProperties.Name="Datum" />
+                    </StackPanel>
+                    <Grid Grid.Row="3" ColumnSpacing="12">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <StackPanel>
+                            <TextBlock Text="Zeitfenster von *" Style="{StaticResource FeldLabel}" />
+                            <TextBox x:Name="AbholVonBox" Style="{StaticResource FormTextBox}" MaxLength="5" PlaceholderText="hh:mm"
+                                     AutomationProperties.Name="Zeitfenster von" />
+                        </StackPanel>
+                        <StackPanel Grid.Column="1">
+                            <TextBlock Text="bis *" Style="{StaticResource FeldLabel}" />
+                            <TextBox x:Name="AbholBisBox" Style="{StaticResource FormTextBox}" MaxLength="5" PlaceholderText="hh:mm"
+                                     AutomationProperties.Name="Zeitfenster bis" />
+                        </StackPanel>
+                    </Grid>
+                    <Grid Grid.Row="3" Grid.Column="1" ColumnSpacing="12">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <StackPanel>
+                            <TextBlock Text="Zeitfenster von *" Style="{StaticResource FeldLabel}" />
+                            <TextBox x:Name="LieferVonBox" Style="{StaticResource FormTextBox}" MaxLength="5" PlaceholderText="hh:mm"
+                                     AutomationProperties.Name="Zeitfenster von" />
+                        </StackPanel>
+                        <StackPanel Grid.Column="1">
+                            <TextBlock Text="bis *" Style="{StaticResource FeldLabel}" />
+                            <TextBox x:Name="LieferBisBox" Style="{StaticResource FormTextBox}" MaxLength="5" PlaceholderText="hh:mm"
+                                     AutomationProperties.Name="Zeitfenster bis" />
+                        </StackPanel>
+                    </Grid>
+                </Grid>
+            </StackPanel>
+        </Border>
+
+        <Border Style="{StaticResource KarteStyle}">
+            <StackPanel Spacing="16">
+                <TextBlock Text="Vor Ort" Style="{StaticResource UeberschriftText}" />
+                <Grid ColumnSpacing="18" RowSpacing="16">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                    </Grid.RowDefinitions>
+                    <StackPanel>
+                        <TextBlock Text="Ansprechpartner vor Ort *" Style="{StaticResource FeldLabel}" />
+                        <TextBox x:Name="AnsprechpartnerBox" Style="{StaticResource FormTextBox}" MaxLength="200"
+                                 PlaceholderText="Name und Telefon" AutomationProperties.Name="Ansprechpartner vor Ort" />
+                    </StackPanel>
+                    <StackPanel Grid.Column="1">
+                        <TextBlock Text="Lade-/Entladeequipment *" Style="{StaticResource FeldLabel}" />
+                        <ComboBox x:Name="EquipmentBox" Style="{StaticResource FormComboBox}" PlaceholderText="Bitte wählen"
+                                  AutomationProperties.Name="Lade- und Entladeequipment" />
+                    </StackPanel>
+                </Grid>
+            </StackPanel>
+        </Border>
+
+        <Border Style="{StaticResource KarteStyle}">
+            <StackPanel Spacing="16">
+                <TextBlock Text="Ladegut" Style="{StaticResource UeberschriftText}" />
+                <TextBlock Style="{StaticResource HinweisText}" Text="Maße gelten je Einheit (z. B. je Palette), das Gewicht für die ganze Sendung. Bei Frische sind beide Temperaturen Pflicht." />
+                <Grid ColumnSpacing="18" RowSpacing="16">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                    </Grid.RowDefinitions>
+                    <StackPanel>
+                        <TextBlock Text="Gutart *" Style="{StaticResource FeldLabel}" />
+                        <ComboBox x:Name="GutartBox" Style="{StaticResource FormComboBox}" PlaceholderText="Bitte wählen"
+                                  SelectionChanged="GutartBox_SelectionChanged" AutomationProperties.Name="Gutart" />
+                    </StackPanel>
+                    <StackPanel Grid.Column="1">
+                        <TextBlock Text="Verpackungstyp *" Style="{StaticResource FeldLabel}" />
+                        <ComboBox x:Name="VerpackungBox" Style="{StaticResource FormComboBox}" PlaceholderText="Bitte wählen"
+                                  SelectionChanged="VerpackungBox_SelectionChanged" AutomationProperties.Name="Verpackungstyp" />
+                    </StackPanel>
+                    <StackPanel Grid.Column="2">
+                        <TextBlock Text="Anzahl (Einheiten) *" Style="{StaticResource FeldLabel}" />
+                        <TextBox x:Name="AnzahlBox" Style="{StaticResource FormTextBox}" MaxLength="6"
+                                 PlaceholderText="z. B. 4" AutomationProperties.Name="Anzahl (Einheiten)" />
+                    </StackPanel>
+                    <StackPanel Grid.Column="3">
+                        <TextBlock Text="Gewicht gesamt (kg) *" Style="{StaticResource FeldLabel}" />
+                        <TextBox x:Name="GewichtBox" Style="{StaticResource FormTextBox}" MaxLength="10"
+                                 PlaceholderText="z. B. 800" AutomationProperties.Name="Gewicht gesamt (kg)" />
+                    </StackPanel>
+                    <StackPanel Grid.Row="1">
+                        <TextBlock Text="Länge je Einheit (m) *" Style="{StaticResource FeldLabel}" />
+                        <TextBox x:Name="LaengeBox" Style="{StaticResource FormTextBox}" MaxLength="6"
+                                 PlaceholderText="z. B. 1,20" AutomationProperties.Name="Länge je Einheit (m)" />
+                    </StackPanel>
+                    <StackPanel Grid.Row="1" Grid.Column="1">
+                        <TextBlock Text="Breite je Einheit (m) *" Style="{StaticResource FeldLabel}" />
+                        <TextBox x:Name="BreiteBox" Style="{StaticResource FormTextBox}" MaxLength="6"
+                                 PlaceholderText="z. B. 0,80" AutomationProperties.Name="Breite je Einheit (m)" />
+                    </StackPanel>
+                    <StackPanel Grid.Row="1" Grid.Column="2">
+                        <TextBlock Text="Höhe je Einheit (m) *" Style="{StaticResource FeldLabel}" />
+                        <TextBox x:Name="HoeheBox" Style="{StaticResource FormTextBox}" MaxLength="6"
+                                 PlaceholderText="z. B. 1,50" AutomationProperties.Name="Höhe je Einheit (m)" />
+                    </StackPanel>
+                    <StackPanel Grid.Row="1" Grid.Column="3">
+                        <TextBlock Text="Warenwert (€) *" Style="{StaticResource FeldLabel}" />
+                        <TextBox x:Name="WarenwertBox" Style="{StaticResource FormTextBox}" MaxLength="12"
+                                 PlaceholderText="z. B. 5000" AutomationProperties.Name="Warenwert (€)" />
+                    </StackPanel>
+                    <StackPanel Grid.Row="2">
+                        <TextBlock Text="Temperatur min. (°C)" Style="{StaticResource FeldLabel}" />
+                        <TextBox x:Name="TempMinBox" Style="{StaticResource FormTextBox}" MaxLength="6"
+                                 PlaceholderText="z. B. 2" AutomationProperties.Name="Temperatur min. (°C)" />
+                    </StackPanel>
+                    <StackPanel Grid.Row="2" Grid.Column="1">
+                        <TextBlock Text="Temperatur max. (°C)" Style="{StaticResource FeldLabel}" />
+                        <TextBox x:Name="TempMaxBox" Style="{StaticResource FormTextBox}" MaxLength="6"
+                                 PlaceholderText="z. B. 7" AutomationProperties.Name="Temperatur max. (°C)" />
+                    </StackPanel>
+                    <StackPanel Grid.Row="2" Grid.Column="2" Grid.ColumnSpan="2" VerticalAlignment="Bottom">
+                        <TextBlock x:Name="LademeterText" Style="{StaticResource NormalText}" FontWeight="SemiBold" />
+                        <TextBlock x:Name="TemperaturHinweis" Style="{StaticResource HinweisText}" />
+                    </StackPanel>
+                    <VariableSizedWrapGrid Grid.Row="3" Grid.ColumnSpan="4" Orientation="Horizontal" ItemWidth="230">
+                        <CheckBox x:Name="StapelbarBox" Content="Stapelbar" />
+                        <CheckBox x:Name="DrehbarBox" Content="Drehbar" />
+                        <CheckBox x:Name="GefahrgutBox" Content="Gefahrgut" />
+                        <CheckBox x:Name="VersicherungBox" Content="Versicherung" />
+                        <CheckBox x:Name="LadehilfsmittelBox" Content="Ladehilfsmitteltausch" />
+                        <CheckBox x:Name="ZollBox" Content="Zollrelevant" />
+                        <CheckBox x:Name="AvisierungBox" Content="Avisierung erforderlich" />
+                    </VariableSizedWrapGrid>
+                </Grid>
+            </StackPanel>
+        </Border>
+        </StackPanel>
+
+        <TextBlock x:Name="FehlerText" Style="{StaticResource FehlerText}" Visibility="Collapsed" />
+        <StackPanel Orientation="Horizontal" Spacing="12" HorizontalAlignment="Right">
+            <Button x:Name="AbbrechenButton" Content="Abbrechen" Style="{StaticResource DashboardButton}" Click="Abbrechen_Click" />
+            <Button x:Name="SpeichernButton" Content="Sendung speichern" Style="{StaticResource PrimaryButton}"
+                    IsEnabled="False" Click="Speichern_Click" />
+        </StackPanel>
+    </StackPanel>
+</UserControl>

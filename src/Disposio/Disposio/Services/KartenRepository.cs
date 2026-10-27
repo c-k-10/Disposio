@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Globalization;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Disposio.Models;
@@ -26,19 +27,18 @@ public sealed class KartenRepository
         string firma = Text(zugriff.UnternehmenId);
         var objekte = new List<KartenObjekt>();
 
-        // Fahrer = aktive Konten der Firma mit der Rolle „Fahrer“. Abteilung nur, wenn sie zur selben Firma gehört.
+        // Fahrer = Einträge in public.fahrer, deren Konto (public.benutzer) aktiv ist und zur Firma gehört.
+        // Das ist dieselbe Tabelle, auf die tour.fahrer_id zeigt. Die Id im Schlüssel ist deshalb die fahrer_id.
+        // Abteilung nur, wenn sie zur selben Firma gehört.
         const string fahrerQuery = """
-            SELECT b.benutzer_id, b.vorname, b.nachname, a.bezeichnung
-            FROM public.benutzer b
+            SELECT fa.fahrer_id, b.vorname, b.nachname, a.bezeichnung, fa.verfuegbarkeit
+            FROM public.fahrer fa
+            JOIN public.benutzer b ON b.benutzer_id = fa.benutzer_id
             LEFT JOIN public.abteilung a ON a.abteilung_id = b.abteilung_id AND a.unternehmen_id = b.unternehmen_id
             WHERE b.unternehmen_id = $1::bigint AND b.aktiv = true
-              AND EXISTS (SELECT 1 FROM public.benutzer_rolle br
-                          JOIN public.rolle r ON r.rollen_id = br.rollen_id
-                          WHERE br.benutzer_id = b.benutzer_id AND r.bezeichnung = $2)
-            ORDER BY lower(b.nachname), lower(b.vorname), b.benutzer_id
+            ORDER BY lower(b.nachname), lower(b.vorname), fa.fahrer_id
             """;
-        var fahrer = await _client.Value.QueryAsync(fahrerQuery,
-            new string?[] { firma, FirmenRollenKatalog.DatenbankName(FirmenRolle.Fahrer) }, cancellationToken);
+        var fahrer = await _client.Value.QueryAsync(fahrerQuery, new string?[] { firma }, cancellationToken);
         foreach (var row in fahrer)
         {
             string vorname = Required(row, 1);
@@ -47,7 +47,8 @@ public sealed class KartenRepository
                 KartenObjektArt.Fahrer,
                 long.Parse(Required(row, 0), CultureInfo.InvariantCulture),
                 $"{vorname} {nachname}".Trim(),
-                row[3] is string abteilung ? $"Fahrer · Abteilung {abteilung}" : "Fahrer",
+                string.Join(" · ", new[] { "Fahrer", row[3] is string abteilung ? $"Abteilung {abteilung}" : null, row[4] }
+                    .Where(teil => !string.IsNullOrWhiteSpace(teil))),
                 new[] { $"{vorname} {nachname}", $"{nachname} {vorname}" }));
         }
 
