@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
+using System.Net.Mail;
 using System.Threading;
 using System.Threading.Tasks;
 using Disposio.Models;
@@ -24,6 +25,9 @@ namespace Disposio.Views
         private readonly long? _id;
         private CancellationTokenSource? _abbruch;
         private bool _speichert;
+
+        // Felder, die beim letzten Speichern rot markiert wurden.
+        private readonly HashSet<Control> _markiert = new();
 
         public D03SendungFormular(FirmenAnsichtKontext kontext)
         {
@@ -49,6 +53,7 @@ namespace Disposio.Views
             BreiteBox.TextChanged += (_, _) => LademeterAnzeigen();
             LademeterAnzeigen();
             TemperaturHinweisAnzeigen();
+            MarkierungZuruecksetzenBeiEingabe();
 
             Loaded += async (_, _) => await LadenAsync();
             Unloaded += (_, _) => _abbruch?.Cancel();
@@ -235,6 +240,16 @@ namespace Disposio.Views
                 return;
 
             FehlerText.Visibility = Visibility.Collapsed;
+            AlleMarkierungenEntfernen();
+
+            // Erst alle Felder prüfen und die fehlerhaften rot umranden, dann erst speichern.
+            List<(Control Feld, string Meldung)> fehlerListe = FelderPruefen();
+            if (fehlerListe.Count > 0)
+            {
+                FehlerMarkieren(fehlerListe);
+                return;
+            }
+
             SendungEntwurf entwurf;
             try
             {
@@ -265,7 +280,9 @@ namespace Disposio.Views
             }
             catch (NummerVergebenException fehler)
             {
-                FehlerAnzeigen(fehler.Message);
+                // Die Datenbank meldet eine schon vergebene Nummer: das passende Feld markieren.
+                Control feld = fehler.Message.Contains("Kundennummer") ? KundennummerBox : AuftragsnummerBox;
+                FehlerMarkieren(new List<(Control, string)> { (feld, fehler.Message) });
             }
             catch (ArgumentException fehler)
             {
@@ -343,6 +360,191 @@ namespace Disposio.Views
         {
             FehlerText.Text = text;
             FehlerText.Visibility = Visibility.Visible;
+        }
+
+        // ---- Fehlerhafte Felder rot markieren ----
+
+        // Prüft alle Felder in der Reihenfolge des Formulars. Gleiche Regeln wie SendungRepository.Pruefen,
+        // aber hier wird jeder Fehler seinem Feld zugeordnet, damit man sieht, wo etwas fehlt.
+        private List<(Control Feld, string Meldung)> FelderPruefen()
+        {
+            var fehler = new List<(Control, string)>();
+            void Fehler(Control feld, string meldung) => fehler.Add((feld, meldung));
+            void Pflicht(TextBox feld, string name)
+            {
+                if (string.IsNullOrWhiteSpace(feld.Text))
+                    Fehler(feld, $"{name} fehlt.");
+            }
+            void Auswahl(ComboBox feld, string meldung)
+            {
+                if (feld.SelectedItem is null)
+                    Fehler(feld, meldung);
+            }
+            decimal? ZahlImBereich(TextBox feld, string name, decimal minimum, decimal maximum, bool pflicht = true)
+            {
+                if (string.IsNullOrWhiteSpace(feld.Text))
+                {
+                    if (pflicht)
+                        Fehler(feld, $"{name} fehlt.");
+                    return null;
+                }
+                if (!ZahlVersuchen(feld.Text, out decimal wert))
+                {
+                    Fehler(feld, $"Bei „{name}“ bitte eine Zahl eingeben.");
+                    return null;
+                }
+                if (wert < minimum || wert > maximum)
+                {
+                    Fehler(feld, $"{name} muss zwischen {minimum.ToString(Deutsch)} und {maximum.ToString("N0", Deutsch)} liegen.");
+                    return null;
+                }
+                return wert;
+            }
+            TimeOnly? Zeit(TextBox feld, string name)
+            {
+                try
+                {
+                    return Uhrzeit(feld.Text, name);
+                }
+                catch (ArgumentException e)
+                {
+                    Fehler(feld, string.IsNullOrWhiteSpace(feld.Text) ? $"{name} fehlt." : e.Message);
+                    return null;
+                }
+            }
+            void Fenster(TextBox vonFeld, TextBox bisFeld, string name)
+            {
+                TimeOnly? von = Zeit(vonFeld, $"{name} von");
+                TimeOnly? bis = Zeit(bisFeld, $"{name} bis");
+                if (von is { } v && bis is { } b && b < v)
+                    Fehler(bisFeld, $"Beim Zeitfenster „{name}“ liegt „bis“ vor „von“.");
+            }
+
+            // Auftrag
+            Pflicht(AuftragsnummerBox, "Auftragsnummer");
+            Auswahl(PrioritaetBox, "Bitte eine Priorität wählen.");
+
+            // Kunde
+            object? kundeTag = (KundeBox.SelectedItem as ComboBoxItem)?.Tag;
+            if (kundeTag is null)
+                Fehler(KundeBox, "Bitte einen Kunden wählen oder „+ Neuer Kunde“ anlegen.");
+            else if (kundeTag as string == NeuerKundeTag)
+            {
+                Pflicht(KundennummerBox, "Kundennummer");
+                Pflicht(FirmennameBox, "Firmenname");
+                Pflicht(KundeAnsprechpartnerBox, "Ansprechpartner des Kunden");
+                Pflicht(KundeAdresseBox, "Straße und Hausnummer des Kunden");
+                Pflicht(KundePlzBox, "PLZ");
+                Pflicht(KundeOrtBox, "Ort");
+                Pflicht(KundeTelefonBox, "Telefon");
+                string email = KundeEmailBox.Text.Trim();
+                if (email.Length == 0)
+                    Fehler(KundeEmailBox, "E-Mail des Kunden fehlt.");
+                else if (!MailAddress.TryCreate(email, out MailAddress? adresse) || adresse.Address != email)
+                    Fehler(KundeEmailBox, "Bitte eine gültige E-Mail-Adresse für den Kunden eingeben.");
+            }
+
+            // Transportorte
+            Pflicht(AbholadresseBox, "Abholadresse");
+            Pflicht(LieferadresseBox, "Lieferadresse");
+            if (AbholdatumBox.Date is null)
+                Fehler(AbholdatumBox, "Bitte ein Abholdatum wählen.");
+            if (LieferdatumBox.Date is null)
+                Fehler(LieferdatumBox, "Bitte ein Lieferdatum wählen.");
+            else if (AbholdatumBox.Date is { } abholung && LieferdatumBox.Date.Value.Date < abholung.Date)
+                Fehler(LieferdatumBox, "Das Lieferdatum darf nicht vor dem Abholdatum liegen.");
+            Fenster(AbholVonBox, AbholBisBox, "Abholung");
+            Fenster(LieferVonBox, LieferBisBox, "Zustellung");
+
+            // Vor Ort
+            Pflicht(AnsprechpartnerBox, "Ansprechpartner vor Ort");
+            Auswahl(EquipmentBox, "Bitte das Lade-/Entladeequipment wählen.");
+
+            // Ladegut
+            Auswahl(GutartBox, "Bitte eine Gutart wählen.");
+            Auswahl(VerpackungBox, "Bitte einen Verpackungstyp wählen.");
+            if (string.IsNullOrWhiteSpace(AnzahlBox.Text))
+                Fehler(AnzahlBox, "Anzahl fehlt.");
+            else if (!int.TryParse(AnzahlBox.Text.Trim(), NumberStyles.Integer, Deutsch, out int anzahl) || anzahl is < 1 or > 10_000)
+                Fehler(AnzahlBox, "Die Anzahl muss eine ganze Zahl zwischen 1 und 10.000 sein.");
+            ZahlImBereich(GewichtBox, "Gewicht (kg)", 0.01m, 60_000);
+            ZahlImBereich(LaengeBox, "Länge (m)", 0.01m, 20);
+            ZahlImBereich(BreiteBox, "Breite (m)", 0.01m, 3);
+            ZahlImBereich(HoeheBox, "Höhe (m)", 0.01m, 4);
+            ZahlImBereich(WarenwertBox, "Warenwert (€)", 0, 100_000_000);
+
+            bool frische = GutartBox.SelectedItem as string == SendungWerte.GutartFrische;
+            decimal? min = ZahlImBereich(TempMinBox, "Temperatur min. (°C)", -30, 30, pflicht: frische);
+            decimal? max = ZahlImBereich(TempMaxBox, "Temperatur max. (°C)", -30, 30, pflicht: frische);
+            if (frische && min is decimal tMin && max is decimal tMax && tMin > tMax)
+            {
+                Fehler(TempMinBox, "Die Mindesttemperatur darf nicht über der Höchsttemperatur liegen.");
+                Fehler(TempMaxBox, "Die Höchsttemperatur darf nicht unter der Mindesttemperatur liegen.");
+            }
+
+            return fehler;
+        }
+
+        // Rahmen rot, Meldung als Tooltip am Feld, unten eine Liste aller Fehler. Zum ersten Feld wird gescrollt.
+        private void FehlerMarkieren(List<(Control Feld, string Meldung)> fehler)
+        {
+            Brush rot = Application.Current.Resources.TryGetValue("ErrorBrush", out object? wert) && wert is Brush brush
+                ? brush
+                : new SolidColorBrush(Microsoft.UI.Colors.Red);
+            foreach (var (feld, meldung) in fehler)
+            {
+                feld.BorderBrush = rot;
+                feld.BorderThickness = new Thickness(2);
+                ToolTipService.SetToolTip(feld, meldung);
+                _markiert.Add(feld);
+            }
+
+            FehlerAnzeigen(fehler.Count == 1
+                ? fehler[0].Meldung
+                : $"Bitte die {fehler.Count} rot markierten Felder prüfen:\n" +
+                  string.Join("\n", fehler.Select(f => "• " + f.Meldung).Distinct()));
+
+            // Nur hinscrollen, nicht fokussieren: Ein fokussiertes Feld zeigt sonst den Fokusrahmen statt Rot.
+            fehler[0].Feld.StartBringIntoView(new BringIntoViewOptions { VerticalAlignmentRatio = 0.3 });
+        }
+
+        private void MarkierungEntfernen(Control feld)
+        {
+            if (!_markiert.Remove(feld))
+                return;
+            // Zurück auf die Werte aus dem Stil (FormTextBox / FormComboBox / FormDatePicker).
+            feld.ClearValue(Control.BorderBrushProperty);
+            feld.ClearValue(Control.BorderThicknessProperty);
+            ToolTipService.SetToolTip(feld, null);
+            if (_markiert.Count == 0)
+                FehlerText.Visibility = Visibility.Collapsed;
+        }
+
+        private void AlleMarkierungenEntfernen()
+        {
+            foreach (Control feld in _markiert.ToList())
+                MarkierungEntfernen(feld);
+        }
+
+        // Sobald man ein markiertes Feld ändert, verschwindet sein roter Rahmen.
+        private void MarkierungZuruecksetzenBeiEingabe()
+        {
+            foreach (TextBox box in new[]
+                     {
+                         AuftragsnummerBox, KundennummerBox, FirmennameBox, KundeAnsprechpartnerBox, KundeAdresseBox,
+                         KundePlzBox, KundeOrtBox, KundeTelefonBox, KundeEmailBox, AbholadresseBox, LieferadresseBox,
+                         AbholVonBox, AbholBisBox, LieferVonBox, LieferBisBox, AnsprechpartnerBox, AnzahlBox, GewichtBox,
+                         LaengeBox, BreiteBox, HoeheBox, WarenwertBox, TempMinBox, TempMaxBox
+                     })
+                box.TextChanged += (_, _) => MarkierungEntfernen(box);
+
+            foreach (ComboBox box in new[] { PrioritaetBox, KundeBox, EquipmentBox, GutartBox, VerpackungBox })
+                box.SelectionChanged += (_, _) => MarkierungEntfernen(box);
+
+            AbholdatumBox.DateChanged += (_, _) => { MarkierungEntfernen(AbholdatumBox); MarkierungEntfernen(LieferdatumBox); };
+            LieferdatumBox.DateChanged += (_, _) => MarkierungEntfernen(LieferdatumBox);
+            // Mit der Gutart ändert sich, ob die Temperaturen Pflicht sind.
+            GutartBox.SelectionChanged += (_, _) => { MarkierungEntfernen(TempMinBox); MarkierungEntfernen(TempMaxBox); };
         }
 
         // ---- Eingaben umwandeln ----
