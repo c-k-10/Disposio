@@ -7,7 +7,9 @@ using System.Threading.Tasks;
 using Disposio.Models;
 using Disposio.Services;
 using Microsoft.UI.Xaml;
+using Microsoft.UI;
 using Microsoft.UI.Xaml.Controls;
+using Microsoft.UI.Xaml.Media;
 
 namespace Disposio.Views
 {
@@ -121,8 +123,15 @@ namespace Disposio.Views
             }
 
             bool unterwegs = t.Status.Contains("unterwegs", StringComparison.OrdinalIgnoreCase);
-            StoppListe.ItemsSource = details.Stopps
-                .Select(s => new TourDetailStoppZeile(s, ReferenceEquals(s, naechster) && unterwegs))
+            var stopps = details.Stopps;
+            StoppListe.ItemsSource = stopps
+                .Select((s, i) => new TourDetailStoppZeile(
+                    s,
+                    istAktuell: offen && ReferenceEquals(s, naechster),
+                    unterwegs: unterwegs,
+                    istErster: i == 0,
+                    istLetzter: i == stopps.Count - 1,
+                    naechsterErreicht: i + 1 < stopps.Count && stopps[i + 1].IstAnkunft is not null))
                 .ToList();
             StoppLeerText.Visibility = details.Stopps.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
 
@@ -168,34 +177,100 @@ namespace Disposio.Views
         }
     }
 
-    // Eine Zeile der Stopptabelle mit fertig formatierten Texten.
+    // Ein Stopp der Zeitleiste mit fertig formatierten Texten und Farben.
+    // Die Farben kommen aus FirmenStil.xaml (passen also zu hell/dunkel und zur Akzentfarbe der Firma).
     public sealed class TourDetailStoppZeile
     {
-        public TourDetailStoppZeile(TourDetailStopp s, bool istUnterwegsZiel)
+        public TourDetailStoppZeile(TourDetailStopp s, bool istAktuell, bool unterwegs, bool istErster, bool istLetzter,
+                                    bool naechsterErreicht)
         {
             // Wie im Wireframe „Celle · Markt Nord“: Bezeichnung und Kunde(n) der Sendungen.
             Titel = string.IsNullOrWhiteSpace(s.Kunden) ? s.Bezeichnung : $"{s.Bezeichnung} · {s.Kunden}";
-            Unterzeile = $"{s.Reihenfolge}. {s.Art} · {s.Adresse}";
+            Unterzeile = $"{s.Art} · {s.Adresse}";
+            ZeitfensterText = $"Fenster {s.FensterVon}–{s.FensterBis}";
 
+            bool erreicht = s.IstAnkunft is not null;
             Status = s.IstAbfahrt is not null ? "Abgefahren"
-                : s.IstAnkunft is not null ? "Angekommen"
-                : istUnterwegsZiel ? "Unterwegs"
+                : erreicht ? "Angekommen"
+                : istAktuell && unterwegs ? "Unterwegs"
                 : s.Status;
 
-            Fenster = $"{s.FensterVon}–{s.FensterBis}";
             Zeit = s.IstAnkunft ?? (s.Eta is null ? "—" : $"ETA {s.Eta}");
-
-            bool verspaetet = s.IstAnkunft is null && s.VerspaetungMinuten > 0;
+            bool verspaetet = !erreicht && s.VerspaetungMinuten > 0;
             Verspaetung = verspaetet ? $"+{s.VerspaetungMinuten} Min. nach Fenster" : "";
             VerspaetungSichtbar = verspaetet ? Visibility.Visible : Visibility.Collapsed;
+
+            Brush grau = R("MutedTextBrush"), rand = R("BorderBrush"), flaeche = R("SurfaceBrush"),
+                  akzent = R("AccentBrush"), akzentText = R("AccentTextBrush"), fehler = R("ErrorBrush"),
+                  text = R("TextBrush"), leer = new SolidColorBrush(Colors.Transparent);
+
+            // Linien: grau, soweit die Tour schon gefahren ist, sonst in Rahmenfarbe.
+            LinieObenSichtbar = istErster ? Visibility.Collapsed : Visibility.Visible;
+            LinieUntenSichtbar = istLetzter ? Visibility.Collapsed : Visibility.Visible;
+            LinieObenFarbe = erreicht ? grau : rand;
+            LinieUntenFarbe = naechsterErreicht ? grau : rand;
+
+            PunktText = erreicht ? "✓" : s.Reihenfolge.ToString(CultureInfo.InvariantCulture);
+            KartenRandDicke = new Thickness(1);
+            Deckkraft = 1;
+            if (erreicht)
+            {
+                PunktFuellung = grau; PunktRand = grau; PunktSchrift = flaeche;
+                PilleHintergrund = leer; PilleRand = rand; PilleSchrift = grau;
+                KartenRand = rand;
+                Deckkraft = 0.75;
+            }
+            else if (istAktuell && verspaetet)
+            {
+                PunktFuellung = fehler; PunktRand = fehler; PunktSchrift = flaeche;
+                PilleHintergrund = leer; PilleRand = fehler; PilleSchrift = fehler;
+                KartenRand = fehler;
+                KartenRandDicke = new Thickness(2);
+            }
+            else if (istAktuell)
+            {
+                PunktFuellung = akzent; PunktRand = akzent; PunktSchrift = akzentText;
+                PilleHintergrund = akzent; PilleRand = akzent; PilleSchrift = akzentText;
+                KartenRand = akzent;
+                KartenRandDicke = new Thickness(2);
+            }
+            else if (verspaetet)
+            {
+                PunktFuellung = flaeche; PunktRand = fehler; PunktSchrift = fehler;
+                PilleHintergrund = leer; PilleRand = fehler; PilleSchrift = fehler;
+                KartenRand = rand;
+            }
+            else
+            {
+                PunktFuellung = flaeche; PunktRand = rand; PunktSchrift = grau;
+                PilleHintergrund = leer; PilleRand = rand; PilleSchrift = text;
+                KartenRand = rand;
+            }
         }
+
+        private static Brush R(string schluessel) => (Brush)Application.Current.Resources[schluessel];
 
         public string Titel { get; }
         public string Unterzeile { get; }
+        public string ZeitfensterText { get; }
         public string Status { get; }
-        public string Fenster { get; }
         public string Zeit { get; }
         public string Verspaetung { get; }
         public Visibility VerspaetungSichtbar { get; }
+
+        public Visibility LinieObenSichtbar { get; }
+        public Visibility LinieUntenSichtbar { get; }
+        public Brush LinieObenFarbe { get; }
+        public Brush LinieUntenFarbe { get; }
+        public string PunktText { get; }
+        public Brush PunktFuellung { get; }
+        public Brush PunktRand { get; }
+        public Brush PunktSchrift { get; }
+        public Brush PilleHintergrund { get; }
+        public Brush PilleRand { get; }
+        public Brush PilleSchrift { get; }
+        public Brush KartenRand { get; }
+        public Thickness KartenRandDicke { get; }
+        public double Deckkraft { get; }
     }
 }

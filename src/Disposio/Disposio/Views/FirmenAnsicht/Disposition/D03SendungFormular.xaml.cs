@@ -10,6 +10,8 @@ using Disposio.Services;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Media;
+using Microsoft.UI.Xaml.Shapes;
+using Windows.Foundation;
 
 namespace Disposio.Views
 {
@@ -28,6 +30,14 @@ namespace Disposio.Views
 
         // Felder, die beim letzten Speichern rot markiert wurden.
         private readonly HashSet<Control> _markiert = new();
+
+        // Die fünf Abschnitte links: Karte im Formular, Knopf in der Liste und die Felder, die dazugehören.
+        private sealed record Abschnitt(Border Karte, Button Knopf, Rectangle Balken, Ellipse Punkt, TextBlock Symbol,
+                                        string Nummer, Control[] Felder);
+
+        private readonly SolidColorBrush _gruen = new(Microsoft.UI.ColorHelper.FromArgb(255, 0x2E, 0xA6, 0x6A));
+        private Abschnitt[] _abschnitte = Array.Empty<Abschnitt>();
+        private ScrollViewer? _scroll;
 
         public D03SendungFormular(FirmenAnsichtKontext kontext)
         {
@@ -53,10 +63,20 @@ namespace Disposio.Views
             BreiteBox.TextChanged += (_, _) => LademeterAnzeigen();
             LademeterAnzeigen();
             TemperaturHinweisAnzeigen();
+            AbschnitteAnlegen();
             MarkierungZuruecksetzenBeiEingabe();
+            AbschnitteAktualisieren();
 
-            Loaded += async (_, _) => await LadenAsync();
-            Unloaded += (_, _) => _abbruch?.Cancel();
+            Loaded += async (_, _) =>
+            {
+                ScrollAnmelden();
+                await LadenAsync();
+            };
+            Unloaded += (_, _) =>
+            {
+                _abbruch?.Cancel();
+                ScrollAbmelden();
+            };
         }
 
         // ---- Laden ----
@@ -103,6 +123,7 @@ namespace Disposio.Views
                 }
 
                 SpeichernButton.IsEnabled = true;
+                AbschnitteAktualisieren();
                 LadeFertig("");
             }
             catch (OperationCanceledException) when (abbruch.IsCancellationRequested)
@@ -402,15 +423,12 @@ namespace Disposio.Views
             }
             TimeOnly? Zeit(TextBox feld, string name)
             {
-                try
-                {
-                    return Uhrzeit(feld.Text, name);
-                }
-                catch (ArgumentException e)
-                {
-                    Fehler(feld, string.IsNullOrWhiteSpace(feld.Text) ? $"{name} fehlt." : e.Message);
-                    return null;
-                }
+                if (UhrzeitVersuchen(feld.Text, out TimeOnly zeit))
+                    return zeit;
+                Fehler(feld, string.IsNullOrWhiteSpace(feld.Text)
+                    ? $"{name} fehlt."
+                    : $"Bitte bei „{name}“ eine Uhrzeit wie 08:30 eingeben.");
+                return null;
             }
             void Fenster(TextBox vonFeld, TextBox bisFeld, string name)
             {
@@ -499,6 +517,7 @@ namespace Disposio.Views
                 _markiert.Add(feld);
             }
 
+            AbschnitteAktualisieren();
             FehlerAnzeigen(fehler.Count == 1
                 ? fehler[0].Meldung
                 : $"Bitte die {fehler.Count} rot markierten Felder prüfen:\n" +
@@ -536,15 +555,167 @@ namespace Disposio.Views
                          AbholVonBox, AbholBisBox, LieferVonBox, LieferBisBox, AnsprechpartnerBox, AnzahlBox, GewichtBox,
                          LaengeBox, BreiteBox, HoeheBox, WarenwertBox, TempMinBox, TempMaxBox
                      })
-                box.TextChanged += (_, _) => MarkierungEntfernen(box);
+                box.TextChanged += (_, _) => { MarkierungEntfernen(box); AbschnitteAktualisieren(); };
 
             foreach (ComboBox box in new[] { PrioritaetBox, KundeBox, EquipmentBox, GutartBox, VerpackungBox })
-                box.SelectionChanged += (_, _) => MarkierungEntfernen(box);
+                box.SelectionChanged += (_, _) => { MarkierungEntfernen(box); AbschnitteAktualisieren(); };
 
-            AbholdatumBox.DateChanged += (_, _) => { MarkierungEntfernen(AbholdatumBox); MarkierungEntfernen(LieferdatumBox); };
-            LieferdatumBox.DateChanged += (_, _) => MarkierungEntfernen(LieferdatumBox);
+            AbholdatumBox.DateChanged += (_, _) =>
+            {
+                MarkierungEntfernen(AbholdatumBox);
+                MarkierungEntfernen(LieferdatumBox);
+                AbschnitteAktualisieren();
+            };
+            LieferdatumBox.DateChanged += (_, _) => { MarkierungEntfernen(LieferdatumBox); AbschnitteAktualisieren(); };
             // Mit der Gutart ändert sich, ob die Temperaturen Pflicht sind.
             GutartBox.SelectionChanged += (_, _) => { MarkierungEntfernen(TempMinBox); MarkierungEntfernen(TempMaxBox); };
+        }
+
+        // ---- Abschnitte links (Navigation und Fortschritt) ----
+
+        private void AbschnitteAnlegen()
+        {
+            _abschnitte = new[]
+            {
+                new Abschnitt(AuftragKarte, NavAuftrag, NavAuftragBalken, NavAuftragPunkt, NavAuftragSymbol, "1",
+                    new Control[] { AuftragsnummerBox, KundenreferenzBox, PrioritaetBox }),
+                new Abschnitt(KundeKarte, NavKunde, NavKundeBalken, NavKundePunkt, NavKundeSymbol, "2",
+                    new Control[]
+                    {
+                        KundeBox, KundennummerBox, FirmennameBox, KundeAnsprechpartnerBox, KundeAdresseBox,
+                        KundePlzBox, KundeOrtBox, KundeTelefonBox, KundeEmailBox
+                    }),
+                new Abschnitt(OrteKarte, NavOrte, NavOrteBalken, NavOrtePunkt, NavOrteSymbol, "3",
+                    new Control[]
+                    {
+                        AbholadresseBox, LieferadresseBox, AbholdatumBox, LieferdatumBox,
+                        AbholVonBox, AbholBisBox, LieferVonBox, LieferBisBox
+                    }),
+                new Abschnitt(VorOrtKarte, NavVorOrt, NavVorOrtBalken, NavVorOrtPunkt, NavVorOrtSymbol, "4",
+                    new Control[] { AnsprechpartnerBox, EquipmentBox }),
+                new Abschnitt(LadegutKarte, NavLadegut, NavLadegutBalken, NavLadegutPunkt, NavLadegutSymbol, "5",
+                    new Control[]
+                    {
+                        GutartBox, VerpackungBox, AnzahlBox, GewichtBox, LaengeBox, BreiteBox, HoeheBox,
+                        WarenwertBox, TempMinBox, TempMaxBox
+                    })
+            };
+            AktivenAbschnittSetzen(_abschnitte[0]);
+        }
+
+        // Rot „!“ = ein Feld ist nach dem Speichern rot markiert. Grün „✓“ = alle Pflichtangaben stimmen.
+        // Sonst die Nummer des Abschnitts: Es fehlt noch etwas (wird erst beim Speichern rot).
+        private void AbschnitteAktualisieren()
+        {
+            if (_abschnitte.Length == 0)
+                return;
+            var offeneFelder = FelderPruefen().Select(f => f.Feld).ToHashSet();
+            int vollstaendig = 0;
+            foreach (Abschnitt a in _abschnitte)
+            {
+                if (a.Felder.Any(_markiert.Contains))
+                    PunktSetzen(a, "!", Ressource("ErrorBrush"), Ressource("ErrorBrush"), Ressource("SurfaceBrush"));
+                else if (!a.Felder.Any(offeneFelder.Contains))
+                {
+                    PunktSetzen(a, "✓", _gruen, _gruen, new SolidColorBrush(Microsoft.UI.Colors.White));
+                    vollstaendig++;
+                }
+                else
+                    PunktSetzen(a, a.Nummer, new SolidColorBrush(Microsoft.UI.Colors.Transparent),
+                        Ressource("BorderBrush"), Ressource("MutedTextBrush"));
+            }
+            FortschrittText.Text = vollstaendig == _abschnitte.Length
+                ? "Alle Abschnitte vollständig."
+                : $"{vollstaendig} von {_abschnitte.Length} Abschnitten vollständig";
+        }
+
+        private static void PunktSetzen(Abschnitt a, string symbol, Brush fuellung, Brush rand, Brush schrift)
+        {
+            a.Symbol.Text = symbol;
+            a.Symbol.Foreground = schrift;
+            a.Punkt.Fill = fuellung;
+            a.Punkt.Stroke = rand;
+        }
+
+        private static Brush Ressource(string schluessel) => (Brush)Application.Current.Resources[schluessel];
+
+        private void Abschnitt_Click(object sender, RoutedEventArgs e)
+        {
+            Abschnitt? a = _abschnitte.FirstOrDefault(x => ReferenceEquals(x.Knopf, sender));
+            if (a is null)
+                return;
+            AktivenAbschnittSetzen(a);
+            a.Karte.StartBringIntoView(new BringIntoViewOptions
+            {
+                VerticalAlignmentRatio = 0,
+                VerticalOffset = -16,
+                AnimationDesired = true
+            });
+        }
+
+        private void AktivenAbschnittSetzen(Abschnitt aktiv)
+        {
+            foreach (Abschnitt a in _abschnitte)
+            {
+                bool istAktiv = ReferenceEquals(a, aktiv);
+                a.Balken.Opacity = istAktiv ? 1 : 0;
+                a.Knopf.Background = istAktiv ? Ressource("InputBrush") : new SolidColorBrush(Microsoft.UI.Colors.Transparent);
+            }
+        }
+
+        // Die Seite scrollt im ScrollViewer der FirmenAnsicht. Damit die Abschnittsliste sichtbar bleibt,
+        // wird sie beim Scrollen nach unten mitgeschoben (höchstens bis zum Ende des Formulars).
+        private void ScrollAnmelden()
+        {
+            DependencyObject? element = this;
+            while (element is not null and not ScrollViewer)
+                element = VisualTreeHelper.GetParent(element);
+            _scroll = element as ScrollViewer;
+            if (_scroll is null)
+                return;
+            _scroll.ViewChanged += Scroll_ViewChanged;
+            SizeChanged += Groesse_Changed;
+            NavigationNachziehen();
+        }
+
+        private void ScrollAbmelden()
+        {
+            if (_scroll is not null)
+                _scroll.ViewChanged -= Scroll_ViewChanged;
+            SizeChanged -= Groesse_Changed;
+            _scroll = null;
+        }
+
+        private void Scroll_ViewChanged(object? sender, ScrollViewerViewChangedEventArgs e) => NavigationNachziehen();
+
+        private void Groesse_Changed(object sender, SizeChangedEventArgs e) => NavigationNachziehen();
+
+        private void NavigationNachziehen()
+        {
+            if (_scroll is null || _abschnitte.Length == 0)
+                return;
+            try
+            {
+                // Oberkante des Formulars im sichtbaren Bereich (negativ, wenn schon darüber gescrollt).
+                double oben = FormularRaster.TransformToVisual(_scroll).TransformPoint(new Point(0, 0)).Y;
+                double spielraum = Math.Max(0, FormularRaster.ActualHeight - AbschnittNavigation.ActualHeight);
+                NavVerschiebung.Y = Math.Clamp(16 - oben, 0, spielraum);
+
+                // Aktiv ist der letzte Abschnitt, dessen Karte das obere Drittel erreicht hat.
+                double grenze = _scroll.ViewportHeight * 0.3;
+                Abschnitt aktiv = _abschnitte[0];
+                foreach (Abschnitt a in _abschnitte)
+                    if (a.Karte.TransformToVisual(_scroll).TransformPoint(new Point(0, 0)).Y <= grenze)
+                        aktiv = a;
+                // Ganz unten angekommen: Der letzte Abschnitt erreicht das obere Drittel evtl. nie.
+                if (_scroll.ScrollableHeight > 0 && _scroll.VerticalOffset >= _scroll.ScrollableHeight - 1)
+                    aktiv = _abschnitte[^1];
+                AktivenAbschnittSetzen(aktiv);
+            }
+            catch (ArgumentException)
+            {
+                // Die Ansicht wird gerade aus dem Baum entfernt.
+            }
         }
 
         // ---- Eingaben umwandeln ----
@@ -555,14 +726,17 @@ namespace Disposio.Views
                 : throw new ArgumentException($"Bitte ein {name} wählen.");
 
         // Erlaubt „8:00“, „08:00“ und „0800“.
-        private static TimeOnly Uhrzeit(string? text, string feld)
+        private static TimeOnly Uhrzeit(string? text, string feld) =>
+            UhrzeitVersuchen(text, out TimeOnly zeit)
+                ? zeit
+                : throw new ArgumentException($"Bitte bei „{feld}“ eine Uhrzeit wie 08:30 eingeben.");
+
+        private static bool UhrzeitVersuchen(string? text, out TimeOnly zeit)
         {
             string wert = (text ?? "").Trim();
             if (wert.Length == 4 && wert.All(char.IsDigit))
                 wert = wert[..2] + ":" + wert[2..];
-            if (TimeOnly.TryParseExact(wert, new[] { "H:mm", "HH:mm" }, Deutsch, DateTimeStyles.None, out TimeOnly zeit))
-                return zeit;
-            throw new ArgumentException($"Bitte bei „{feld}“ eine Uhrzeit wie 08:30 eingeben.");
+            return TimeOnly.TryParseExact(wert, new[] { "H:mm", "HH:mm" }, Deutsch, DateTimeStyles.None, out zeit);
         }
 
         private static decimal Zahl(string? text, string feld) =>

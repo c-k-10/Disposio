@@ -84,7 +84,12 @@
                 <ItemsControl x:Name="TourListe">
                     <ItemsControl.ItemTemplate>
                         <DataTemplate x:DataType="local:TourZeile">
-                            <Border BorderBrush="{StaticResource BorderBrush}" BorderThickness="0,0,0,1" Padding="14,12">
+                            <!-- Außen die Trennlinie, innen die Zeile mit Hover und Auswahlbalken (ListenZeile.cs).
+                                 Klick markiert die Tour, Doppelklick öffnet sie. -->
+                            <Border BorderBrush="{StaticResource BorderBrush}" BorderThickness="0,0,0,1">
+                            <Border local:ListenZeile.Aktiv="True" local:ListenZeile.Markiert="{x:Bind IstMarkiert}"
+                                    Tag="{x:Bind Id}" Tapped="Zeile_Tapped" DoubleTapped="Zeile_DoubleTapped" Loaded="Zeile_Loaded"
+                                    BorderThickness="4,0,0,0" CornerRadius="6" Padding="10,12,14,12">
                                 <Grid ColumnSpacing="16">
                                     <Grid.ColumnDefinitions>
                                         <ColumnDefinition Width="1.2*" />
@@ -116,6 +121,7 @@
                                             Style="{StaticResource DashboardButton}" MinHeight="36" Padding="14,4"
                                             HorizontalAlignment="Left" Click="TourAktion_Click" />
                                 </Grid>
+                            </Border>
                             </Border>
                         </DataTemplate>
                     </ItemsControl.ItemTemplate>

@@ -86,7 +86,11 @@
                 <ItemsControl x:Name="SendungListe">
                     <ItemsControl.ItemTemplate>
                         <DataTemplate x:DataType="local:SendungListenZeile">
-                            <Border BorderBrush="{StaticResource BorderBrush}" BorderThickness="0,0,0,1" Padding="14,12">
+                            <!-- Außen die Trennlinie, innen die Zeile mit Hover und Auswahlbalken (ListenZeile.cs).
+                                 Angehakte Sendungen sind markiert. 4 px Balken + 10 px Abstand = 14 px wie die Kopfzeile. -->
+                            <Border BorderBrush="{StaticResource BorderBrush}" BorderThickness="0,0,0,1">
+                            <Border local:ListenZeile.Aktiv="True" local:ListenZeile.Markiert="{x:Bind IstMarkiert}"
+                                    BorderThickness="4,0,0,0" CornerRadius="6" Padding="10,12,14,12">
                                 <Grid ColumnSpacing="16">
                                     <Grid.ColumnDefinitions>
                                         <ColumnDefinition Width="32" />
@@ -120,6 +124,7 @@
                                                 Click="Zuweisen_Click" />
                                     </StackPanel>
                                 </Grid>
+                            </Border>
                             </Border>
                         </DataTemplate>
                     </ItemsControl.ItemTemplate>

@@ -87,48 +87,66 @@
                     IsEnabled="False" Click="Zuweisen_Click" />
         </StackPanel>
 
-        <!-- Stopps -->
+        <!-- Stopps als Zeitleiste: links Linie mit Punkten (grau ✓ = erledigt, Akzent = aktueller Stopp,
+             rot = verspätet, Umriss = offen), rechts je Stopp eine kleine Karte. -->
         <Border Style="{StaticResource KarteStyle}">
-            <StackPanel Spacing="12">
+            <StackPanel Spacing="8">
                 <TextBlock Text="Stopps" Style="{StaticResource UeberschriftText}" />
-                <Border Background="{StaticResource InputBrush}" CornerRadius="8" Padding="14,10">
-                    <Grid ColumnSpacing="16">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="2*" />
-                            <ColumnDefinition Width="*" />
-                            <ColumnDefinition Width="*" />
-                            <ColumnDefinition Width="*" />
-                        </Grid.ColumnDefinitions>
-                        <TextBlock Text="Stopp" Style="{StaticResource HinweisText}" FontWeight="SemiBold" />
-                        <TextBlock Grid.Column="1" Text="Status" Style="{StaticResource HinweisText}" FontWeight="SemiBold" />
-                        <TextBlock Grid.Column="2" Text="Fenster" Style="{StaticResource HinweisText}" FontWeight="SemiBold" />
-                        <TextBlock Grid.Column="3" Text="Tatsächliche Zeit" Style="{StaticResource HinweisText}" FontWeight="SemiBold" />
-                    </Grid>
-                </Border>
                 <ItemsControl x:Name="StoppListe">
                     <ItemsControl.ItemTemplate>
                         <DataTemplate x:DataType="local:TourDetailStoppZeile">
-                            <Border BorderBrush="{StaticResource BorderBrush}" BorderThickness="0,0,0,1" Padding="14,12">
-                                <Grid ColumnSpacing="16">
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="2*" />
-                                        <ColumnDefinition Width="*" />
-                                        <ColumnDefinition Width="*" />
-                                        <ColumnDefinition Width="*" />
-                                    </Grid.ColumnDefinitions>
-                                    <StackPanel Spacing="1" VerticalAlignment="Center">
-                                        <TextBlock Text="{x:Bind Titel}" Style="{StaticResource NormalText}" />
-                                        <TextBlock Text="{x:Bind Unterzeile}" Style="{StaticResource HinweisText}" FontSize="13" />
-                                    </StackPanel>
-                                    <TextBlock Grid.Column="1" Text="{x:Bind Status}" Style="{StaticResource NormalText}" VerticalAlignment="Center" />
-                                    <TextBlock Grid.Column="2" Text="{x:Bind Fenster}" Style="{StaticResource NormalText}" VerticalAlignment="Center" />
-                                    <StackPanel Grid.Column="3" Spacing="1" VerticalAlignment="Center">
-                                        <TextBlock Text="{x:Bind Zeit}" Style="{StaticResource NormalText}" />
-                                        <TextBlock Text="{x:Bind Verspaetung}" Style="{StaticResource FehlerText}" FontSize="13"
-                                                   Visibility="{x:Bind VerspaetungSichtbar}" />
-                                    </StackPanel>
+                            <Grid ColumnSpacing="14">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="32" />
+                                    <ColumnDefinition Width="*" />
+                                </Grid.ColumnDefinitions>
+
+                                <!-- Zeitleiste: Linie oben, Punkt, Linie unten. Die Linien verbinden die Zeilen. -->
+                                <Grid>
+                                    <Grid.RowDefinitions>
+                                        <RowDefinition Height="20" />
+                                        <RowDefinition Height="Auto" />
+                                        <RowDefinition Height="*" />
+                                    </Grid.RowDefinitions>
+                                    <Rectangle Width="2" HorizontalAlignment="Center" Fill="{x:Bind LinieObenFarbe}"
+                                               Visibility="{x:Bind LinieObenSichtbar}" />
+                                    <Grid Grid.Row="1" Width="30" Height="30">
+                                        <Ellipse Fill="{x:Bind PunktFuellung}" Stroke="{x:Bind PunktRand}" StrokeThickness="2" />
+                                        <TextBlock Text="{x:Bind PunktText}" Foreground="{x:Bind PunktSchrift}" FontSize="13"
+                                                   FontWeight="SemiBold" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                    </Grid>
+                                    <Rectangle Grid.Row="2" Width="2" HorizontalAlignment="Center" Fill="{x:Bind LinieUntenFarbe}"
+                                               Visibility="{x:Bind LinieUntenSichtbar}" />
                                 </Grid>
-                            </Border>
+
+                                <Border Grid.Column="1" Margin="0,6" Padding="16,12" CornerRadius="10"
+                                        Background="{StaticResource InputBrush}" BorderBrush="{x:Bind KartenRand}"
+                                        BorderThickness="{x:Bind KartenRandDicke}" Opacity="{x:Bind Deckkraft}">
+                                    <Grid ColumnSpacing="16">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <StackPanel Spacing="3" VerticalAlignment="Center">
+                                            <TextBlock Text="{x:Bind Titel}" Style="{StaticResource NormalText}" FontWeight="SemiBold" />
+                                            <TextBlock Text="{x:Bind Unterzeile}" Style="{StaticResource HinweisText}" FontSize="13" />
+                                            <TextBlock Text="{x:Bind ZeitfensterText}" Style="{StaticResource HinweisText}" FontSize="13" />
+                                        </StackPanel>
+                                        <StackPanel Grid.Column="1" Spacing="4" HorizontalAlignment="Right" VerticalAlignment="Center">
+                                            <!-- Status-Pille -->
+                                            <Border HorizontalAlignment="Right" CornerRadius="11" Padding="10,2" BorderThickness="1"
+                                                    Background="{x:Bind PilleHintergrund}" BorderBrush="{x:Bind PilleRand}">
+                                                <TextBlock Text="{x:Bind Status}" FontSize="12" FontWeight="SemiBold"
+                                                           Foreground="{x:Bind PilleSchrift}" />
+                                            </Border>
+                                            <TextBlock Text="{x:Bind Zeit}" Style="{StaticResource NormalText}" FontWeight="SemiBold"
+                                                       HorizontalAlignment="Right" />
+                                            <TextBlock Text="{x:Bind Verspaetung}" Style="{StaticResource FehlerText}" FontSize="13"
+                                                       HorizontalAlignment="Right" Visibility="{x:Bind VerspaetungSichtbar}" />
+                                        </StackPanel>
+                                    </Grid>
+                                </Border>
+                            </Grid>
                         </DataTemplate>
                     </ItemsControl.ItemTemplate>
                 </ItemsControl>
