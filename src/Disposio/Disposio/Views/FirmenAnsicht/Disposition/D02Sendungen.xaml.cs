@@ -90,6 +90,7 @@ namespace Disposio.Views
                 _ausgewaehlt.Add(id);
             else
                 _ausgewaehlt.Remove(id);
+            ListenZeile.MarkierenFuer(box, box.IsChecked == true);
             AuswahlAnzeigen();
         }
 
@@ -253,6 +254,8 @@ namespace Disposio.Views
 
         public long Id { get; }
         public bool? Ausgewaehlt { get; }
+        // Angehakte Zeilen werden farbig hervorgehoben (ListenZeile.Markiert).
+        public bool IstMarkiert => Ausgewaehlt == true;
         public bool KannGeplantWerden { get; }
         public string ReferenzUndKunde { get; }
         public string Strecke { get; }
