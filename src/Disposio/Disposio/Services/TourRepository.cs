@@ -10,7 +10,7 @@ using Disposio.Models;
 namespace Disposio.Services;
 
 /// <summary>
-/// Touren für die Ansichten des Disponenten (D04, D05 …). Wie in den anderen Repositories wird zuerst die Rolle
+/// Touren für die Ansichten des Disponenten (D04, D05, D06, D07, D16 …). Wie in den anderen Repositories wird zuerst die Rolle
 /// Disponent geprüft und danach nur die Firma aus dieser Prüfung verwendet, nie eine Id aus der Oberfläche.
 /// Fahrer: tour.fahrer_id zeigt auf public.fahrer, der Name steht im verknüpften public.benutzer.
 /// </summary>
@@ -203,6 +203,14 @@ public sealed class TourRepository
                         WHERE fa.fahrer_id = $8::bigint AND b.unternehmen_id = $1::bigint AND b.aktiv = true))
                   AND ($9::bigint IS NULL OR EXISTS (
                         SELECT 1 FROM public.fahrzeug f WHERE f.fahrzeug_id = $9::bigint AND f.unternehmen_id = $1::bigint))
+                  -- Fahrer und Fahrzeug dürfen im Zeitraum der neuen Tour keine andere offene Tour haben.
+                  AND NOT EXISTS (
+                        SELECT 1 FROM public.tour x
+                        WHERE x.unternehmen_id = $1::bigint
+                          AND (x.fahrer_id = $8::bigint OR x.fahrzeug_id = $9::bigint)
+                          AND x.startzeit < $5::timestamp AT TIME ZONE 'Europe/Berlin'
+                          AND x.endzeit > $4::timestamp AT TIME ZONE 'Europe/Berlin'
+                          AND lower(x.status) NOT SIMILAR TO '%(abgeschlossen|beendet|storniert)%')
                   AND (SELECT count(*) FROM public.auftrag x
                        WHERE x.auftrag_id = ANY($12::bigint[]) AND x.unternehmen_id = $1::bigint AND x.tour_id IS NULL)
                       = cardinality($12::bigint[])
@@ -264,8 +272,9 @@ public sealed class TourRepository
                 return Id(rows[0], 0);
 
             // Keine Zeile: Die Prüfung oben ist fehlgeschlagen.
-            throw new ArgumentException("Die Tour konnte nicht gespeichert werden: Eine Sendung wurde inzwischen verplant " +
-                                        "oder Abteilung (inzwischen deaktiviert?), Fahrer bzw. Fahrzeug gibt es nicht mehr. Bitte laden Sie das Formular neu.");
+            throw new ArgumentException("Die Tour konnte nicht gespeichert werden: Eine Sendung wurde inzwischen verplant, " +
+                                        "Fahrer oder Fahrzeug haben in diesem Zeitraum schon eine andere Tour, oder Abteilung, " +
+                                        "Fahrer bzw. Fahrzeug gibt es nicht mehr. Bitte laden Sie das Formular neu.");
         }
         catch (NeonSqlException exception) when (exception.Code == "23505" &&
             exception.ConstraintName == "tour_unternehmen_tournummer_uq")
@@ -274,6 +283,320 @@ public sealed class TourRepository
             throw new TournummerVergebenException(exception);
         }
     }
+
+    // ── D16: Sendung zuweisen ────────────────────────────────────────────────────────
+
+    /// <summary>
+    /// Die Sendung, alle Fahrer und Fahrzeuge, die im Zeitraum der Sendung frei sind, aktive Abteilungen und
+    /// ein Vorschlag für die Tournummer. Frei = keine andere offene Tour, die sich mit Abholung bis Zustellung
+    /// überschneidet. Fahrer nicht im Urlaub/krank, Fahrzeug nicht in Wartung oder gesperrt.
+    /// </summary>
+    /// <exception cref="ArgumentException">Die Sendung gibt es in dieser Firma nicht.</exception>
+    public async Task<ZuweisungDaten> ZuweisungLadenAsync(long auftragId, CancellationToken cancellationToken = default)
+    {
+        FirmenZugriff zugriff = await AuthService.FirmenZugriffPruefenAsync(Rolle, cancellationToken);
+        var ids = new string?[] { Text(zugriff.UnternehmenId), Text(auftragId) };
+
+        var rows = await _client.Value.QueryAsync("""
+            SELECT a.auftrag_id, a.auftragsnummer, COALESCE(NULLIF(a.kundenreferenz, ''), a.auftragsnummer), COALESCE(k.firmenname, ''),
+                   a.abholadresse, to_char(a.abholdatum, 'YYYY-MM-DD'), to_char(a.abholfenster_von, 'HH24:MI'), to_char(a.abholfenster_bis, 'HH24:MI'),
+                   a.lieferadresse, to_char(a.lieferdatum, 'YYYY-MM-DD'), to_char(a.lieferfenster_von, 'HH24:MI'), to_char(a.lieferfenster_bis, 'HH24:MI'),
+                   a.gutart, a.verpackungstyp, a.anzahl, a.gewicht_kg, round(a.anzahl * a.laenge_m * a.breite_m / 2.4, 1),
+                   a.temperatur_min_c, a.temperatur_max_c, a.gefahrgut, a.prioritaet, t.tournummer
+            FROM public.auftrag a
+            LEFT JOIN public.kunde k ON k.kunde_id = a.kunde_id AND k.unternehmen_id = a.unternehmen_id
+            LEFT JOIN public.tour t ON t.tour_id = a.tour_id AND t.unternehmen_id = a.unternehmen_id
+            WHERE a.unternehmen_id = $1::bigint AND a.auftrag_id = $2::bigint
+            """, ids, cancellationToken);
+        if (rows.Count != 1)
+            throw new ArgumentException("Diese Sendung gibt es nicht (mehr).");
+        var r = rows[0];
+        var sendung = new ZuweisungSendung(
+            Id(r, 0), Required(r, 1), Required(r, 2), Required(r, 3),
+            Required(r, 4), Datum(r, 5), Uhrzeit(r, 6), Uhrzeit(r, 7),
+            Required(r, 8), Datum(r, 9), Uhrzeit(r, 10), Uhrzeit(r, 11),
+            Required(r, 12), Required(r, 13), int.Parse(Required(r, 14), CultureInfo.InvariantCulture),
+            Zahl(r, 15), Zahl(r, 16),
+            r[17] is string min ? decimal.Parse(min, CultureInfo.InvariantCulture) : null,
+            r[18] is string max ? decimal.Parse(max, CultureInfo.InvariantCulture) : null,
+            Required(r, 19) == "t", Required(r, 20), r[21]);
+
+        // Zeitraum der Sendung und „belegt“ = andere offene Tour, die sich damit überschneidet.
+        const string zeitraum = """
+            WITH z AS (
+                SELECT (a.abholdatum + a.abholfenster_von) AT TIME ZONE 'Europe/Berlin' AS von,
+                       (a.lieferdatum + a.lieferfenster_bis) AT TIME ZONE 'Europe/Berlin' AS bis
+                FROM public.auftrag a WHERE a.auftrag_id = $2::bigint AND a.unternehmen_id = $1::bigint
+            ), belegt AS (
+                SELECT t.fahrer_id, t.fahrzeug_id FROM public.tour t, z
+                WHERE t.unternehmen_id = $1::bigint AND t.startzeit < z.bis AND t.endzeit > z.von
+                  AND lower(t.status) NOT SIMILAR TO '%(abgeschlossen|beendet|storniert)%'
+            )
+            """;
+
+        var fahrer = (await _client.Value.QueryAsync(zeitraum + "\n" + """
+            SELECT fa.fahrer_id, trim(concat_ws(' ', b.vorname, b.nachname)), fa.fuehrerscheinklasse, fa.verfuegbarkeit, ab.bezeichnung
+            FROM public.fahrer fa
+            JOIN public.benutzer b ON b.benutzer_id = fa.benutzer_id
+            LEFT JOIN public.abteilung ab ON ab.abteilung_id = b.abteilung_id AND ab.unternehmen_id = b.unternehmen_id
+            WHERE b.unternehmen_id = $1::bigint AND b.aktiv = true
+              AND lower(fa.verfuegbarkeit) NOT SIMILAR TO '%(urlaub|krank|abwesend|gesperrt|nicht verfügbar)%'
+              AND NOT EXISTS (SELECT 1 FROM belegt x WHERE x.fahrer_id = fa.fahrer_id)
+            ORDER BY lower(b.nachname), lower(b.vorname), fa.fahrer_id
+            """, ids, cancellationToken))
+            .Select(row => new FreierFahrer(Id(row, 0), Required(row, 1), Required(row, 2), Required(row, 3), row[4]))
+            .ToArray();
+
+        var fahrzeuge = (await _client.Value.QueryAsync(zeitraum + "\n" + """
+            SELECT f.fahrzeug_id, f.kennzeichen, f.fahrzeugtyp, f.aufbau, f.nutzlast_kg, f.nutzbare_lademeter, f.ep_stellplaetze,
+                   f.status, ab.bezeichnung
+            FROM public.fahrzeug f
+            LEFT JOIN public.abteilung ab ON ab.abteilung_id = f.abteilung_id AND ab.unternehmen_id = f.unternehmen_id
+            WHERE f.unternehmen_id = $1::bigint
+              AND lower(f.status) NOT SIMILAR TO '%(wartung|gesperrt|ausgemustert)%'
+              AND NOT EXISTS (SELECT 1 FROM belegt x WHERE x.fahrzeug_id = f.fahrzeug_id)
+            ORDER BY f.kennzeichen, f.fahrzeug_id
+            """, ids, cancellationToken))
+            .Select(row => new FreiesFahrzeug(Id(row, 0), Required(row, 1), Required(row, 2), Required(row, 3),
+                Zahl(row, 4), Zahl(row, 5), int.Parse(Required(row, 6), CultureInfo.InvariantCulture), Required(row, 7), row[8]))
+            .ToArray();
+
+        TourPlanungsdaten planung = await PlanungsdatenLadenAsync(cancellationToken);
+        return new ZuweisungDaten(sendung, fahrer, fahrzeuge, planung.Abteilungen, planung.TournummerVorschlag);
+    }
+
+    // ── D06: Tour zuweisen ───────────────────────────────────────────────────────────
+
+    /// <summary>
+    /// Die Tour mit Stopps und Ladung sowie alle Fahrer und Fahrzeuge, die im Zeitraum der Tour frei sind.
+    /// Frei wie in D16: keine ANDERE offene Tour im Zeitraum. Die bisherige Zuordnung dieser Tour gilt als frei.
+    /// </summary>
+    /// <exception cref="ArgumentException">Die Tour gibt es in dieser Firma nicht.</exception>
+    public async Task<TourZuweisungDaten> TourZuweisungLadenAsync(long tourId, CancellationToken cancellationToken = default)
+    {
+        FirmenZugriff zugriff = await AuthService.FirmenZugriffPruefenAsync(Rolle, cancellationToken);
+        var ids = new string?[] { Text(zugriff.UnternehmenId), Text(tourId) };
+
+        var rows = await _client.Value.QueryAsync("""
+            SELECT t.tour_id, t.tournummer, a.bezeichnung, t.status,
+                   lower(t.status) NOT SIMILAR TO '%(abgeschlossen|beendet|storniert)%',
+                   t.startort, t.zielort,
+                   to_char(t.startzeit AT TIME ZONE 'Europe/Berlin', 'YYYY-MM-DD HH24:MI'),
+                   to_char(t.endzeit AT TIME ZONE 'Europe/Berlin', 'YYYY-MM-DD HH24:MI'),
+                   t.fahrer_id, t.fahrzeug_id,
+                   l.anzahl, l.gewicht, l.lademeter, l.paletten, l.gekuehlt
+            FROM public.tour t
+            LEFT JOIN public.abteilung a ON a.abteilung_id = t.abteilung_id AND a.unternehmen_id = t.unternehmen_id
+            CROSS JOIN LATERAL (
+                SELECT count(*) AS anzahl,
+                       COALESCE(sum(x.gewicht_kg), 0) AS gewicht,
+                       COALESCE(round(sum(x.anzahl * x.laenge_m * x.breite_m / 2.4), 1), 0) AS lademeter,
+                       COALESCE(sum(x.anzahl) FILTER (WHERE x.verpackungstyp = 'Europalette'), 0) AS paletten,
+                       COALESCE(bool_or(x.gutart = 'Frische'), false) AS gekuehlt
+                FROM public.auftrag x WHERE x.tour_id = t.tour_id AND x.unternehmen_id = t.unternehmen_id
+            ) l
+            WHERE t.unternehmen_id = $1::bigint AND t.tour_id = $2::bigint
+            """, ids, cancellationToken);
+        if (rows.Count != 1)
+            throw new ArgumentException("Diese Tour gibt es nicht (mehr).");
+        var r = rows[0];
+        var tour = new TourZuweisungKopf(
+            Id(r, 0), Required(r, 1), r[2], Required(r, 3), Required(r, 4) == "t",
+            Required(r, 5), Required(r, 6), Zeitpunkt(r, 7), Zeitpunkt(r, 8),
+            r[9] is string fahrer ? long.Parse(fahrer, CultureInfo.InvariantCulture) : null,
+            r[10] is string fahrzeug ? long.Parse(fahrzeug, CultureInfo.InvariantCulture) : null,
+            int.Parse(Required(r, 11), CultureInfo.InvariantCulture), Zahl(r, 12), Zahl(r, 13),
+            int.Parse(Required(r, 14), CultureInfo.InvariantCulture), Required(r, 15) == "t");
+
+        var stopps = (await _client.Value.QueryAsync("""
+            SELECT s.reihenfolge, s.art, s.bezeichnung,
+                   to_char(s.zeitfenster_von AT TIME ZONE 'Europe/Berlin', 'DD.MM. HH24:MI') || '–' ||
+                   to_char(s.zeitfenster_bis AT TIME ZONE 'Europe/Berlin', 'HH24:MI')
+            FROM public.tourstopp s JOIN public.tour t ON t.tour_id = s.tour_id
+            WHERE t.unternehmen_id = $1::bigint AND s.tour_id = $2::bigint
+            ORDER BY s.reihenfolge, s.stopp_id
+            """, ids, cancellationToken))
+            .Select(row => new TourStoppKurz(int.Parse(Required(row, 0), CultureInfo.InvariantCulture),
+                Required(row, 1), Required(row, 2), Required(row, 3)))
+            .ToArray();
+
+        // Zeitraum der Tour; „belegt“ = ANDERE offene Tour, die sich damit überschneidet.
+        const string zeitraum = """
+            WITH z AS (
+                SELECT t.startzeit AS von, t.endzeit AS bis
+                FROM public.tour t WHERE t.tour_id = $2::bigint AND t.unternehmen_id = $1::bigint
+            ), belegt AS (
+                SELECT t.fahrer_id, t.fahrzeug_id FROM public.tour t, z
+                WHERE t.unternehmen_id = $1::bigint AND t.tour_id <> $2::bigint
+                  AND t.startzeit < z.bis AND t.endzeit > z.von
+                  AND lower(t.status) NOT SIMILAR TO '%(abgeschlossen|beendet|storniert)%'
+            )
+            """;
+        var fahrerListe = (await _client.Value.QueryAsync(zeitraum + "\n" + """
+            SELECT fa.fahrer_id, trim(concat_ws(' ', b.vorname, b.nachname)), fa.fuehrerscheinklasse, fa.verfuegbarkeit, ab.bezeichnung
+            FROM public.fahrer fa
+            JOIN public.benutzer b ON b.benutzer_id = fa.benutzer_id
+            LEFT JOIN public.abteilung ab ON ab.abteilung_id = b.abteilung_id AND ab.unternehmen_id = b.unternehmen_id
+            WHERE b.unternehmen_id = $1::bigint AND b.aktiv = true
+              AND lower(fa.verfuegbarkeit) NOT SIMILAR TO '%(urlaub|krank|abwesend|gesperrt|nicht verfügbar)%'
+              AND NOT EXISTS (SELECT 1 FROM belegt x WHERE x.fahrer_id = fa.fahrer_id)
+            ORDER BY lower(b.nachname), lower(b.vorname), fa.fahrer_id
+            """, ids, cancellationToken))
+            .Select(row => new FreierFahrer(Id(row, 0), Required(row, 1), Required(row, 2), Required(row, 3), row[4]))
+            .ToArray();
+
+        var fahrzeugListe = (await _client.Value.QueryAsync(zeitraum + "\n" + """
+            SELECT f.fahrzeug_id, f.kennzeichen, f.fahrzeugtyp, f.aufbau, f.nutzlast_kg, f.nutzbare_lademeter, f.ep_stellplaetze,
+                   f.status, ab.bezeichnung
+            FROM public.fahrzeug f
+            LEFT JOIN public.abteilung ab ON ab.abteilung_id = f.abteilung_id AND ab.unternehmen_id = f.unternehmen_id
+            WHERE f.unternehmen_id = $1::bigint
+              AND lower(f.status) NOT SIMILAR TO '%(wartung|gesperrt|ausgemustert)%'
+              AND NOT EXISTS (SELECT 1 FROM belegt x WHERE x.fahrzeug_id = f.fahrzeug_id)
+            ORDER BY f.kennzeichen, f.fahrzeug_id
+            """, ids, cancellationToken))
+            .Select(row => new FreiesFahrzeug(Id(row, 0), Required(row, 1), Required(row, 2), Required(row, 3),
+                Zahl(row, 4), Zahl(row, 5), int.Parse(Required(row, 6), CultureInfo.InvariantCulture), Required(row, 7), row[8]))
+            .ToArray();
+
+        return new TourZuweisungDaten(tour, stopps, fahrerListe, fahrzeugListe);
+    }
+
+    /// <summary>
+    /// Setzt Fahrer und Fahrzeug einer offenen Tour. Eine geplante Tour wird dabei „Zugewiesen“, eine schon
+    /// laufende Tour behält ihren Status. Geprüft wird in einem Befehl: Tour, Fahrer und Fahrzeug gehören zur Firma,
+    /// die Tour ist nicht abgeschlossen, und Fahrer bzw. Fahrzeug haben im Tourzeitraum keine andere offene Tour.
+    /// </summary>
+    /// <exception cref="ArgumentException">Eine der Prüfungen ist fehlgeschlagen.</exception>
+    public async Task ZuweisenAsync(long tourId, long fahrerId, long fahrzeugId, CancellationToken cancellationToken = default)
+    {
+        FirmenZugriff zugriff = await AuthService.FirmenZugriffPruefenAsync(Rolle, cancellationToken);
+        const string query = """
+            WITH ziel AS (
+                SELECT t.tour_id, t.startzeit, t.endzeit FROM public.tour t
+                WHERE t.tour_id = $2::bigint AND t.unternehmen_id = $1::bigint
+                  AND lower(t.status) NOT SIMILAR TO '%(abgeschlossen|beendet|storniert)%'
+                  AND EXISTS (SELECT 1 FROM public.fahrer fa JOIN public.benutzer b ON b.benutzer_id = fa.benutzer_id
+                              WHERE fa.fahrer_id = $3::bigint AND b.unternehmen_id = $1::bigint AND b.aktiv = true)
+                  AND EXISTS (SELECT 1 FROM public.fahrzeug f WHERE f.fahrzeug_id = $4::bigint AND f.unternehmen_id = $1::bigint)
+                  AND NOT EXISTS (
+                        SELECT 1 FROM public.tour x
+                        WHERE x.unternehmen_id = $1::bigint AND x.tour_id <> t.tour_id
+                          AND (x.fahrer_id = $3::bigint OR x.fahrzeug_id = $4::bigint)
+                          AND x.startzeit < t.endzeit AND x.endzeit > t.startzeit
+                          AND lower(x.status) NOT SIMILAR TO '%(abgeschlossen|beendet|storniert)%')
+            ), geaendert AS (
+                UPDATE public.tour t
+                SET fahrer_id = $3::bigint, fahrzeug_id = $4::bigint,
+                    status = CASE WHEN lower(t.status) IN ('geplant', 'offen', 'zugewiesen') THEN $6 ELSE t.status END
+                FROM ziel z WHERE t.tour_id = z.tour_id
+                RETURNING t.tour_id, t.tournummer, t.unternehmen_id, t.abteilung_id
+            ), protokoll AS (
+                INSERT INTO public.aktionsprotokoll (akteur_art, aktion, ergebnis, detail, unternehmen_id, abteilung_id, benutzer_id)
+                SELECT CASE WHEN $5::bigint IS NULL THEN 'Entwicklungsansicht' ELSE 'Benutzer' END,
+                       'Tour zugewiesen', 'Gespeichert', 'Tour ' || g.tournummer, g.unternehmen_id, g.abteilung_id, $5::bigint
+                FROM geaendert g
+            )
+            SELECT tour_id FROM geaendert
+            """;
+        var rows = await _client.Value.QueryAsync(query, new string?[]
+        {
+            Text(zugriff.UnternehmenId), Text(tourId), Text(fahrerId), Text(fahrzeugId),
+            BenutzerSitzung.AktuellerBenutzer is { } benutzer ? Text(benutzer.Id) : null,
+            TourWerte.StatusZugewiesen
+        }, cancellationToken);
+        if (rows.Count != 1)
+            throw new ArgumentException("Die Zuweisung konnte nicht gespeichert werden: Die Tour ist inzwischen abgeschlossen, " +
+                                        "oder Fahrer bzw. Fahrzeug haben in diesem Zeitraum schon eine andere Tour. Bitte laden Sie die Ansicht neu.");
+    }
+
+    // ── D07: Tourdetails ─────────────────────────────────────────────────────────────
+
+    /// <summary>Tour mit Fahrer, Fahrzeug, Ladung und allen Stopps (Ist-Zeiten, ETA, Kunden der Sendungen).</summary>
+    /// <exception cref="ArgumentException">Die Tour gibt es in dieser Firma nicht.</exception>
+    public async Task<TourDetails> DetailsLadenAsync(long tourId, CancellationToken cancellationToken = default)
+    {
+        FirmenZugriff zugriff = await AuthService.FirmenZugriffPruefenAsync(Rolle, cancellationToken);
+        var ids = new string?[] { Text(zugriff.UnternehmenId), Text(tourId) };
+
+        var rows = await _client.Value.QueryAsync("""
+            SELECT t.tour_id, t.tournummer, a.bezeichnung, t.status,
+                   NULLIF(trim(concat_ws(' ', b.vorname, b.nachname)), ''), f.kennzeichen, f.fahrzeugtyp, f.aufbau,
+                   to_char(t.startzeit AT TIME ZONE 'Europe/Berlin', 'Dy DD.MM. HH24:MI') || ' – ' ||
+                   CASE WHEN (t.startzeit AT TIME ZONE 'Europe/Berlin')::date = (t.endzeit AT TIME ZONE 'Europe/Berlin')::date
+                        THEN to_char(t.endzeit AT TIME ZONE 'Europe/Berlin', 'HH24:MI')
+                        ELSE to_char(t.endzeit AT TIME ZONE 'Europe/Berlin', 'Dy DD.MM. HH24:MI') END,
+                   t.startort, t.zielort,
+                   l.anzahl, l.plaetze, l.lademeter, l.gewicht
+            FROM public.tour t
+            LEFT JOIN public.abteilung a ON a.abteilung_id = t.abteilung_id AND a.unternehmen_id = t.unternehmen_id
+            LEFT JOIN public.fahrer fa ON fa.fahrer_id = t.fahrer_id
+            LEFT JOIN public.benutzer b ON b.benutzer_id = fa.benutzer_id AND b.unternehmen_id = t.unternehmen_id
+            LEFT JOIN public.fahrzeug f ON f.fahrzeug_id = t.fahrzeug_id AND f.unternehmen_id = t.unternehmen_id
+            CROSS JOIN LATERAL (
+                SELECT count(*) AS anzahl, COALESCE(sum(x.anzahl), 0) AS plaetze,
+                       COALESCE(round(sum(x.anzahl * x.laenge_m * x.breite_m / 2.4), 1), 0) AS lademeter,
+                       COALESCE(sum(x.gewicht_kg), 0) AS gewicht
+                FROM public.auftrag x WHERE x.tour_id = t.tour_id AND x.unternehmen_id = t.unternehmen_id
+            ) l
+            WHERE t.unternehmen_id = $1::bigint AND t.tour_id = $2::bigint
+            """, ids, cancellationToken);
+        if (rows.Count != 1)
+            throw new ArgumentException("Diese Tour gibt es nicht (mehr).");
+        var r = rows[0];
+        var kopf = new TourDetailKopf(
+            Id(r, 0), Required(r, 1), r[2], Required(r, 3), r[4], r[5], r[6], r[7],
+            Wochentag(Required(r, 8)), Required(r, 9), Required(r, 10),
+            int.Parse(Required(r, 11), CultureInfo.InvariantCulture), int.Parse(Required(r, 12), CultureInfo.InvariantCulture),
+            Zahl(r, 13), Zahl(r, 14));
+
+        // Kunden eines Stopps = Kunden der Sendungen, die an diesem Stopp abgeholt oder zugestellt werden.
+        var stopps = (await _client.Value.QueryAsync("""
+            SELECT s.stopp_id, s.reihenfolge, s.art, s.bezeichnung, s.adresse,
+                   (SELECT string_agg(DISTINCT k.firmenname, ', ')
+                    FROM public.stopp_auftrag sa
+                    JOIN public.auftrag x ON x.auftrag_id = sa.auftrag_id AND x.unternehmen_id = t.unternehmen_id
+                    JOIN public.kunde k ON k.kunde_id = x.kunde_id
+                    WHERE sa.stopp_id = s.stopp_id),
+                   to_char(s.zeitfenster_von AT TIME ZONE 'Europe/Berlin', 'DD.MM.'),
+                   to_char(s.zeitfenster_von AT TIME ZONE 'Europe/Berlin', 'HH24:MI'),
+                   to_char(s.zeitfenster_bis AT TIME ZONE 'Europe/Berlin', 'HH24:MI'),
+                   to_char(s.ist_ankunft AT TIME ZONE 'Europe/Berlin', 'HH24:MI'),
+                   to_char(s.ist_abfahrt AT TIME ZONE 'Europe/Berlin', 'HH24:MI'),
+                   to_char(COALESCE(s.aktuelle_eta, s.geplante_ankunft) AT TIME ZONE 'Europe/Berlin', 'HH24:MI'),
+                   GREATEST(0, ceil(extract(epoch FROM COALESCE(s.aktuelle_eta, s.geplante_ankunft) - s.zeitfenster_bis) / 60))::integer,
+                   s.status, s.breitengrad, s.laengengrad
+            FROM public.tourstopp s JOIN public.tour t ON t.tour_id = s.tour_id
+            WHERE t.unternehmen_id = $1::bigint AND s.tour_id = $2::bigint
+            ORDER BY s.reihenfolge, s.stopp_id
+            """, ids, cancellationToken))
+            .Select(row => new TourDetailStopp(
+                Id(row, 0), int.Parse(Required(row, 1), CultureInfo.InvariantCulture), Required(row, 2), Required(row, 3),
+                Required(row, 4), row[5], Required(row, 6), Required(row, 7), Required(row, 8), row[9], row[10], row[11],
+                row[12] is string minuten ? int.Parse(minuten, CultureInfo.InvariantCulture) : 0,
+                Required(row, 13),
+                row[14] is string breite ? decimal.Parse(breite, CultureInfo.InvariantCulture) : null,
+                row[15] is string laenge ? decimal.Parse(laenge, CultureInfo.InvariantCulture) : null))
+            .ToArray();
+
+        return new TourDetails(kopf, stopps);
+    }
+
+    // PostgreSQL liefert englische Wochentage („Thu“). Für die Anzeige auf Deutsch übersetzen.
+    private static string Wochentag(string text)
+    {
+        string[] englisch = { "Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun" };
+        string[] deutsch = { "Mo", "Di", "Mi", "Do", "Fr", "Sa", "So" };
+        for (int i = 0; i < englisch.Length; i++)
+            text = text.Replace(englisch[i], deutsch[i], StringComparison.Ordinal);
+        return text;
+    }
+
+    // „2026-09-29 08:00“ aus der Datenbank (deutsche Ortszeit).
+    private static DateTime Zeitpunkt(string?[] row, int index) =>
+        DateTime.ParseExact(Required(row, index), "yyyy-MM-dd HH:mm", CultureInfo.InvariantCulture);
+
+    private static decimal Zahl(string?[] row, int index) => decimal.Parse(Required(row, index), CultureInfo.InvariantCulture);
 
     /// <summary>Prüft die Eingaben noch einmal unabhängig von der Oberfläche. Die Meldungen sind für die Anzeige gedacht.</summary>
     private static TourEntwurf Pruefen(TourEntwurf entwurf)

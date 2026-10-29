@@ -14,7 +14,10 @@ namespace Disposio.Views
             "D03" => new D03SendungFormular(kontext),
             "D04" => new D04Touren(kontext),
             "D05" => new D05TourPlanen(kontext),
+            "D06" => new D06TourZuweisen(kontext),
+            "D07" => new D07Tourdetails(kontext),
             "D08" => new D08LiveKarte(kontext),
+            "D16" => new D16SendungZuweisen(kontext),
             _ => null
         };
     }

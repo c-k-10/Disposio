@@ -64,6 +64,13 @@ namespace Disposio.Views
                 _kontext.Oeffnen("D03", id);
         }
 
+        // Öffnet D16: freie Fahrer und Fahrzeuge für genau diese Sendung.
+        private void Zuweisen_Click(object sender, RoutedEventArgs e)
+        {
+            if (sender is Button { Tag: long id })
+                _kontext.Oeffnen("D16", id);
+        }
+
         private async void FilterAnwenden_Click(object sender, RoutedEventArgs e) => await AnwendenAsync();
 
         private async void SuchBox_KeyDown(object sender, KeyRoutedEventArgs e)
@@ -241,6 +248,7 @@ namespace Disposio.Views
             Status = s.Status;
             TourText = s.Tournummer is null ? "" : $"Tour {s.Tournummer}";
             TourSichtbar = s.Tournummer is null ? Visibility.Collapsed : Visibility.Visible;
+            ZuweisenSichtbar = s.IstVerplant ? Visibility.Collapsed : Visibility.Visible;
         }
 
         public long Id { get; }
@@ -253,5 +261,6 @@ namespace Disposio.Views
         public string Status { get; }
         public string TourText { get; }
         public Visibility TourSichtbar { get; }
+        public Visibility ZuweisenSichtbar { get; }
     }
 }

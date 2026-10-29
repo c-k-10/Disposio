@@ -49,6 +49,7 @@ public static class AnsichtenKatalog
         new("D01", "Tagesübersicht", "Tagesübersicht", "Schichtbeginn: Nachtgeschehen und Handlungsbedarf erfassen.", FirmenRolle.Disponent),
         new("D02", "Sendungen", "Sendungen", "Aufträge durchsuchen, erfassen und zur Planung auswählen.", FirmenRolle.Disponent),
         new("D03", null, "Sendung erfassen / bearbeiten", "Kundendaten, Ladegut und beide Transportorte vollständig erfassen.", FirmenRolle.Disponent, "D02"),
+        new("D16", null, "Sendung zuweisen", "Freie Fahrer und Fahrzeuge für eine Sendung wählen und daraus eine Tour anlegen.", FirmenRolle.Disponent, "D02"),
         new("D13", null, "Verplanungsvorschlag prüfen", "Sendungen anhand von Route, Zeitfenster und Ladekapazität zuordnen.", FirmenRolle.Disponent, "D02"),
         new("D04", "Touren", "Tourenübersicht", "Touren suchen, planen und deren Bearbeitungsstand erkennen.", FirmenRolle.Disponent),
         new("D05", null, "Tour planen", "Sendungen und Stoppreihenfolge zu einer Tour zusammenstellen.", FirmenRolle.Disponent, "D04"),
