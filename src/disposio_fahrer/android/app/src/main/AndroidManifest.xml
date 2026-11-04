@@ -1,6 +1,8 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Ohne diese Berechtigung erreicht die Release-App die API nicht -->
+    <uses-permission android:name="android.permission.INTERNET"/>
     <application
-        android:label="disposio_fahrer"
+        android:label="Disposio Fahrer"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
         <activity
