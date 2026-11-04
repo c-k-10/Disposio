@@ -5,7 +5,7 @@ using Microsoft.IdentityModel.Tokens;
 using Npgsql;
 
 // Disposio.Api - Schnittstelle zwischen Fahrer-App und Neon.
-// Phase 0: Health-Check. Phase 1: Anmeldung (M01) und Profil (M09).
+// Phase 0: Health-Check. Phase 1: Anmeldung (M01) und Profil (M09). Phase 2: Touren (M02 bis M05).
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -57,7 +57,7 @@ var app = builder.Build();
 app.UseAuthentication();
 app.UseAuthorization();
 
-app.MapGet("/", () => Results.Ok(new { name = "Disposio.Api", version = "0.2" }));
+app.MapGet("/", () => Results.Ok(new { name = "Disposio.Api", version = "0.3" }));
 
 app.MapGet("/health", async (NpgsqlDataSource db) =>
 {
@@ -76,5 +76,6 @@ app.MapGet("/health", async (NpgsqlDataSource db) =>
 
 app.MapAuthEndpoints();
 app.MapProfilEndpoints();
+app.MapTourEndpoints();
 
 app.Run();

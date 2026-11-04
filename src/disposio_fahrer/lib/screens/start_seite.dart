@@ -3,10 +3,11 @@ import 'package:flutter/material.dart';
 import '../texte.dart';
 import '../theme/disposio_theme.dart';
 import 'profil_seite.dart';
+import 'touren_seite.dart';
 
 /// Grundgeruest mit der unteren Leiste aus den Wireframes:
 /// Touren · Chat · Uebertragung · Profil.
-/// Touren, Chat und Uebertragung kommen in den naechsten Phasen (M02, M08, M11).
+/// Touren seit Phase 2 (M02). Chat und Uebertragung kommen in den naechsten Phasen (M08, M11).
 class StartSeite extends StatefulWidget {
   const StartSeite({super.key});
 
@@ -22,7 +23,7 @@ class _StartSeiteState extends State<StartSeite> {
   @override
   Widget build(BuildContext context) {
     final seiten = [
-      _Platzhalter(titel: Texte.t('touren_titel'), hinweis: Texte.t('touren_hinweis')),
+      const TourenSeite(),
       _Platzhalter(titel: Texte.t('chat_titel'), hinweis: Texte.t('chat_hinweis')),
       _Platzhalter(titel: Texte.t('uebertragung_titel'), hinweis: Texte.t('uebertragung_hinweis')),
       ProfilSeite(zuUebertragungen: () => setState(() => _tab = _tabUebertragung)),

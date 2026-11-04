@@ -18,7 +18,7 @@ public static class ProfilEndpoints
     public static readonly string[] Verfuegbarkeiten = { "Verfügbar", "Nicht verfügbar", "Urlaub" };
 
     // Gilt fuer b = benutzer, f = fahrer: Konto aktiv, Firma nicht gesperrt, Fahrer-Rolle vorhanden.
-    private const string NochGueltig = """
+    internal const string NochGueltig = """
         b.benutzer_id = $1 AND f.fahrer_id = $2 AND b.unternehmen_id = $3 AND b.aktiv = true
         AND EXISTS (SELECT 1 FROM public.unternehmen u WHERE u.unternehmen_id = b.unternehmen_id AND u.status <> 'Inaktiv')
         AND EXISTS (SELECT 1 FROM public.benutzer_rolle br JOIN public.rolle r ON r.rollen_id = br.rollen_id
