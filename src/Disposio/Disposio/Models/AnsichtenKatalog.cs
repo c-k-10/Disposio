@@ -41,9 +41,9 @@ public static class AnsichtenKatalog
         // Fuhrparkmanager
         new("F01", "Fuhrpark", "Fuhrparkübersicht", "Verfügbarkeit und Kapazitäten aller Unternehmensfahrzeuge sehen.", FirmenRolle.Fuhrparkmanager),
         new("F02", null, "Fahrzeug anlegen / bearbeiten", "Tatsächliche Maße, Nutzlast und Stellplätze getrennt erfassen.", FirmenRolle.Fuhrparkmanager, "F01"),
-        new("F03", "Fahrerzuordnung", "Fahrer – Fahrzeug zuweisen", "Zuweisungen zeitlich planen und Überschneidungen erkennen.", FirmenRolle.Fuhrparkmanager),
-        new("F04", "Wartung & Dokumente", "Wartung & Dokumente", "Fällige Wartungen und auslaufende Fahrzeugdokumente überwachen.", FirmenRolle.Fuhrparkmanager),
-        new("F05", null, "Wartung / Dokument erfassen", "Frist, Kilometerstand, Nachweis und Verfügbarkeit festhalten.", FirmenRolle.Fuhrparkmanager, "F04"),
+        new("F03", "Fahrerzuordnung", "Fahrer – Fahrzeug zuweisen", "Fahrer verfügbaren Fahrzeugen zuordnen, wechseln oder beenden; Doppelbelegungen sind ausgeschlossen.", FirmenRolle.Fuhrparkmanager),
+        new("F04", "Wartung", "Wartung", "Fällige Wartungen farblich erkennen und die Wartungshistorie je Fahrzeug einsehen.", FirmenRolle.Fuhrparkmanager),
+        new("F05", null, "Wartung erfassen", "Termin planen oder durchgeführte Wartung mit Datum, Kilometerstand und Bemerkung festhalten.", FirmenRolle.Fuhrparkmanager, "F04"),
 
         // Disponent
         new("D01", "Tagesübersicht", "Tagesübersicht", "Schichtbeginn: Nachtgeschehen und Handlungsbedarf erfassen.", FirmenRolle.Disponent),
