@@ -10,6 +10,7 @@ namespace Disposio.Views
     {
         public static UIElement? Erstellen(FirmenAnsichtKontext kontext) => kontext.Ansicht.Id switch
         {
+            "D01" => new D01Tagesuebersicht(kontext),
             "D02" => new D02Sendungen(kontext),
             "D03" => new D03SendungFormular(kontext),
             "D04" => new D04Touren(kontext),
@@ -17,6 +18,7 @@ namespace Disposio.Views
             "D06" => new D06TourZuweisen(kontext),
             "D07" => new D07Tourdetails(kontext),
             "D08" => new D08LiveKarte(kontext),
+            "D09" => new D09Nachrichten(kontext),
             "D16" => new D16SendungZuweisen(kontext),
             _ => null
         };

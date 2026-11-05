@@ -272,6 +272,10 @@
                                      Foreground="{StaticResource MutedTextBrush}" VerticalAlignment="Center" />
                 </Grid>
 
+                <!-- Systemzustand: Ampel-Kacheln für kritische Fehler (Datenbank, Neon Functions, Übersetzung …).
+                     Bleibt in beiden Bereichen (Kunden und Aktionsprotokoll) sichtbar. Inhalt: SystemzustandAnzeige.cs -->
+                <Border x:Name="SystemzustandHost" />
+
                 <!-- Der Status erklärt Laden/Fehler. Erneut laden holt den aktuellen Stand aus Neon. -->
                 <Grid x:Name="CustomerStatusRow" ColumnSpacing="16">
                     <Grid.ColumnDefinitions>

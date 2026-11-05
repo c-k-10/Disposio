@@ -11,6 +11,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Threading.Tasks;
 using System.Runtime.InteropServices.WindowsRuntime;
 using Windows.Foundation;
 using Windows.Foundation.Collections;
@@ -60,6 +61,14 @@ namespace Disposio
 #endif
             runtimeFrame.Navigate(startPage);
             this.Content = runtimeFrame;
+
+            // Fenster schließen zählt auch als Abmeldung (für D01 „Seit Ihrer letzten Schicht“).
+            // Höchstens 3 Sekunden warten, damit das Schließen nie hängt. Task.Run: kein Warten auf dem UI-Thread-Kontext.
+            Closed += (_, _) =>
+            {
+                if (BenutzerSitzung.AktuellerBenutzer is { } benutzer)
+                    Task.Run(() => TagesuebersichtRepository.AbmeldungSpeichernAsync(benutzer.Id)).Wait(TimeSpan.FromSeconds(3));
+            };
         }
     }
 }

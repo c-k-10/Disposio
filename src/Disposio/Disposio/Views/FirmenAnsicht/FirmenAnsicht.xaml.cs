@@ -154,7 +154,14 @@ namespace Disposio.Views
                 frame.BackStack.Clear();
         }
 
-        private void Logout_Click(object sender, RoutedEventArgs e) => ReturnToLogin();
+        private void Logout_Click(object sender, RoutedEventArgs e)
+        {
+            // Für D01 „Seit Ihrer letzten Schicht“ den Zeitpunkt merken. Läuft im Hintergrund weiter,
+            // die Abmeldung wartet nicht darauf und klappt auch ohne Verbindung.
+            if (BenutzerSitzung.AktuellerBenutzer is { } benutzer)
+                _ = TagesuebersichtRepository.AbmeldungSpeichernAsync(benutzer.Id);
+            ReturnToLogin();
+        }
 
         // Beendet nur den Admin-Zugang. Der MegakrasserAdmin bleibt angemeldet.
         private void BackToDashboard_Click(object sender, RoutedEventArgs e)

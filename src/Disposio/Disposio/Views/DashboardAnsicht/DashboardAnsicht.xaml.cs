@@ -67,6 +67,10 @@ namespace Disposio.Views
             if (!EnsureDashboardAccess())
                 return;
 
+            // Systemzustand nur einmal anlegen; er prüft selbst beim Öffnen und danach jede Minute.
+            SystemzustandHost.Child ??= new SystemzustandAnzeige(key => Resources[key],
+                () => ReturnToLogin("Die Dashboard-Berechtigung ist nicht mehr vorhanden. Bitte erneut anmelden."));
+
             if (!_hasDataLoaded)
                 await LoadCustomersAsync();
         }

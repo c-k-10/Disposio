@@ -1,0 +1,146 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- D09 „Nachrichten mit Fahrer“: links die Touren mit Fahrer (heute, unterwegs oder mit neuen Nachrichten),
+     rechts der Verlauf. Nachrichten des Fahrers erscheinen übersetzt, das Original lässt sich aufklappen.
+     Eigene Nachrichten werden sofort im Original gespeichert und danach von der Neon Function „uebersetzen“
+     übersetzt. Fällt die Übersetzung aus, bleibt das Original sichtbar und „Erneut übersetzen“ erscheint. -->
+<UserControl
+    x:Class="Disposio.Views.D09Nachrichten"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:local="using:Disposio.Views">
+
+    <Grid ColumnSpacing="20">
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="320" />
+            <ColumnDefinition Width="*" />
+        </Grid.ColumnDefinitions>
+
+        <!-- Links: Gespräche -->
+        <StackPanel Spacing="10">
+            <StackPanel Orientation="Horizontal" Spacing="10">
+                <ProgressRing x:Name="ListeLadeAnzeige" Width="18" Height="18" IsActive="False" Visibility="Collapsed" />
+                <TextBlock x:Name="ListeStatusText" Style="{StaticResource HinweisText}" VerticalAlignment="Center" />
+            </StackPanel>
+            <ListView x:Name="GespraechListe" SelectionMode="Single" SelectionChanged="Gespraech_SelectionChanged"
+                      AutomationProperties.Name="Fahrer und Touren">
+                <ListView.ItemContainerStyle>
+                    <Style TargetType="ListViewItem">
+                        <Setter Property="Padding" Value="0" />
+                        <Setter Property="Margin" Value="0,0,0,10" />
+                        <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+                    </Style>
+                </ListView.ItemContainerStyle>
+                <ListView.ItemTemplate>
+                    <DataTemplate x:DataType="local:GespraechZeile">
+                        <!-- Der geöffnete Chat: Akzentrahmen, in der Firmenfarbe getönt und Balken links (wie die markierten Zeilen in D02). -->
+                        <Border Background="{x:Bind Hintergrund}" BorderBrush="{x:Bind Rahmen}"
+                                BorderThickness="{x:Bind Rahmenstaerke}" CornerRadius="12">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="*" />
+                                </Grid.ColumnDefinitions>
+                                <Border Width="5" Background="{StaticResource AccentBrush}" CornerRadius="11,0,0,11"
+                                        Visibility="{x:Bind BalkenSichtbar}" />
+                            <StackPanel Grid.Column="1" Spacing="6" Margin="{x:Bind Innenabstand}">
+                                <Grid>
+                                    <TextBlock Text="{x:Bind FahrerName}" Style="{StaticResource NormalText}" FontWeight="SemiBold" />
+                                    <!-- Anzahl ungelesener Nachrichten -->
+                                    <Border HorizontalAlignment="Right" Background="{StaticResource AccentBrush}" CornerRadius="10"
+                                            Padding="8,1" Visibility="{x:Bind UngelesenSichtbar}">
+                                        <TextBlock Text="{x:Bind UngelesenText}" FontSize="12" FontWeight="SemiBold"
+                                                   Foreground="{StaticResource AccentTextBrush}" />
+                                    </Border>
+                                </Grid>
+                                <TextBlock Text="{x:Bind TourUndFahrzeug}" Style="{StaticResource HinweisText}" />
+                                <TextBlock Text="{x:Bind Hinweis}" Style="{StaticResource HinweisText}" FontSize="13"
+                                           FontWeight="{x:Bind HinweisSchrift}" Visibility="{x:Bind HinweisSichtbar}" />
+                                <TextBlock Text="Geöffnet" Visibility="{x:Bind BalkenSichtbar}" FontSize="12" FontWeight="SemiBold"
+                                           Foreground="{StaticResource TextBrush}" />
+                            </StackPanel>
+                            </Grid>
+                        </Border>
+                    </DataTemplate>
+                </ListView.ItemTemplate>
+            </ListView>
+            <TextBlock x:Name="ListeLeer" Visibility="Collapsed" Style="{StaticResource HinweisText}"
+                       Text="Heute gibt es keine Touren mit zugewiesenem Fahrer." />
+        </StackPanel>
+
+        <!-- Rechts: Verlauf und Eingabe -->
+        <Border Grid.Column="1" Style="{StaticResource KarteStyle}" VerticalAlignment="Top">
+            <StackPanel Spacing="14">
+                <StackPanel Spacing="2">
+                    <TextBlock x:Name="KopfText" Text="Bitte links einen Fahrer wählen." Style="{StaticResource UeberschriftText}" />
+                    <!-- Welche Tour gehört zu diesem Chat? -->
+                    <TextBlock x:Name="KopfUnterText" Style="{StaticResource HinweisText}" Visibility="Collapsed" />
+                </StackPanel>
+
+                <ScrollViewer x:Name="VerlaufScroller" MaxHeight="460" VerticalScrollBarVisibility="Auto">
+                    <StackPanel Spacing="12">
+                        <ItemsControl x:Name="VerlaufListe">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate x:DataType="local:NachrichtZeile">
+                                    <!-- Fahrer links, Disponent rechts -->
+                                    <Border HorizontalAlignment="{x:Bind Ausrichtung}" MaxWidth="620" Margin="0,0,0,12"
+                                            Background="{x:Bind Hintergrund}" BorderBrush="{StaticResource BorderBrush}"
+                                            BorderThickness="1" CornerRadius="12" Padding="18,12">
+                                        <StackPanel Spacing="4">
+                                            <TextBlock Text="{x:Bind Haupttext}" Style="{StaticResource NormalText}" IsTextSelectionEnabled="True" />
+                                            <!-- Zeit/Übersetzung links, bei eigenen Nachrichten rechts „✓ Gesendet / ✓✓ Zugestellt / ✓✓ Gelesen“ -->
+                                            <Grid ColumnSpacing="16">
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="*" />
+                                                    <ColumnDefinition Width="Auto" />
+                                                </Grid.ColumnDefinitions>
+                                                <TextBlock Text="{x:Bind Meta}" Style="{StaticResource HinweisText}" FontSize="13" />
+                                                <TextBlock Grid.Column="1" Text="{x:Bind Zustellung}" Foreground="{x:Bind ZustellungFarbe}"
+                                                           FontSize="13" FontWeight="SemiBold" VerticalAlignment="Bottom"
+                                                           Visibility="{x:Bind ZustellungSichtbar}"
+                                                           ToolTipService.ToolTip="{x:Bind ZustellungErklaerung}"
+                                                           AutomationProperties.Name="{x:Bind ZustellungErklaerung}" />
+                                            </Grid>
+                                            <TextBlock Text="{x:Bind Fehlertext}" Style="{StaticResource FehlerText}" FontSize="13"
+                                                       Visibility="{x:Bind FehlerSichtbar}" />
+                                            <StackPanel Orientation="Horizontal" Spacing="8">
+                                                <HyperlinkButton Content="{x:Bind UmschaltText, Mode=OneWay}" Tag="{x:Bind Selbst}"
+                                                                 Visibility="{x:Bind UmschaltenSichtbar}" Padding="0,2"
+                                                                 Click="Umschalten_Click" />
+                                                <Button Content="Erneut übersetzen" Tag="{x:Bind Selbst}"
+                                                        Visibility="{x:Bind FehlerSichtbar}" Style="{StaticResource DashboardButton}"
+                                                        MinHeight="30" Padding="10,2" FontSize="13" Click="ErneutUebersetzen_Click" />
+                                            </StackPanel>
+                                            <!-- Original bzw. Übersetzung zum Prüfen -->
+                                            <TextBlock Text="{x:Bind Zweittext}" Visibility="{x:Bind ZweittextSichtbar, Mode=OneWay}"
+                                                       Style="{StaticResource HinweisText}" FontStyle="Italic" IsTextSelectionEnabled="True" />
+                                        </StackPanel>
+                                    </Border>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                        <TextBlock x:Name="VerlaufLeer" Visibility="Collapsed" Style="{StaticResource HinweisText}"
+                                   Text="Noch keine Nachrichten zu dieser Tour." />
+                    </StackPanel>
+                </ScrollViewer>
+
+                <StackPanel Spacing="6">
+                    <TextBlock x:Name="EingabeLabel" Text="Nachricht" Style="{StaticResource FeldLabel}" />
+                    <TextBox x:Name="EingabeBox" Style="{StaticResource FormTextBox}" PlaceholderText="Nachricht schreiben …"
+                             AcceptsReturn="True" TextWrapping="Wrap" MinHeight="96" MaxLength="2000" IsEnabled="False"
+                             AutomationProperties.Name="Nachricht an den Fahrer" />
+                </StackPanel>
+                <Grid ColumnSpacing="12">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <TextBlock x:Name="StatusText" Style="{StaticResource HinweisText}" VerticalAlignment="Center" />
+                    <Button x:Name="SendenButton" Grid.Column="1" Content="Senden" Style="{StaticResource PrimaryButton}"
+                            IsEnabled="False" Click="Senden_Click" />
+                </Grid>
+                <TextBlock Style="{StaticResource HinweisText}" FontSize="13"
+                           Text="Falls die Übersetzung ausfällt: Das Original bleibt gespeichert und sichtbar, „Erneut übersetzen“ versucht es noch einmal." />
+            </StackPanel>
+        </Border>
+    </Grid>
+</UserControl>

@@ -19,7 +19,8 @@ namespace Disposio.Services;
 public static class BenutzerKontoDienst
 {
     // Nach dem Deploy mit "neon functions get konto" ausgeben lassen und hier eintragen.
-    private const string FunktionsUrl = "https://br-shy-darkness-b21twd96-konto.compute.c-6.eu-central-1.aws.neon.tech/";
+    // internal: Auch der Systemzustand im Admin-Dashboard prüft diese Adresse.
+    internal const string FunktionsUrl = "https://br-shy-darkness-b21twd96-konto.compute.c-6.eu-central-1.aws.neon.tech/";
 
     private static readonly HttpClient Http = new() { Timeout = TimeSpan.FromSeconds(30) };
 
