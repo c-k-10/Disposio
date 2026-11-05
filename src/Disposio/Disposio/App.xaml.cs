@@ -1,4 +1,5 @@
-﻿using Microsoft.UI.Xaml;
+﻿using Microsoft.UI.Windowing;
+using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Controls.Primitives;
 using Microsoft.UI.Xaml.Data;
@@ -56,7 +57,14 @@ namespace Disposio
 #endif
 
             _window = new MainWindow(start);
+            // Icon in der Titelleiste: der Kopf des Maskottchens (Assets/disposio.ico).
+            _window.AppWindow.SetIcon(System.IO.Path.Combine(AppContext.BaseDirectory, "Assets", "disposio.ico"));
             _window.Activate();
+
+            // Die App startet maximiert (wie ein Doppelklick auf die Titelleiste). Titelleiste und Taskleiste
+            // bleiben sichtbar, das Fenster lässt sich weiter verkleinern.
+            if (_window.AppWindow.Presenter is OverlappedPresenter presenter)
+                presenter.Maximize();
         }
     }
 }

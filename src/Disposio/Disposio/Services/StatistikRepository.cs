@@ -46,7 +46,8 @@ public sealed class StatistikRepository : IStatistikRepository
                     (SELECT min(x.datum)::timestamp FROM public.tankvorgang x
                      JOIN public.fahrzeug f ON f.fahrzeug_id = x.fahrzeug_id WHERE f.unternehmen_id = $1::bigint),
                     (SELECT min(x.datum)::timestamp FROM public.wartung x
-                     JOIN public.fahrzeug f ON f.fahrzeug_id = x.fahrzeug_id WHERE f.unternehmen_id = $1::bigint),
+                     JOIN public.fahrzeug f ON f.fahrzeug_id = x.fahrzeug_id
+                     WHERE f.unternehmen_id = $1::bigint AND x.status = 'Erledigt'),
                     (SELECT min(x.datum)::timestamp FROM public.schadensmeldung x
                      JOIN public.fahrzeug f ON f.fahrzeug_id = x.fahrzeug_id WHERE f.unternehmen_id = $1::bigint)
                 ), now() AT TIME ZONE 'Europe/Berlin')) AS monat
@@ -86,7 +87,8 @@ public sealed class StatistikRepository : IStatistikRepository
             ), wartung AS (
                 SELECT count(*) AS anzahl, COALESCE(sum(x.kosten), 0) AS kosten
                 FROM public.wartung x JOIN public.fahrzeug f ON f.fahrzeug_id = x.fahrzeug_id CROSS JOIN z
-                WHERE f.unternehmen_id = $1::bigint AND x.datum >= z.von AND x.datum < z.bis
+                -- Nur durchgeführte Wartungen zählen. Geplante Termine (F04) sind noch keine Kosten.
+                WHERE f.unternehmen_id = $1::bigint AND x.status = 'Erledigt' AND x.datum >= z.von AND x.datum < z.bis
             ), schaden AS (
                 SELECT count(*) AS anzahl, COALESCE(sum(x.kosten), 0) AS kosten
                 FROM public.schadensmeldung x JOIN public.fahrzeug f ON f.fahrzeug_id = x.fahrzeug_id CROSS JOIN z

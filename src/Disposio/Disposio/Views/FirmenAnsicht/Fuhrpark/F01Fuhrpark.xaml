@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- F01 „Fuhrparkübersicht“: alle Fahrzeuge des eigenen Unternehmens, der Weg zu „Fahrzeug anlegen / bearbeiten“ (F02)
-     und „Inaktiv setzen“. Inaktive (ausgemusterte) Fahrzeuge sind zuerst ausgeblendet. -->
+     und „Inaktiv setzen“. Inaktive (ausgemusterte) Fahrzeuge sind zuerst ausgeblendet.
+     Je Fahrzeug stehen auch der aktuelle Fahrer (F03) und der Wartungsstatus (F04) dabei. -->
 <UserControl
     x:Class="Disposio.Views.F01Fuhrpark"
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
@@ -48,6 +49,7 @@
                                 <ColumnDefinition Width="*" />
                                 <ColumnDefinition Width="1.2*" />
                                 <ColumnDefinition Width="0.9*" />
+                                <ColumnDefinition Width="1.1*" />
                             </Grid.ColumnDefinitions>
                             <TextBlock Text="Kennzeichen" Style="{StaticResource HinweisText}" FontWeight="SemiBold" />
                             <TextBlock Grid.Column="1" Text="Klasse / Aufbau" Style="{StaticResource HinweisText}" FontWeight="SemiBold" />
@@ -55,6 +57,7 @@
                             <TextBlock Grid.Column="3" Text="Kilometerstand" Style="{StaticResource HinweisText}" FontWeight="SemiBold" />
                             <TextBlock Grid.Column="4" Text="Kapazität" Style="{StaticResource HinweisText}" FontWeight="SemiBold" />
                             <TextBlock Grid.Column="5" Text="Status" Style="{StaticResource HinweisText}" FontWeight="SemiBold" />
+                            <TextBlock Grid.Column="6" Text="Wartung" Style="{StaticResource HinweisText}" FontWeight="SemiBold" />
                         </Grid>
                         <TextBlock Grid.Column="1" Text="Aktionen" Style="{StaticResource HinweisText}" FontWeight="SemiBold" />
                     </Grid>
@@ -78,11 +81,15 @@
                                             <ColumnDefinition Width="*" />
                                             <ColumnDefinition Width="1.2*" />
                                             <ColumnDefinition Width="0.9*" />
+                                            <ColumnDefinition Width="1.1*" />
                                         </Grid.ColumnDefinitions>
                                         <StackPanel Spacing="2" VerticalAlignment="Center">
                                             <TextBlock Text="{x:Bind Kennzeichen}" Style="{StaticResource NormalText}" FontWeight="SemiBold" />
                                             <TextBlock Text="{x:Bind Abteilung}" Style="{StaticResource HinweisText}"
                                                        Visibility="{x:Bind AbteilungSichtbarkeit}" />
+                                            <!-- #85 aktuelle Fahrerzuordnung aus F03. -->
+                                            <TextBlock Text="{x:Bind Fahrer}" Style="{StaticResource HinweisText}"
+                                                       Visibility="{x:Bind FahrerSichtbarkeit}" />
                                         </StackPanel>
                                         <TextBlock Grid.Column="1" Text="{x:Bind KlasseUndAufbau}" Style="{StaticResource NormalText}" VerticalAlignment="Center" />
                                         <TextBlock Grid.Column="2" Text="{x:Bind HerstellerUndModell}" Style="{StaticResource NormalText}" VerticalAlignment="Center" />
@@ -92,6 +99,18 @@
                                                 CornerRadius="14" Padding="10,3" HorizontalAlignment="Left" VerticalAlignment="Center">
                                             <TextBlock Text="{x:Bind Status}" FontSize="13" Foreground="{StaticResource TextBrush}" />
                                         </Border>
+                                        <!-- #92 Wartungsstatus: Ampel mit Text, darunter der dringendste offene Termin. -->
+                                        <StackPanel Grid.Column="6" Spacing="3" VerticalAlignment="Center">
+                                            <Border BorderBrush="{x:Bind WartungFarbe}" BorderThickness="1"
+                                                    CornerRadius="14" Padding="10,3" HorizontalAlignment="Left">
+                                                <StackPanel Orientation="Horizontal" Spacing="6">
+                                                    <Ellipse Width="9" Height="9" Fill="{x:Bind WartungFarbe}" VerticalAlignment="Center" />
+                                                    <TextBlock Text="{x:Bind WartungStatus}" FontSize="13" Foreground="{StaticResource TextBrush}" />
+                                                </StackPanel>
+                                            </Border>
+                                            <TextBlock Text="{x:Bind WartungDetail}" Style="{StaticResource HinweisText}" FontSize="12"
+                                                       Visibility="{x:Bind WartungDetailSichtbarkeit}" />
+                                        </StackPanel>
                                     </Grid>
                                     <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
                                         <Button Content="Bearbeiten" Style="{StaticResource DashboardButton}"

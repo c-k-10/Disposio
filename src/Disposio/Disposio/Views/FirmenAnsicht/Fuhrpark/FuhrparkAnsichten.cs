@@ -12,6 +12,9 @@ namespace Disposio.Views
         {
             "F01" => new F01Fuhrpark(kontext),
             "F02" => new F02FahrzeugFormular(kontext),
+            "F03" => new F03Fahrerzuordnung(kontext),
+            "F04" => new F04Wartung(kontext),
+            "F05" => new F05WartungFormular(kontext),
             _ => null
         };
     }

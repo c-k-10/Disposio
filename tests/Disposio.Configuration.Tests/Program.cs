@@ -101,4 +101,26 @@ try
     catch (InvalidOperationException exception) { Check(!exception.Message.Contains("TEST_SECRET"), "HTTPS-Hostschutz bleibt aktiv"); }
 }
 finally { Environment.SetEnvironmentVariable(Database.ConnectionStringEnvironmentVariable, previous); }
-Console.WriteLine($"PASS: {checks} Konfigurationsprüfungen ohne Netzwerk oder Speicherung.");
+
+// US-05 (#90, #92): Ampel für Wartungstermine. Reine Rechenregeln, ohne Datenbank.
+{
+    var heute = new DateOnly(2026, 11, 5);
+    Disposio.Models.WartungsAmpel A(DateOnly termin, int? faelligKm = null, int aktuellKm = 0) =>
+        Disposio.Models.WartungsRegeln.Bewerten(termin, faelligKm, aktuellKm, heute);
+    Check(A(heute.AddDays(-1)) == Disposio.Models.WartungsAmpel.Ueberfaellig, "Wartung: gestern ist überfällig");
+    Check(A(heute) == Disposio.Models.WartungsAmpel.BaldFaellig, "Wartung: heute ist bald fällig, nicht überfällig");
+    Check(A(heute.AddDays(14)) == Disposio.Models.WartungsAmpel.BaldFaellig, "Wartung: in 14 Tagen ist bald fällig");
+    Check(A(heute.AddDays(15)) == Disposio.Models.WartungsAmpel.Geplant, "Wartung: in 15 Tagen ist geplant");
+    Check(A(heute.AddDays(60), 100_000, 100_000) == Disposio.Models.WartungsAmpel.Ueberfaellig, "Wartung: Kilometerstand erreicht");
+    Check(A(heute.AddDays(60), 100_000, 99_000) == Disposio.Models.WartungsAmpel.BaldFaellig, "Wartung: 1.000 km vorher bald fällig");
+    Check(A(heute.AddDays(60), 100_000, 98_999) == Disposio.Models.WartungsAmpel.Geplant, "Wartung: mehr als 1.000 km vorher geplant");
+
+    var frueh = new Disposio.Models.Wartungstermin(1, 7, "N-DS 101", "Inspektion", heute.AddDays(30), null, 50_000, "");
+    var kmFaellig = new Disposio.Models.Wartungstermin(2, 7, "N-DS 101", "Ölwechsel", heute.AddDays(90), 50_000, 50_000, "");
+    Check(Disposio.Models.WartungsRegeln.DringendsterTermin(new[] { frueh, kmFaellig }, heute) == kmFaellig,
+        "Wartung: Fahrzeugstatus nimmt den dringendsten, nicht den frühesten Termin");
+    Check(Disposio.Models.WartungsRegeln.DringendsterTermin(Array.Empty<Disposio.Models.Wartungstermin>(), heute) is null,
+        "Wartung: ohne Termin kein Status");
+}
+
+Console.WriteLine($"PASS: {checks} Konfigurations- und Wartungsprüfungen ohne Netzwerk oder Speicherung.");

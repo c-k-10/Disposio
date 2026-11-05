@@ -24,6 +24,9 @@ namespace Disposio.Views
         private readonly FirmenAnsichtKontext _kontext;
         private readonly TourRepository _repository = new();
         private IReadOnlyList<TourUebersicht> _touren = Array.Empty<TourUebersicht>();
+        // Per Klick markierte Zeile. Die Id bleibt erhalten, wenn die Liste neu gefiltert wird.
+        private Border? _markierteZeile;
+        private long? _markierteTourId;
         private DateOnly? _geladenerTag;
         private CancellationTokenSource? _laden;
         // Nach dem Speichern in D05 kommt eine Erfolgsmeldung als Startwert. Sie erscheint nur einmal.
@@ -76,12 +79,41 @@ namespace Disposio.Views
         // „Zuweisen“ öffnet D06, „Öffnen“ die Tourdetails D07. Beide bekommen die Tour-Id als Startwert.
         private void TourAktion_Click(object sender, RoutedEventArgs e)
         {
-            if (sender is not Button { Tag: long id })
-                return;
+            if (sender is Button { Tag: long id })
+                TourOeffnen(id);
+        }
+
+        private void TourOeffnen(long id)
+        {
             TourUebersicht? tour = _touren.FirstOrDefault(t => t.Id == id);
             if (tour is null)
                 return;
             _kontext.Oeffnen(MussZugewiesenWerden(tour) ? "D06" : "D07", id);
+        }
+
+        // Klick auf eine Zeile markiert sie (Akzentbalken links), Doppelklick öffnet die Tour wie der Knopf.
+        private void Zeile_Tapped(object sender, TappedRoutedEventArgs e)
+        {
+            if (sender is not Border { Tag: long id } zeile)
+                return;
+            if (_markierteZeile is { } vorher && !ReferenceEquals(vorher, zeile))
+                ListenZeile.SetMarkiert(vorher, false);
+            ListenZeile.SetMarkiert(zeile, true);
+            _markierteZeile = zeile;
+            _markierteTourId = id;
+        }
+
+        // Nach dem Neuaufbau der Liste: die noch markierte Zeile merken, damit ein Klick sie wieder abwählt.
+        private void Zeile_Loaded(object sender, RoutedEventArgs e)
+        {
+            if (sender is Border zeile && ListenZeile.GetMarkiert(zeile))
+                _markierteZeile = zeile;
+        }
+
+        private void Zeile_DoubleTapped(object sender, DoubleTappedRoutedEventArgs e)
+        {
+            if (sender is Border { Tag: long id })
+                TourOeffnen(id);
         }
 
         // ---- Laden und Filtern ----
@@ -160,7 +192,13 @@ namespace Disposio.Views
                     text?.Contains(suche, StringComparison.CurrentCultureIgnoreCase) == true))
                 .ToList();
 
-            TourListe.ItemsSource = treffer.Select(tour => new TourZeile(tour, AnzeigeStatus(tour), MussZugewiesenWerden(tour))).ToList();
+            _markierteZeile = null;
+            TourListe.ItemsSource = treffer
+                .Select(tour => new TourZeile(tour, AnzeigeStatus(tour), MussZugewiesenWerden(tour))
+                {
+                    IstMarkiert = tour.Id == _markierteTourId
+                })
+                .ToList();
 
             string anzahl = treffer.Count == _touren.Count
                 ? (_touren.Count == 1 ? "1 Tour" : $"{_touren.Count} Touren")
@@ -258,5 +296,7 @@ namespace Disposio.Views
         public Visibility NormalSichtbar { get; }
         public Visibility VerspaetetSichtbar { get; }
         public string AktionText { get; }
+        // Beim Neuaufbau der Liste bleibt die zuletzt angeklickte Tour markiert.
+        public bool IstMarkiert { get; init; }
     }
 }

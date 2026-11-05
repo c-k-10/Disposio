@@ -1,0 +1,158 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- D07 „Tourdetails“ (aus D04 „Öffnen“): Status, Fahrer, Fahrzeug, Ladung, nächstes Fenster, ETA und alle Stopps.
+     „Auf Karte zeigen“ öffnet die Live-Karte (D08) mit den Stopps dieser Tour. -->
+<UserControl
+    x:Class="Disposio.Views.D07Tourdetails"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:local="using:Disposio.Views">
+
+    <StackPanel Spacing="18">
+        <StackPanel x:Name="LadeBereich" Orientation="Horizontal" Spacing="12">
+            <ProgressRing x:Name="LadeAnzeige" Width="20" Height="20" IsActive="True" />
+            <TextBlock x:Name="LadeText" Style="{StaticResource HinweisText}" VerticalAlignment="Center"
+                       TextWrapping="Wrap" Text="Tour wird geladen …" />
+        </StackPanel>
+
+        <!-- Leiste: Tournummer · Bereich · Status, rechts „Auf Karte zeigen“ -->
+        <Border Background="{StaticResource SurfaceBrush}" BorderBrush="{StaticResource BorderBrush}"
+                BorderThickness="1" CornerRadius="12">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <Border Width="5" Background="{StaticResource AccentBrush}" CornerRadius="12,0,0,12" />
+                <StackPanel Grid.Column="1" Margin="22,12" Spacing="2" VerticalAlignment="Center">
+                    <TextBlock x:Name="KopfText" Style="{StaticResource NormalText}" FontWeight="SemiBold" Text="Tour" />
+                    <TextBlock x:Name="ZeitraumText" Style="{StaticResource HinweisText}" />
+                </StackPanel>
+                <Button x:Name="KarteButton" Grid.Column="2" Content="Auf Karte zeigen" Style="{StaticResource DashboardButton}"
+                        Margin="0,12,18,12" IsEnabled="False" Click="AufKarte_Click" />
+            </Grid>
+        </Border>
+
+        <!-- Tour im Überblick: 3 × 2 Felder wie im Wireframe -->
+        <Border Style="{StaticResource KarteStyle}">
+            <StackPanel Spacing="16">
+                <TextBlock Text="Tour im Überblick" Style="{StaticResource UeberschriftText}" />
+                <Grid ColumnSpacing="24" RowSpacing="18">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                    </Grid.RowDefinitions>
+                    <StackPanel Spacing="2">
+                        <TextBlock Text="Fahrer" Style="{StaticResource HinweisText}" FontSize="13" />
+                        <TextBlock x:Name="FahrerText" Style="{StaticResource NormalText}" FontWeight="SemiBold" Text="—" />
+                    </StackPanel>
+                    <StackPanel Grid.Column="1" Spacing="2">
+                        <TextBlock Text="Fahrzeug" Style="{StaticResource HinweisText}" FontSize="13" />
+                        <TextBlock x:Name="FahrzeugText" Style="{StaticResource NormalText}" FontWeight="SemiBold" Text="—" />
+                    </StackPanel>
+                    <StackPanel Grid.Column="2" Spacing="2">
+                        <TextBlock Text="Letztes GPS" Style="{StaticResource HinweisText}" FontSize="13" />
+                        <TextBlock x:Name="GpsText" Style="{StaticResource NormalText}" FontWeight="SemiBold" Text="—" />
+                    </StackPanel>
+                    <StackPanel Grid.Row="1" Spacing="2">
+                        <TextBlock Text="Ladung" Style="{StaticResource HinweisText}" FontSize="13" />
+                        <TextBlock x:Name="LadungText" Style="{StaticResource NormalText}" FontWeight="SemiBold" Text="—" />
+                    </StackPanel>
+                    <StackPanel Grid.Row="1" Grid.Column="1" Spacing="2">
+                        <TextBlock Text="Nächstes Fenster" Style="{StaticResource HinweisText}" FontSize="13" />
+                        <TextBlock x:Name="FensterText" Style="{StaticResource NormalText}" FontWeight="SemiBold" Text="—" />
+                    </StackPanel>
+                    <StackPanel Grid.Row="1" Grid.Column="2" Spacing="2">
+                        <TextBlock Text="Aktuelle ETA" Style="{StaticResource HinweisText}" FontSize="13" />
+                        <TextBlock x:Name="EtaText" Style="{StaticResource NormalText}" FontWeight="SemiBold" Text="—" />
+                    </StackPanel>
+                </Grid>
+            </StackPanel>
+        </Border>
+
+        <!-- Aktionen. Die Zielansichten bekommen die Tour-Id als Startwert. -->
+        <StackPanel Orientation="Horizontal" Spacing="12">
+            <Button x:Name="FahrerKontaktButton" Content="Fahrer kontaktieren" Style="{StaticResource DashboardButton}"
+                    IsEnabled="False" Click="FahrerKontaktieren_Click" />
+            <Button x:Name="KundenButton" Content="Kundeninformation prüfen" Style="{StaticResource PrimaryButton}"
+                    IsEnabled="False" Click="Kundeninformation_Click" />
+            <Button x:Name="DokumenteButton" Content="Frachtdokumente" Style="{StaticResource DashboardButton}"
+                    IsEnabled="False" Click="Frachtdokumente_Click" />
+            <Button x:Name="ZuweisenButton" Content="Zuweisung ändern" Style="{StaticResource DashboardButton}"
+                    IsEnabled="False" Click="Zuweisen_Click" />
+        </StackPanel>
+
+        <!-- Stopps als Zeitleiste: links Linie mit Punkten (grau ✓ = erledigt, Akzent = aktueller Stopp,
+             rot = verspätet, Umriss = offen), rechts je Stopp eine kleine Karte. -->
+        <Border Style="{StaticResource KarteStyle}">
+            <StackPanel Spacing="8">
+                <TextBlock Text="Stopps" Style="{StaticResource UeberschriftText}" />
+                <ItemsControl x:Name="StoppListe">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate x:DataType="local:TourDetailStoppZeile">
+                            <Grid ColumnSpacing="14">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="32" />
+                                    <ColumnDefinition Width="*" />
+                                </Grid.ColumnDefinitions>
+
+                                <!-- Zeitleiste: Linie oben, Punkt, Linie unten. Die Linien verbinden die Zeilen. -->
+                                <Grid>
+                                    <Grid.RowDefinitions>
+                                        <RowDefinition Height="20" />
+                                        <RowDefinition Height="Auto" />
+                                        <RowDefinition Height="*" />
+                                    </Grid.RowDefinitions>
+                                    <Rectangle Width="2" HorizontalAlignment="Center" Fill="{x:Bind LinieObenFarbe}"
+                                               Visibility="{x:Bind LinieObenSichtbar}" />
+                                    <Grid Grid.Row="1" Width="30" Height="30">
+                                        <Ellipse Fill="{x:Bind PunktFuellung}" Stroke="{x:Bind PunktRand}" StrokeThickness="2" />
+                                        <TextBlock Text="{x:Bind PunktText}" Foreground="{x:Bind PunktSchrift}" FontSize="13"
+                                                   FontWeight="SemiBold" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                    </Grid>
+                                    <Rectangle Grid.Row="2" Width="2" HorizontalAlignment="Center" Fill="{x:Bind LinieUntenFarbe}"
+                                               Visibility="{x:Bind LinieUntenSichtbar}" />
+                                </Grid>
+
+                                <Border Grid.Column="1" Margin="0,6" Padding="16,12" CornerRadius="10"
+                                        Background="{StaticResource InputBrush}" BorderBrush="{x:Bind KartenRand}"
+                                        BorderThickness="{x:Bind KartenRandDicke}" Opacity="{x:Bind Deckkraft}">
+                                    <Grid ColumnSpacing="16">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <StackPanel Spacing="3" VerticalAlignment="Center">
+                                            <TextBlock Text="{x:Bind Titel}" Style="{StaticResource NormalText}" FontWeight="SemiBold" />
+                                            <TextBlock Text="{x:Bind Unterzeile}" Style="{StaticResource HinweisText}" FontSize="13" />
+                                            <TextBlock Text="{x:Bind ZeitfensterText}" Style="{StaticResource HinweisText}" FontSize="13" />
+                                        </StackPanel>
+                                        <StackPanel Grid.Column="1" Spacing="4" HorizontalAlignment="Right" VerticalAlignment="Center">
+                                            <!-- Status-Pille -->
+                                            <Border HorizontalAlignment="Right" CornerRadius="11" Padding="10,2" BorderThickness="1"
+                                                    Background="{x:Bind PilleHintergrund}" BorderBrush="{x:Bind PilleRand}">
+                                                <TextBlock Text="{x:Bind Status}" FontSize="12" FontWeight="SemiBold"
+                                                           Foreground="{x:Bind PilleSchrift}" />
+                                            </Border>
+                                            <TextBlock Text="{x:Bind Zeit}" Style="{StaticResource NormalText}" FontWeight="SemiBold"
+                                                       HorizontalAlignment="Right" />
+                                            <TextBlock Text="{x:Bind Verspaetung}" Style="{StaticResource FehlerText}" FontSize="13"
+                                                       HorizontalAlignment="Right" Visibility="{x:Bind VerspaetungSichtbar}" />
+                                        </StackPanel>
+                                    </Grid>
+                                </Border>
+                            </Grid>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+                <TextBlock x:Name="StoppLeerText" Style="{StaticResource HinweisText}" Visibility="Collapsed"
+                           Text="Diese Tour hat noch keine Stopps." />
+            </StackPanel>
+        </Border>
+    </StackPanel>
+</UserControl>

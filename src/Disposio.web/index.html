@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Disposio – Disposition für kleine Speditionen</title>
+  <meta name="description" content="Disposio bringt Disponenten und Fahrer in einem System zusammen: Touren planen, Fahrerstatus sehen, einfach kommunizieren.">
+  <link rel="icon" href="assets/logo.png">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+  <header class="kopf">
+    <div class="container">
+      <a class="marke" href="index.html"><img src="assets/logo.png" alt=""> Disposio</a>
+      <nav class="nav">
+        <a href="index.html" aria-current="page">Start</a>
+        <a href="#funktionen">Funktionen</a>
+        <a href="anmelden.html">Sendung anmelden</a>
+      </nav>
+    </div>
+  </header>
+
+  <main>
+    <section class="hero">
+      <div class="container">
+        <div>
+          <h1>Disposition für kleine Speditionen – einfach und übersichtlich.</h1>
+          <p>Disposio bringt Disponenten und Fahrer in einem System zusammen:
+             Touren planen, Fahrerstatus live sehen und ohne Sprachbarriere miteinander schreiben.</p>
+          <div class="aktionen">
+            <a class="button" id="download-link" href="#">Für Windows herunterladen</a>
+            <a class="button zweitrangig" href="anmelden.html">Sendung anmelden</a>
+          </div>
+          <p class="hinweis-klein" id="download-info">Windows 10 / 11 · 64 Bit</p>
+        </div>
+        <img src="assets/logo.png" alt="Maskottchen von Disposio">
+      </div>
+    </section>
+
+    <section class="abschnitt" id="funktionen">
+      <div class="container">
+        <h2>Was Disposio kann</h2>
+        <div class="karten">
+          <div class="karte">
+            <h3>Touren planen</h3>
+            <p>Sendungen erfassen, zu Touren bündeln und Fahrern zuweisen.</p>
+          </div>
+          <div class="karte">
+            <h3>Live-Karte</h3>
+            <p>Sehen, wo die Fahrzeuge gerade sind – Ortung nur während einer aktiven Tour.</p>
+          </div>
+          <div class="karte">
+            <h3>Chat mit Übersetzung</h3>
+            <p>Nachrichten werden automatisch übersetzt: Deutsch, Englisch und Polnisch.</p>
+          </div>
+          <div class="karte">
+            <h3>Winston, der Co-Disponent</h3>
+            <p>Erkennt Verspätungen und schlägt passende Nachrichten vor. Gesendet wird nur nach Freigabe.</p>
+          </div>
+          <div class="karte">
+            <h3>Sendungen online anmelden</h3>
+            <p>Eure Kunden melden Sendungen über ein Formular an – sie landen direkt in der Disposition.</p>
+          </div>
+          <div class="karte">
+            <h3>Gemacht für kleine Firmen</h3>
+            <p>Für Speditionen mit 2–20 Lkw und 1–3 Disponenten. Ohne unnötigen Ballast.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="abschnitt">
+      <div class="container">
+        <h2>Sie möchten eine Sendung aufgeben?</h2>
+        <p style="color: var(--muted); max-width: 640px;">
+          Wenn Ihre Spedition mit Disposio arbeitet, können Sie Ihre Sendung direkt online anmelden.
+          Den passenden Link bekommen Sie von Ihrer Spedition.
+        </p>
+        <a class="button" href="anmelden.html">Zum Anmeldeformular</a>
+      </div>
+    </section>
+  </main>
+
+  <footer class="fuss">
+    <div class="container">
+      <span>© <span id="jahr"></span> Disposio · Teamprojekt</span>
+      <span><a href="#">Impressum</a> · <a href="#">Datenschutz</a></span>
+    </div>
+  </footer>
+
+  <script src="js/config.js"></script>
+  <script>
+    document.getElementById("jahr").textContent = new Date().getFullYear();
+
+    // Download-Link kommt aus js/config.js, damit man ihn nur an einer Stelle ändern muss.
+    const link = document.getElementById("download-link");
+    if (DISPOSIO_CONFIG.downloadUrl) {
+      link.href = DISPOSIO_CONFIG.downloadUrl;
+    } else {
+      link.addEventListener("click", (e) => {
+        e.preventDefault();
+        document.getElementById("download-info").textContent =
+          "Der Download ist noch nicht verfügbar – bald gibt es hier die erste Version.";
+      });
+    }
+  </script>
+</body>
+</html>

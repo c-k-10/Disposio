@@ -31,6 +31,9 @@ namespace Disposio.Views
         private bool _kartenBereit;
         private bool _hatSchluessel;
 
+        // Kommt man aus D07 über „Auf Karte zeigen“, ist der Parameter die Tour mit ihren Stopps.
+        private readonly TourKarte? _tourKarte;
+
         // Fahrer und Fahrzeuge der Firma für die Suche. Gefiltert wird im Speicher, ohne neue Datenbankabfrage.
         private readonly KartenRepository _repository = new();
         private IReadOnlyList<KartenObjekt> _objekte = Array.Empty<KartenObjekt>();
@@ -56,6 +59,7 @@ namespace Disposio.Views
         {
             InitializeComponent();
             _kontext = kontext;
+            _tourKarte = kontext.Parameter as TourKarte;
             Loaded += async (_, _) =>
             {
                 // Karte und Liste laden unabhängig voneinander.
@@ -302,6 +306,7 @@ namespace Disposio.Views
                     AktualisierenKnopf.IsEnabled = true;
                     await FilterAnKarteAsync();
                     await BeispielZeigenAsync();
+                    await TourZeigenAsync();
                     if (_hatSchluessel)
                     {
                         ZeigeStatus("Karte mit Verkehrslage geladen. Fahrzeugpositionen folgen in einem späteren Schritt.");
@@ -448,8 +453,40 @@ namespace Disposio.Views
             }
         }
 
+        // Zeichnet die Stopps der Tour aus D07 als nummerierte Punkte mit Verbindungslinie.
+        private async Task TourZeigenAsync()
+        {
+            if (_tourKarte is null || !_kartenBereit)
+                return;
+            var daten = new
+            {
+                tournummer = _tourKarte.Tournummer,
+                stopps = _tourKarte.Stopps.Select(stopp => new
+                {
+                    nummer = stopp.Nummer,
+                    bezeichnung = stopp.Bezeichnung,
+                    zeitfenster = stopp.Zeitfenster,
+                    erledigt = stopp.Erledigt,
+                    breite = stopp.Breite,
+                    laenge = stopp.Laenge
+                })
+            };
+            try
+            {
+                await Karte.ExecuteScriptAsync($"tourZeigen({JsonSerializer.Serialize(daten)})");
+            }
+            catch (Exception)
+            {
+                // Die Ansicht wurde gerade verlassen.
+            }
+        }
+
         private void ZeigeStatus(string text)
         {
+            if (_tourKarte is not null)
+                text = _tourKarte.Stopps.Count == 0
+                    ? $"Tour {_tourKarte.Tournummer}: Für die Stopps sind noch keine Koordinaten hinterlegt. {text}"
+                    : $"Tour {_tourKarte.Tournummer} wird angezeigt ({_tourKarte.Stopps.Count} Stopps). {text}";
             StatusText.Text = text;
             LadeAnzeige.IsActive = false;
             LadeAnzeige.Visibility = Visibility.Collapsed;
@@ -504,6 +541,10 @@ namespace Disposio.Views
                     .stoerung { font-size: 13px; line-height: 1.4; min-width: 200px; }
                     .stoerung .titel { font-size: 15px; font-weight: 600; margin-bottom: 2px; }
                     .stoerung .ort { color: #555; }
+                    .tour-stopp { width: 26px; height: 26px; border-radius: 50%; background: #1A73E8; color: #fff;
+                                  border: 2px solid #fff; box-shadow: 0 1px 4px rgba(0,0,0,.4); font: 600 13px/26px sans-serif;
+                                  text-align: center; }
+                    .tour-stopp.erledigt { background: #9AA0A6; }
                     .stoerung .verzoegerung { font-weight: 600; margin-top: 4px; }
                 </style>
             </head>
@@ -800,6 +841,32 @@ namespace Disposio.Views
                                 </div>`);
                             objekte.set(d.schluessel, marker);
                             filterAnwenden();
+                        };
+
+                        // Tour aus D07 („Auf Karte zeigen“): nummerierte Stopps, grau = schon erledigt.
+                        const tourEbene = L.layerGroup().addTo(karte);
+                        window.tourZeigen = d => {
+                            tourEbene.clearLayers();
+                            if (!d.stopps || d.stopps.length === 0) return;
+                            const punkte = d.stopps.map(s => [s.breite, s.laenge]);
+                            L.polyline(punkte, { color: "#1A73E8", weight: 4, opacity: 0.7, dashArray: "8 6" }).addTo(tourEbene);
+                            d.stopps.forEach(s => {
+                                const symbol = L.divIcon({
+                                    className: "",
+                                    html: `<div class="tour-stopp${s.erledigt ? " erledigt" : ""}">${s.nummer}</div>`,
+                                    iconSize: [30, 30],
+                                    iconAnchor: [15, 15],
+                                    popupAnchor: [0, -14]
+                                });
+                                L.marker([s.breite, s.laenge], { icon: symbol, zIndexOffset: 900, keyboard: false })
+                                    .bindPopup(`<div class="stoerung">
+                                        <div class="titel">${escapeHtml(d.tournummer)} · Stopp ${s.nummer}</div>
+                                        <div>${escapeHtml(s.bezeichnung)}</div>
+                                        <div class="ort">Fenster ${escapeHtml(s.zeitfenster)}${s.erledigt ? " · erledigt" : ""}</div>
+                                    </div>`)
+                                    .addTo(tourEbene);
+                            });
+                            karte.fitBounds(L.latLngBounds(punkte), { padding: [60, 60], maxZoom: 13 });
                         };
 
                         // Wird von C# über den Knopf „Aktualisieren“ aufgerufen.

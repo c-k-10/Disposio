@@ -1,0 +1,262 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Sendung anmelden – Disposio</title>
+  <link rel="icon" href="assets/logo.png">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+  <header class="kopf">
+    <div class="container">
+      <a class="marke" href="index.html"><img src="assets/logo.png" alt=""> Disposio</a>
+      <nav class="nav">
+        <a href="index.html">Start</a>
+        <a href="index.html#funktionen">Funktionen</a>
+        <a href="anmelden.html" aria-current="page">Sendung anmelden</a>
+      </nav>
+    </div>
+  </header>
+
+  <main class="container">
+    <div class="seitenkopf">
+      <h1>Sendung anmelden</h1>
+      <p>Felder mit <span style="color: var(--error)">*</span> sind Pflichtfelder.</p>
+    </div>
+
+    <div id="meldung" role="status" aria-live="polite"></div>
+
+    <form id="sendung-form" novalidate>
+
+      <!-- Unsichtbar für Menschen. Bots füllen es oft aus – dann wird nichts gesendet. -->
+      <div class="honig" aria-hidden="true">
+        <label for="website">Bitte leer lassen</label>
+        <input id="website" name="website" tabindex="-1" autocomplete="off">
+      </div>
+
+      <fieldset>
+        <legend>1. Spedition</legend>
+        <div class="raster">
+          <div>
+            <label for="spedition">An welche Spedition geht der Auftrag? <span class="pflicht">*</span></label>
+            <select id="spedition" name="spedition" required>
+              <option value="">Wird geladen …</option>
+            </select>
+            <div class="fehlertext"></div>
+          </div>
+        </div>
+      </fieldset>
+
+      <fieldset>
+        <legend>2. Ihre Daten (Auftraggeber)</legend>
+        <div class="raster">
+          <div>
+            <label for="firmenname">Firma <span class="pflicht">*</span></label>
+            <input id="firmenname" name="firmenname" required autocomplete="organization">
+            <div class="fehlertext"></div>
+          </div>
+          <div>
+            <label for="ansprechpartner">Ansprechpartner <span class="pflicht">*</span></label>
+            <input id="ansprechpartner" name="ansprechpartner" required autocomplete="name">
+            <div class="fehlertext"></div>
+          </div>
+          <div>
+            <label for="email">E-Mail <span class="pflicht">*</span></label>
+            <input id="email" name="email" type="email" required autocomplete="email">
+            <div class="fehlertext"></div>
+          </div>
+          <div>
+            <label for="telefon">Telefon <span class="pflicht">*</span></label>
+            <input id="telefon" name="telefon" type="tel" required autocomplete="tel">
+            <div class="fehlertext"></div>
+          </div>
+          <div class="breit">
+            <label for="kundenreferenz">Ihre Referenz / Bestellnummer</label>
+            <input id="kundenreferenz" name="kundenreferenz">
+            <div class="fehlertext"></div>
+          </div>
+        </div>
+      </fieldset>
+
+      <fieldset>
+        <legend>3. Abholung</legend>
+        <div class="raster raster-4">
+          <div class="breit">
+            <label for="abhol_adresse">Straße und Hausnummer <span class="pflicht">*</span></label>
+            <input id="abhol_adresse" name="abhol_adresse" required>
+            <div class="fehlertext"></div>
+          </div>
+          <div>
+            <label for="abhol_plz">PLZ <span class="pflicht">*</span></label>
+            <input id="abhol_plz" name="abhol_plz" required inputmode="numeric" pattern="[0-9A-Za-z\- ]{4,10}">
+            <div class="fehlertext"></div>
+          </div>
+          <div>
+            <label for="abhol_ort">Ort <span class="pflicht">*</span></label>
+            <input id="abhol_ort" name="abhol_ort" required>
+            <div class="fehlertext"></div>
+          </div>
+          <div>
+            <label for="abhol_datum">Datum <span class="pflicht">*</span></label>
+            <input id="abhol_datum" name="abhol_datum" type="date" required>
+            <div class="fehlertext"></div>
+          </div>
+          <div>
+            <label for="abhol_von">Zeitfenster <span class="pflicht">*</span></label>
+            <div style="display:flex; gap:6px;">
+              <input id="abhol_von" name="abhol_von" type="time" required value="08:00" aria-label="Abholung von">
+              <input id="abhol_bis" name="abhol_bis" type="time" required value="16:00" aria-label="Abholung bis">
+            </div>
+            <div class="fehlertext"></div>
+          </div>
+        </div>
+      </fieldset>
+
+      <fieldset>
+        <legend>4. Lieferung</legend>
+        <div class="raster raster-4">
+          <div class="breit">
+            <label for="liefer_adresse">Straße und Hausnummer <span class="pflicht">*</span></label>
+            <input id="liefer_adresse" name="liefer_adresse" required>
+            <div class="fehlertext"></div>
+          </div>
+          <div>
+            <label for="liefer_plz">PLZ <span class="pflicht">*</span></label>
+            <input id="liefer_plz" name="liefer_plz" required inputmode="numeric" pattern="[0-9A-Za-z\- ]{4,10}">
+            <div class="fehlertext"></div>
+          </div>
+          <div>
+            <label for="liefer_ort">Ort <span class="pflicht">*</span></label>
+            <input id="liefer_ort" name="liefer_ort" required>
+            <div class="fehlertext"></div>
+          </div>
+          <div>
+            <label for="liefer_datum">Datum <span class="pflicht">*</span></label>
+            <input id="liefer_datum" name="liefer_datum" type="date" required>
+            <div class="fehlertext"></div>
+          </div>
+          <div>
+            <label for="liefer_von">Zeitfenster <span class="pflicht">*</span></label>
+            <div style="display:flex; gap:6px;">
+              <input id="liefer_von" name="liefer_von" type="time" required value="08:00" aria-label="Lieferung von">
+              <input id="liefer_bis" name="liefer_bis" type="time" required value="16:00" aria-label="Lieferung bis">
+            </div>
+            <div class="fehlertext"></div>
+          </div>
+          <div class="breit">
+            <label class="checkbox"><input type="checkbox" name="avisierung"> Anlieferung muss vorher angekündigt werden (Avisierung)</label>
+          </div>
+        </div>
+      </fieldset>
+
+      <fieldset>
+        <legend>5. Ware</legend>
+        <!-- Auswahlwerte wie in der Desktop-App (Models/SendungFormular.cs → SendungWerte) -->
+        <div class="raster raster-4">
+          <div>
+            <label for="gutart">Gutart <span class="pflicht">*</span></label>
+            <select id="gutart" name="gutart" required>
+              <option value="Trockengut">Trockengut</option>
+              <option value="Frische">Frische (gekühlt)</option>
+            </select>
+            <div class="fehlertext"></div>
+          </div>
+          <div>
+            <label for="verpackungstyp">Verpackung <span class="pflicht">*</span></label>
+            <select id="verpackungstyp" name="verpackungstyp" required>
+              <option>Europalette</option>
+              <option>Einwegpalette</option>
+              <option>Gitterbox</option>
+              <option>Karton</option>
+              <option>Sonstiges</option>
+            </select>
+            <div class="fehlertext"></div>
+          </div>
+          <div>
+            <label for="anzahl">Anzahl <span class="pflicht">*</span></label>
+            <input id="anzahl" name="anzahl" type="number" min="1" max="10000" step="1" required value="1">
+            <div class="fehlertext"></div>
+          </div>
+          <div>
+            <label for="gewicht_kg">Gesamtgewicht (kg) <span class="pflicht">*</span></label>
+            <input id="gewicht_kg" name="gewicht_kg" type="number" min="0.01" max="60000" step="0.01" required>
+            <div class="fehlertext"></div>
+          </div>
+
+          <!-- Grenzen wie in SendungRepository.Pruefen und in sendung.ts -->
+          <div>
+            <label for="laenge_m">Länge je Einheit (m) <span class="pflicht">*</span></label>
+            <input id="laenge_m" name="laenge_m" type="number" min="0.01" max="20" step="0.01" required value="1.20">
+            <div class="fehlertext"></div>
+          </div>
+          <div>
+            <label for="breite_m">Breite je Einheit (m) <span class="pflicht">*</span></label>
+            <input id="breite_m" name="breite_m" type="number" min="0.01" max="3" step="0.01" required value="0.80">
+            <div class="fehlertext"></div>
+          </div>
+          <div>
+            <label for="hoehe_m">Höhe je Einheit (m) <span class="pflicht">*</span></label>
+            <input id="hoehe_m" name="hoehe_m" type="number" min="0.01" max="4" step="0.01" required>
+            <div class="fehlertext"></div>
+          </div>
+          <div>
+            <label for="ladeequipment">Benötigt vor Ort</label>
+            <select id="ladeequipment" name="ladeequipment">
+              <option>Keines</option>
+              <option>Hebebühne</option>
+              <option>Stapler vor Ort</option>
+              <option>Mitnahmestapler</option>
+              <option>Hubwagen</option>
+            </select>
+            <div class="fehlertext"></div>
+          </div>
+
+          <!-- Nur bei Gutart „Frische“ sichtbar und dann Pflicht -->
+          <div class="kuehlung" hidden>
+            <label for="temperatur_min">Temperatur min. (°C) <span class="pflicht">*</span></label>
+            <input id="temperatur_min" name="temperatur_min" type="number" min="-30" max="30" step="0.5" value="2">
+            <div class="fehlertext"></div>
+          </div>
+          <div class="kuehlung" hidden>
+            <label for="temperatur_max">Temperatur max. (°C) <span class="pflicht">*</span></label>
+            <input id="temperatur_max" name="temperatur_max" type="number" min="-30" max="30" step="0.5" value="7">
+            <div class="fehlertext"></div>
+          </div>
+
+          <div class="breit checkboxen">
+            <label class="checkbox"><input type="checkbox" name="stapelbar"> stapelbar</label>
+            <label class="checkbox"><input type="checkbox" name="gefahrgut"> Gefahrgut</label>
+            <label class="checkbox"><input type="checkbox" name="zollrelevanz"> zollrelevant</label>
+            <label class="checkbox"><input type="checkbox" name="ladehilfsmitteltausch"> Palettentausch</label>
+          </div>
+        </div>
+      </fieldset>
+
+      <fieldset>
+        <legend>6. Abschicken</legend>
+        <label class="checkbox">
+          <input type="checkbox" id="datenschutz" name="datenschutz" required>
+          <span>Ich bin einverstanden, dass meine Angaben zur Bearbeitung der Sendung gespeichert werden
+          (<a href="#">Datenschutz</a>). <span class="pflicht">*</span></span>
+        </label>
+        <div class="fehlertext"></div>
+        <p style="margin-bottom:0;">
+          <button class="button" type="submit" id="absenden">Sendung anmelden</button>
+        </p>
+      </fieldset>
+    </form>
+  </main>
+
+  <footer class="fuss">
+    <div class="container">
+      <span>© <span id="jahr"></span> Disposio · Teamprojekt</span>
+      <span><a href="#">Impressum</a> · <a href="#">Datenschutz</a></span>
+    </div>
+  </footer>
+
+  <script src="js/config.js"></script>
+  <script src="js/anmelden.js"></script>
+</body>
+</html>

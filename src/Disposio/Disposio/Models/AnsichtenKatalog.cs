@@ -21,7 +21,7 @@ public static class AnsichtenKatalog
         // Kundenadmin
         new("K01", "Benutzer", "Benutzer verwalten", "Konten des eigenen Unternehmens suchen und verwalten.", FirmenRolle.Kundenadmin),
         new("K02", null, "Benutzer anlegen / bearbeiten", "Alle Kontodaten, Rolle und Abteilungszugriff erfassen.", FirmenRolle.Kundenadmin, "K01"),
-        new("K05", "Abteilungen", "Abteilungen verwalten", "Bereiche des Unternehmens anlegen, umbenennen und deaktivieren.", FirmenRolle.Kundenadmin),
+        new("K06", "Abteilungen", "Abteilungen verwalten", "Bereiche des Unternehmens anlegen, umbenennen und deaktivieren.", FirmenRolle.Kundenadmin),
         new("K03", "Rollen & Rechte", "Rollen & Rechte", "Zugriffsbereiche verständlich erklären.", FirmenRolle.Kundenadmin),
         new("K04", "Passwort-Richtlinien", "Passwort-Richtlinien", "Unternehmensweite Anmeldevorgaben konfigurieren.", FirmenRolle.Kundenadmin),
         new("K05", "Aktionsprotokoll", "Aktionsprotokoll", "Nachvollziehen, wer im Unternehmen wann was geändert hat.", FirmenRolle.Kundenadmin),
@@ -41,14 +41,15 @@ public static class AnsichtenKatalog
         // Fuhrparkmanager
         new("F01", "Fuhrpark", "Fuhrparkübersicht", "Verfügbarkeit und Kapazitäten aller Unternehmensfahrzeuge sehen.", FirmenRolle.Fuhrparkmanager),
         new("F02", null, "Fahrzeug anlegen / bearbeiten", "Tatsächliche Maße, Nutzlast und Stellplätze getrennt erfassen.", FirmenRolle.Fuhrparkmanager, "F01"),
-        new("F03", "Fahrerzuordnung", "Fahrer – Fahrzeug zuweisen", "Zuweisungen zeitlich planen und Überschneidungen erkennen.", FirmenRolle.Fuhrparkmanager),
-        new("F04", "Wartung & Dokumente", "Wartung & Dokumente", "Fällige Wartungen und auslaufende Fahrzeugdokumente überwachen.", FirmenRolle.Fuhrparkmanager),
-        new("F05", null, "Wartung / Dokument erfassen", "Frist, Kilometerstand, Nachweis und Verfügbarkeit festhalten.", FirmenRolle.Fuhrparkmanager, "F04"),
+        new("F03", "Fahrerzuordnung", "Fahrer – Fahrzeug zuweisen", "Fahrer verfügbaren Fahrzeugen zuordnen, wechseln oder beenden; Doppelbelegungen sind ausgeschlossen.", FirmenRolle.Fuhrparkmanager),
+        new("F04", "Wartung", "Wartung", "Fällige Wartungen farblich erkennen und die Wartungshistorie je Fahrzeug einsehen.", FirmenRolle.Fuhrparkmanager),
+        new("F05", null, "Wartung erfassen", "Termin planen oder durchgeführte Wartung mit Datum, Kilometerstand und Bemerkung festhalten.", FirmenRolle.Fuhrparkmanager, "F04"),
 
         // Disponent
         new("D01", "Tagesübersicht", "Tagesübersicht", "Schichtbeginn: Nachtgeschehen und Handlungsbedarf erfassen.", FirmenRolle.Disponent),
         new("D02", "Sendungen", "Sendungen", "Aufträge durchsuchen, erfassen und zur Planung auswählen.", FirmenRolle.Disponent),
         new("D03", null, "Sendung erfassen / bearbeiten", "Kundendaten, Ladegut und beide Transportorte vollständig erfassen.", FirmenRolle.Disponent, "D02"),
+        new("D16", null, "Sendung zuweisen", "Freie Fahrer und Fahrzeuge für eine Sendung wählen und daraus eine Tour anlegen.", FirmenRolle.Disponent, "D02"),
         new("D13", null, "Verplanungsvorschlag prüfen", "Sendungen anhand von Route, Zeitfenster und Ladekapazität zuordnen.", FirmenRolle.Disponent, "D02"),
         new("D04", "Touren", "Tourenübersicht", "Touren suchen, planen und deren Bearbeitungsstand erkennen.", FirmenRolle.Disponent),
         new("D05", null, "Tour planen", "Sendungen und Stoppreihenfolge zu einer Tour zusammenstellen.", FirmenRolle.Disponent, "D04"),

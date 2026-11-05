@@ -64,6 +64,13 @@ namespace Disposio.Views
                 _kontext.Oeffnen("D03", id);
         }
 
+        // Öffnet D16: freie Fahrer und Fahrzeuge für genau diese Sendung.
+        private void Zuweisen_Click(object sender, RoutedEventArgs e)
+        {
+            if (sender is Button { Tag: long id })
+                _kontext.Oeffnen("D16", id);
+        }
+
         private async void FilterAnwenden_Click(object sender, RoutedEventArgs e) => await AnwendenAsync();
 
         private async void SuchBox_KeyDown(object sender, KeyRoutedEventArgs e)
@@ -83,6 +90,7 @@ namespace Disposio.Views
                 _ausgewaehlt.Add(id);
             else
                 _ausgewaehlt.Remove(id);
+            ListenZeile.MarkierenFuer(box, box.IsChecked == true);
             AuswahlAnzeigen();
         }
 
@@ -241,10 +249,13 @@ namespace Disposio.Views
             Status = s.Status;
             TourText = s.Tournummer is null ? "" : $"Tour {s.Tournummer}";
             TourSichtbar = s.Tournummer is null ? Visibility.Collapsed : Visibility.Visible;
+            ZuweisenSichtbar = s.IstVerplant ? Visibility.Collapsed : Visibility.Visible;
         }
 
         public long Id { get; }
         public bool? Ausgewaehlt { get; }
+        // Angehakte Zeilen werden farbig hervorgehoben (ListenZeile.Markiert).
+        public bool IstMarkiert => Ausgewaehlt == true;
         public bool KannGeplantWerden { get; }
         public string ReferenzUndKunde { get; }
         public string Strecke { get; }
@@ -253,5 +264,6 @@ namespace Disposio.Views
         public string Status { get; }
         public string TourText { get; }
         public Visibility TourSichtbar { get; }
+        public Visibility ZuweisenSichtbar { get; }
     }
 }

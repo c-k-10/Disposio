@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
+using System.Net.Mail;
 using System.Threading;
 using System.Threading.Tasks;
 using Disposio.Models;
@@ -9,6 +10,8 @@ using Disposio.Services;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Media;
+using Microsoft.UI.Xaml.Shapes;
+using Windows.Foundation;
 
 namespace Disposio.Views
 {
@@ -24,6 +27,17 @@ namespace Disposio.Views
         private readonly long? _id;
         private CancellationTokenSource? _abbruch;
         private bool _speichert;
+
+        // Felder, die beim letzten Speichern rot markiert wurden.
+        private readonly HashSet<Control> _markiert = new();
+
+        // Die fünf Abschnitte links: Karte im Formular, Knopf in der Liste und die Felder, die dazugehören.
+        private sealed record Abschnitt(Border Karte, Button Knopf, Rectangle Balken, Ellipse Punkt, TextBlock Symbol,
+                                        string Nummer, Control[] Felder);
+
+        private readonly SolidColorBrush _gruen = new(Microsoft.UI.ColorHelper.FromArgb(255, 0x2E, 0xA6, 0x6A));
+        private Abschnitt[] _abschnitte = Array.Empty<Abschnitt>();
+        private ScrollViewer? _scroll;
 
         public D03SendungFormular(FirmenAnsichtKontext kontext)
         {
@@ -49,9 +63,20 @@ namespace Disposio.Views
             BreiteBox.TextChanged += (_, _) => LademeterAnzeigen();
             LademeterAnzeigen();
             TemperaturHinweisAnzeigen();
+            AbschnitteAnlegen();
+            MarkierungZuruecksetzenBeiEingabe();
+            AbschnitteAktualisieren();
 
-            Loaded += async (_, _) => await LadenAsync();
-            Unloaded += (_, _) => _abbruch?.Cancel();
+            Loaded += async (_, _) =>
+            {
+                ScrollAnmelden();
+                await LadenAsync();
+            };
+            Unloaded += (_, _) =>
+            {
+                _abbruch?.Cancel();
+                ScrollAbmelden();
+            };
         }
 
         // ---- Laden ----
@@ -98,6 +123,7 @@ namespace Disposio.Views
                 }
 
                 SpeichernButton.IsEnabled = true;
+                AbschnitteAktualisieren();
                 LadeFertig("");
             }
             catch (OperationCanceledException) when (abbruch.IsCancellationRequested)
@@ -235,6 +261,16 @@ namespace Disposio.Views
                 return;
 
             FehlerText.Visibility = Visibility.Collapsed;
+            AlleMarkierungenEntfernen();
+
+            // Erst alle Felder prüfen und die fehlerhaften rot umranden, dann erst speichern.
+            List<(Control Feld, string Meldung)> fehlerListe = FelderPruefen();
+            if (fehlerListe.Count > 0)
+            {
+                FehlerMarkieren(fehlerListe);
+                return;
+            }
+
             SendungEntwurf entwurf;
             try
             {
@@ -265,7 +301,9 @@ namespace Disposio.Views
             }
             catch (NummerVergebenException fehler)
             {
-                FehlerAnzeigen(fehler.Message);
+                // Die Datenbank meldet eine schon vergebene Nummer: das passende Feld markieren.
+                Control feld = fehler.Message.Contains("Kundennummer") ? KundennummerBox : AuftragsnummerBox;
+                FehlerMarkieren(new List<(Control, string)> { (feld, fehler.Message) });
             }
             catch (ArgumentException fehler)
             {
@@ -345,6 +383,341 @@ namespace Disposio.Views
             FehlerText.Visibility = Visibility.Visible;
         }
 
+        // ---- Fehlerhafte Felder rot markieren ----
+
+        // Prüft alle Felder in der Reihenfolge des Formulars. Gleiche Regeln wie SendungRepository.Pruefen,
+        // aber hier wird jeder Fehler seinem Feld zugeordnet, damit man sieht, wo etwas fehlt.
+        private List<(Control Feld, string Meldung)> FelderPruefen()
+        {
+            var fehler = new List<(Control, string)>();
+            void Fehler(Control feld, string meldung) => fehler.Add((feld, meldung));
+            void Pflicht(TextBox feld, string name)
+            {
+                if (string.IsNullOrWhiteSpace(feld.Text))
+                    Fehler(feld, $"{name} fehlt.");
+            }
+            void Auswahl(ComboBox feld, string meldung)
+            {
+                if (feld.SelectedItem is null)
+                    Fehler(feld, meldung);
+            }
+            decimal? ZahlImBereich(TextBox feld, string name, decimal minimum, decimal maximum, bool pflicht = true)
+            {
+                if (string.IsNullOrWhiteSpace(feld.Text))
+                {
+                    if (pflicht)
+                        Fehler(feld, $"{name} fehlt.");
+                    return null;
+                }
+                if (!ZahlVersuchen(feld.Text, out decimal wert))
+                {
+                    Fehler(feld, $"Bei „{name}“ bitte eine Zahl eingeben.");
+                    return null;
+                }
+                if (wert < minimum || wert > maximum)
+                {
+                    Fehler(feld, $"{name} muss zwischen {minimum.ToString(Deutsch)} und {maximum.ToString("N0", Deutsch)} liegen.");
+                    return null;
+                }
+                return wert;
+            }
+            TimeOnly? Zeit(TextBox feld, string name)
+            {
+                if (UhrzeitVersuchen(feld.Text, out TimeOnly zeit))
+                    return zeit;
+                Fehler(feld, string.IsNullOrWhiteSpace(feld.Text)
+                    ? $"{name} fehlt."
+                    : $"Bitte bei „{name}“ eine Uhrzeit wie 08:30 eingeben.");
+                return null;
+            }
+            void Fenster(TextBox vonFeld, TextBox bisFeld, string name)
+            {
+                TimeOnly? von = Zeit(vonFeld, $"{name} von");
+                TimeOnly? bis = Zeit(bisFeld, $"{name} bis");
+                if (von is { } v && bis is { } b && b < v)
+                    Fehler(bisFeld, $"Beim Zeitfenster „{name}“ liegt „bis“ vor „von“.");
+            }
+
+            // Auftrag
+            Pflicht(AuftragsnummerBox, "Auftragsnummer");
+            Auswahl(PrioritaetBox, "Bitte eine Priorität wählen.");
+
+            // Kunde
+            object? kundeTag = (KundeBox.SelectedItem as ComboBoxItem)?.Tag;
+            if (kundeTag is null)
+                Fehler(KundeBox, "Bitte einen Kunden wählen oder „+ Neuer Kunde“ anlegen.");
+            else if (kundeTag as string == NeuerKundeTag)
+            {
+                Pflicht(KundennummerBox, "Kundennummer");
+                Pflicht(FirmennameBox, "Firmenname");
+                Pflicht(KundeAnsprechpartnerBox, "Ansprechpartner des Kunden");
+                Pflicht(KundeAdresseBox, "Straße und Hausnummer des Kunden");
+                Pflicht(KundePlzBox, "PLZ");
+                Pflicht(KundeOrtBox, "Ort");
+                Pflicht(KundeTelefonBox, "Telefon");
+                string email = KundeEmailBox.Text.Trim();
+                if (email.Length == 0)
+                    Fehler(KundeEmailBox, "E-Mail des Kunden fehlt.");
+                else if (!MailAddress.TryCreate(email, out MailAddress? adresse) || adresse.Address != email)
+                    Fehler(KundeEmailBox, "Bitte eine gültige E-Mail-Adresse für den Kunden eingeben.");
+            }
+
+            // Transportorte
+            Pflicht(AbholadresseBox, "Abholadresse");
+            Pflicht(LieferadresseBox, "Lieferadresse");
+            if (AbholdatumBox.Date is null)
+                Fehler(AbholdatumBox, "Bitte ein Abholdatum wählen.");
+            if (LieferdatumBox.Date is null)
+                Fehler(LieferdatumBox, "Bitte ein Lieferdatum wählen.");
+            else if (AbholdatumBox.Date is { } abholung && LieferdatumBox.Date.Value.Date < abholung.Date)
+                Fehler(LieferdatumBox, "Das Lieferdatum darf nicht vor dem Abholdatum liegen.");
+            Fenster(AbholVonBox, AbholBisBox, "Abholung");
+            Fenster(LieferVonBox, LieferBisBox, "Zustellung");
+
+            // Vor Ort
+            Pflicht(AnsprechpartnerBox, "Ansprechpartner vor Ort");
+            Auswahl(EquipmentBox, "Bitte das Lade-/Entladeequipment wählen.");
+
+            // Ladegut
+            Auswahl(GutartBox, "Bitte eine Gutart wählen.");
+            Auswahl(VerpackungBox, "Bitte einen Verpackungstyp wählen.");
+            if (string.IsNullOrWhiteSpace(AnzahlBox.Text))
+                Fehler(AnzahlBox, "Anzahl fehlt.");
+            else if (!int.TryParse(AnzahlBox.Text.Trim(), NumberStyles.Integer, Deutsch, out int anzahl) || anzahl is < 1 or > 10_000)
+                Fehler(AnzahlBox, "Die Anzahl muss eine ganze Zahl zwischen 1 und 10.000 sein.");
+            ZahlImBereich(GewichtBox, "Gewicht (kg)", 0.01m, 60_000);
+            ZahlImBereich(LaengeBox, "Länge (m)", 0.01m, 20);
+            ZahlImBereich(BreiteBox, "Breite (m)", 0.01m, 3);
+            ZahlImBereich(HoeheBox, "Höhe (m)", 0.01m, 4);
+            ZahlImBereich(WarenwertBox, "Warenwert (€)", 0, 100_000_000);
+
+            bool frische = GutartBox.SelectedItem as string == SendungWerte.GutartFrische;
+            decimal? min = ZahlImBereich(TempMinBox, "Temperatur min. (°C)", -30, 30, pflicht: frische);
+            decimal? max = ZahlImBereich(TempMaxBox, "Temperatur max. (°C)", -30, 30, pflicht: frische);
+            if (frische && min is decimal tMin && max is decimal tMax && tMin > tMax)
+            {
+                Fehler(TempMinBox, "Die Mindesttemperatur darf nicht über der Höchsttemperatur liegen.");
+                Fehler(TempMaxBox, "Die Höchsttemperatur darf nicht unter der Mindesttemperatur liegen.");
+            }
+
+            return fehler;
+        }
+
+        // Rahmen rot, Meldung als Tooltip am Feld, unten eine Liste aller Fehler. Zum ersten Feld wird gescrollt.
+        private void FehlerMarkieren(List<(Control Feld, string Meldung)> fehler)
+        {
+            Brush rot = Application.Current.Resources.TryGetValue("ErrorBrush", out object? wert) && wert is Brush brush
+                ? brush
+                : new SolidColorBrush(Microsoft.UI.Colors.Red);
+            foreach (var (feld, meldung) in fehler)
+            {
+                feld.BorderBrush = rot;
+                feld.BorderThickness = new Thickness(2);
+                ToolTipService.SetToolTip(feld, meldung);
+                _markiert.Add(feld);
+            }
+
+            AbschnitteAktualisieren();
+            FehlerAnzeigen(fehler.Count == 1
+                ? fehler[0].Meldung
+                : $"Bitte die {fehler.Count} rot markierten Felder prüfen:\n" +
+                  string.Join("\n", fehler.Select(f => "• " + f.Meldung).Distinct()));
+
+            // Nur hinscrollen, nicht fokussieren: Ein fokussiertes Feld zeigt sonst den Fokusrahmen statt Rot.
+            fehler[0].Feld.StartBringIntoView(new BringIntoViewOptions { VerticalAlignmentRatio = 0.3 });
+        }
+
+        private void MarkierungEntfernen(Control feld)
+        {
+            if (!_markiert.Remove(feld))
+                return;
+            // Zurück auf die Werte aus dem Stil (FormTextBox / FormComboBox / FormDatePicker).
+            feld.ClearValue(Control.BorderBrushProperty);
+            feld.ClearValue(Control.BorderThicknessProperty);
+            ToolTipService.SetToolTip(feld, null);
+            if (_markiert.Count == 0)
+                FehlerText.Visibility = Visibility.Collapsed;
+        }
+
+        private void AlleMarkierungenEntfernen()
+        {
+            foreach (Control feld in _markiert.ToList())
+                MarkierungEntfernen(feld);
+        }
+
+        // Sobald man ein markiertes Feld ändert, verschwindet sein roter Rahmen.
+        private void MarkierungZuruecksetzenBeiEingabe()
+        {
+            foreach (TextBox box in new[]
+                     {
+                         AuftragsnummerBox, KundennummerBox, FirmennameBox, KundeAnsprechpartnerBox, KundeAdresseBox,
+                         KundePlzBox, KundeOrtBox, KundeTelefonBox, KundeEmailBox, AbholadresseBox, LieferadresseBox,
+                         AbholVonBox, AbholBisBox, LieferVonBox, LieferBisBox, AnsprechpartnerBox, AnzahlBox, GewichtBox,
+                         LaengeBox, BreiteBox, HoeheBox, WarenwertBox, TempMinBox, TempMaxBox
+                     })
+                box.TextChanged += (_, _) => { MarkierungEntfernen(box); AbschnitteAktualisieren(); };
+
+            foreach (ComboBox box in new[] { PrioritaetBox, KundeBox, EquipmentBox, GutartBox, VerpackungBox })
+                box.SelectionChanged += (_, _) => { MarkierungEntfernen(box); AbschnitteAktualisieren(); };
+
+            AbholdatumBox.DateChanged += (_, _) =>
+            {
+                MarkierungEntfernen(AbholdatumBox);
+                MarkierungEntfernen(LieferdatumBox);
+                AbschnitteAktualisieren();
+            };
+            LieferdatumBox.DateChanged += (_, _) => { MarkierungEntfernen(LieferdatumBox); AbschnitteAktualisieren(); };
+            // Mit der Gutart ändert sich, ob die Temperaturen Pflicht sind.
+            GutartBox.SelectionChanged += (_, _) => { MarkierungEntfernen(TempMinBox); MarkierungEntfernen(TempMaxBox); };
+        }
+
+        // ---- Abschnitte links (Navigation und Fortschritt) ----
+
+        private void AbschnitteAnlegen()
+        {
+            _abschnitte = new[]
+            {
+                new Abschnitt(AuftragKarte, NavAuftrag, NavAuftragBalken, NavAuftragPunkt, NavAuftragSymbol, "1",
+                    new Control[] { AuftragsnummerBox, KundenreferenzBox, PrioritaetBox }),
+                new Abschnitt(KundeKarte, NavKunde, NavKundeBalken, NavKundePunkt, NavKundeSymbol, "2",
+                    new Control[]
+                    {
+                        KundeBox, KundennummerBox, FirmennameBox, KundeAnsprechpartnerBox, KundeAdresseBox,
+                        KundePlzBox, KundeOrtBox, KundeTelefonBox, KundeEmailBox
+                    }),
+                new Abschnitt(OrteKarte, NavOrte, NavOrteBalken, NavOrtePunkt, NavOrteSymbol, "3",
+                    new Control[]
+                    {
+                        AbholadresseBox, LieferadresseBox, AbholdatumBox, LieferdatumBox,
+                        AbholVonBox, AbholBisBox, LieferVonBox, LieferBisBox
+                    }),
+                new Abschnitt(VorOrtKarte, NavVorOrt, NavVorOrtBalken, NavVorOrtPunkt, NavVorOrtSymbol, "4",
+                    new Control[] { AnsprechpartnerBox, EquipmentBox }),
+                new Abschnitt(LadegutKarte, NavLadegut, NavLadegutBalken, NavLadegutPunkt, NavLadegutSymbol, "5",
+                    new Control[]
+                    {
+                        GutartBox, VerpackungBox, AnzahlBox, GewichtBox, LaengeBox, BreiteBox, HoeheBox,
+                        WarenwertBox, TempMinBox, TempMaxBox
+                    })
+            };
+            AktivenAbschnittSetzen(_abschnitte[0]);
+        }
+
+        // Rot „!“ = ein Feld ist nach dem Speichern rot markiert. Grün „✓“ = alle Pflichtangaben stimmen.
+        // Sonst die Nummer des Abschnitts: Es fehlt noch etwas (wird erst beim Speichern rot).
+        private void AbschnitteAktualisieren()
+        {
+            if (_abschnitte.Length == 0)
+                return;
+            var offeneFelder = FelderPruefen().Select(f => f.Feld).ToHashSet();
+            int vollstaendig = 0;
+            foreach (Abschnitt a in _abschnitte)
+            {
+                if (a.Felder.Any(_markiert.Contains))
+                    PunktSetzen(a, "!", Ressource("ErrorBrush"), Ressource("ErrorBrush"), Ressource("SurfaceBrush"));
+                else if (!a.Felder.Any(offeneFelder.Contains))
+                {
+                    PunktSetzen(a, "✓", _gruen, _gruen, new SolidColorBrush(Microsoft.UI.Colors.White));
+                    vollstaendig++;
+                }
+                else
+                    PunktSetzen(a, a.Nummer, new SolidColorBrush(Microsoft.UI.Colors.Transparent),
+                        Ressource("BorderBrush"), Ressource("MutedTextBrush"));
+            }
+            FortschrittText.Text = vollstaendig == _abschnitte.Length
+                ? "Alle Abschnitte vollständig."
+                : $"{vollstaendig} von {_abschnitte.Length} Abschnitten vollständig";
+        }
+
+        private static void PunktSetzen(Abschnitt a, string symbol, Brush fuellung, Brush rand, Brush schrift)
+        {
+            a.Symbol.Text = symbol;
+            a.Symbol.Foreground = schrift;
+            a.Punkt.Fill = fuellung;
+            a.Punkt.Stroke = rand;
+        }
+
+        private static Brush Ressource(string schluessel) => (Brush)Application.Current.Resources[schluessel];
+
+        private void Abschnitt_Click(object sender, RoutedEventArgs e)
+        {
+            Abschnitt? a = _abschnitte.FirstOrDefault(x => ReferenceEquals(x.Knopf, sender));
+            if (a is null)
+                return;
+            AktivenAbschnittSetzen(a);
+            a.Karte.StartBringIntoView(new BringIntoViewOptions
+            {
+                VerticalAlignmentRatio = 0,
+                VerticalOffset = -16,
+                AnimationDesired = true
+            });
+        }
+
+        private void AktivenAbschnittSetzen(Abschnitt aktiv)
+        {
+            foreach (Abschnitt a in _abschnitte)
+            {
+                bool istAktiv = ReferenceEquals(a, aktiv);
+                a.Balken.Opacity = istAktiv ? 1 : 0;
+                a.Knopf.Background = istAktiv ? Ressource("InputBrush") : new SolidColorBrush(Microsoft.UI.Colors.Transparent);
+            }
+        }
+
+        // Die Seite scrollt im ScrollViewer der FirmenAnsicht. Damit die Abschnittsliste sichtbar bleibt,
+        // wird sie beim Scrollen nach unten mitgeschoben (höchstens bis zum Ende des Formulars).
+        private void ScrollAnmelden()
+        {
+            DependencyObject? element = this;
+            while (element is not null and not ScrollViewer)
+                element = VisualTreeHelper.GetParent(element);
+            _scroll = element as ScrollViewer;
+            if (_scroll is null)
+                return;
+            _scroll.ViewChanged += Scroll_ViewChanged;
+            SizeChanged += Groesse_Changed;
+            NavigationNachziehen();
+        }
+
+        private void ScrollAbmelden()
+        {
+            if (_scroll is not null)
+                _scroll.ViewChanged -= Scroll_ViewChanged;
+            SizeChanged -= Groesse_Changed;
+            _scroll = null;
+        }
+
+        private void Scroll_ViewChanged(object? sender, ScrollViewerViewChangedEventArgs e) => NavigationNachziehen();
+
+        private void Groesse_Changed(object sender, SizeChangedEventArgs e) => NavigationNachziehen();
+
+        private void NavigationNachziehen()
+        {
+            if (_scroll is null || _abschnitte.Length == 0)
+                return;
+            try
+            {
+                // Oberkante des Formulars im sichtbaren Bereich (negativ, wenn schon darüber gescrollt).
+                double oben = FormularRaster.TransformToVisual(_scroll).TransformPoint(new Point(0, 0)).Y;
+                double spielraum = Math.Max(0, FormularRaster.ActualHeight - AbschnittNavigation.ActualHeight);
+                NavVerschiebung.Y = Math.Clamp(16 - oben, 0, spielraum);
+
+                // Aktiv ist der letzte Abschnitt, dessen Karte das obere Drittel erreicht hat.
+                double grenze = _scroll.ViewportHeight * 0.3;
+                Abschnitt aktiv = _abschnitte[0];
+                foreach (Abschnitt a in _abschnitte)
+                    if (a.Karte.TransformToVisual(_scroll).TransformPoint(new Point(0, 0)).Y <= grenze)
+                        aktiv = a;
+                // Ganz unten angekommen: Der letzte Abschnitt erreicht das obere Drittel evtl. nie.
+                if (_scroll.ScrollableHeight > 0 && _scroll.VerticalOffset >= _scroll.ScrollableHeight - 1)
+                    aktiv = _abschnitte[^1];
+                AktivenAbschnittSetzen(aktiv);
+            }
+            catch (ArgumentException)
+            {
+                // Die Ansicht wird gerade aus dem Baum entfernt.
+            }
+        }
+
         // ---- Eingaben umwandeln ----
 
         private static DateOnly Datum(CalendarDatePicker feld, string name) =>
@@ -353,14 +726,17 @@ namespace Disposio.Views
                 : throw new ArgumentException($"Bitte ein {name} wählen.");
 
         // Erlaubt „8:00“, „08:00“ und „0800“.
-        private static TimeOnly Uhrzeit(string? text, string feld)
+        private static TimeOnly Uhrzeit(string? text, string feld) =>
+            UhrzeitVersuchen(text, out TimeOnly zeit)
+                ? zeit
+                : throw new ArgumentException($"Bitte bei „{feld}“ eine Uhrzeit wie 08:30 eingeben.");
+
+        private static bool UhrzeitVersuchen(string? text, out TimeOnly zeit)
         {
             string wert = (text ?? "").Trim();
             if (wert.Length == 4 && wert.All(char.IsDigit))
                 wert = wert[..2] + ":" + wert[2..];
-            if (TimeOnly.TryParseExact(wert, new[] { "H:mm", "HH:mm" }, Deutsch, DateTimeStyles.None, out TimeOnly zeit))
-                return zeit;
-            throw new ArgumentException($"Bitte bei „{feld}“ eine Uhrzeit wie 08:30 eingeben.");
+            return TimeOnly.TryParseExact(wert, new[] { "H:mm", "HH:mm" }, Deutsch, DateTimeStyles.None, out zeit);
         }
 
         private static decimal Zahl(string? text, string feld) =>

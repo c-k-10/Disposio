@@ -8,6 +8,7 @@ using Disposio.Models;
 using Disposio.Services;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
+using Microsoft.UI.Xaml.Media;
 
 namespace Disposio.Views
 {
@@ -17,6 +18,8 @@ namespace Disposio.Views
     {
         private readonly FirmenAnsichtKontext _kontext;
         private readonly IFahrzeugRepository _repository = new FahrzeugRepository();
+        private readonly IFahrerzuordnungRepository _zuordnungen = new FahrerzuordnungRepository();
+        private readonly IWartungRepository _wartungen = new WartungRepository();
         private CancellationTokenSource? _laden;
         private bool _laedt;
         // Läuft gerade „Inaktiv setzen“ oder „Aktivieren“? Dann zählt kein weiterer Klick.
@@ -26,6 +29,10 @@ namespace Disposio.Views
         // Alle zuletzt geladenen Fahrzeuge. Angezeigt werden davon die aktiven, auf Wunsch auch die inaktiven.
         private IReadOnlyList<Fahrzeug> _fahrzeuge = Array.Empty<Fahrzeug>();
         private bool _inaktiveAnzeigen;
+        // Aktueller Fahrer je Fahrzeug (F03) und offene Wartungstermine (F04). Fehlen sie, zeigt F01 trotzdem die Fahrzeuge.
+        private IReadOnlyDictionary<long, string> _fahrerJeFahrzeug = new Dictionary<long, string>();
+        private IReadOnlyList<Wartungstermin> _termine = Array.Empty<Wartungstermin>();
+        private bool _zusatzGeladen;
 
         public F01Fuhrpark(FirmenAnsichtKontext kontext)
         {
@@ -133,12 +140,14 @@ namespace Disposio.Views
             try
             {
                 IReadOnlyList<Fahrzeug> fahrzeuge = await _repository.LadenAsync(abbruch.Token);
+                _zusatzGeladen = await ZusatzLadenAsync(abbruch.Token);
                 if (abbruch.IsCancellationRequested)
                     return;
 
                 _fahrzeuge = fahrzeuge;
                 Anzeigen();
-                StatusText.Text = _meldung ?? Zusammenfassung();
+                StatusText.Text = (_meldung ?? Zusammenfassung()) +
+                    (_zusatzGeladen ? "" : " Fahrer und Wartungsstatus konnten nicht geladen werden.");
                 _meldung = null;
             }
             catch (OperationCanceledException) when (abbruch.IsCancellationRequested)
@@ -166,6 +175,29 @@ namespace Disposio.Views
             }
         }
 
+        // Lädt die laufenden Fahrerzuordnungen (#85) und offenen Wartungstermine (#92). Ein Fehler hier soll die
+        // Fahrzeugliste nicht verhindern, deshalb false statt Ausnahme. Entzogene Rechte beenden aber die Sitzung.
+        private async Task<bool> ZusatzLadenAsync(CancellationToken abbruch)
+        {
+            try
+            {
+                IReadOnlyList<Fahrerzuordnung> zuordnungen = await _zuordnungen.AktuelleLadenAsync(abbruch);
+                IReadOnlyList<Wartungstermin> termine = await _wartungen.OffeneTermineLadenAsync(abbruch);
+                _fahrerJeFahrzeug = zuordnungen
+                    .GroupBy(zuordnung => zuordnung.FahrzeugId)
+                    .ToDictionary(gruppe => gruppe.Key, gruppe => string.Join(", ", gruppe.Select(z => z.Fahrername)));
+                _termine = termine;
+                return true;
+            }
+            catch (Exception exception) when (exception is not UnauthorizedAccessException &&
+                !(exception is OperationCanceledException && abbruch.IsCancellationRequested))
+            {
+                _fahrerJeFahrzeug = new Dictionary<long, string>();
+                _termine = Array.Empty<Wartungstermin>();
+                return false;
+            }
+        }
+
         // Zeigt die geladenen Fahrzeuge an. Inaktive nur, wenn „Inaktive anzeigen“ gewählt ist.
         private void Anzeigen()
         {
@@ -174,7 +206,14 @@ namespace Disposio.Views
                 _inaktiveAnzeigen = false;
 
             var sichtbar = _fahrzeuge.Where(fahrzeug => fahrzeug.Aktiv || _inaktiveAnzeigen).ToList();
-            FahrzeugListe.ItemsSource = sichtbar.Select(fahrzeug => new FahrzeugZeile(fahrzeug)).ToList();
+            DateOnly heute = WartungsRegeln.Heute();
+            FahrzeugListe.ItemsSource = sichtbar.Select(fahrzeug => new FahrzeugZeile(
+                    fahrzeug,
+                    _fahrerJeFahrzeug.TryGetValue(fahrzeug.Id, out string? fahrer) ? fahrer : null,
+                    WartungsRegeln.DringendsterTermin(_termine.Where(termin => termin.FahrzeugId == fahrzeug.Id), heute),
+                    heute,
+                    _zusatzGeladen))
+                .ToList();
 
             InaktiveButton.Visibility = inaktive > 0 ? Visibility.Visible : Visibility.Collapsed;
             InaktiveButton.Content = _inaktiveAnzeigen ? "Inaktive ausblenden" : $"Inaktive anzeigen ({inaktive})";
@@ -203,7 +242,7 @@ namespace Disposio.Views
         // Die App ist deutschsprachig: „184.250 km“ und „13,6 Ldm“ unabhängig von der Windows-Sprache.
         private static readonly CultureInfo Deutsch = CultureInfo.GetCultureInfo("de-DE");
 
-        public FahrzeugZeile(Fahrzeug fahrzeug)
+        public FahrzeugZeile(Fahrzeug fahrzeug, string? fahrer, Wartungstermin? naechsterTermin, DateOnly heute, bool zusatzGeladen)
         {
             Id = fahrzeug.Id;
             Aktiv = fahrzeug.Aktiv;
@@ -224,6 +263,18 @@ namespace Disposio.Views
             AktivUmschaltenBeschreibung = fahrzeug.Aktiv
                 ? $"Fahrzeug {fahrzeug.Kennzeichen} inaktiv setzen"
                 : $"Fahrzeug {fahrzeug.Kennzeichen} aktivieren";
+
+            Fahrer = fahrer is null ? "" : $"Fahrer: {fahrer}";
+            FahrerSichtbarkeit = fahrer is null ? Visibility.Collapsed : Visibility.Visible;
+
+            // Wartungsstatus = dringendster offener Termin. Ohne geladene Daten: „Unbekannt“ statt „Kein Termin“.
+            WartungsAmpel ampel = naechsterTermin is null ? WartungsAmpel.KeinTermin : WartungsRegeln.Bewerten(naechsterTermin, heute);
+            WartungStatus = zusatzGeladen ? WartungsRegeln.Bezeichnung(ampel) : "Unbekannt";
+            WartungFarbe = WartungsAmpelFarben.Pinsel(zusatzGeladen ? ampel : WartungsAmpel.KeinTermin);
+            WartungDetail = naechsterTermin is null
+                ? ""
+                : $"{naechsterTermin.Wartungsart} · {naechsterTermin.Termin.ToString("dd.MM.yyyy", Deutsch)}";
+            WartungDetailSichtbarkeit = naechsterTermin is null ? Visibility.Collapsed : Visibility.Visible;
         }
 
         public long Id { get; }
@@ -241,5 +292,11 @@ namespace Disposio.Views
         // Für Bildschirmleser: Welches Fahrzeug ein Knopf betrifft.
         public string BearbeitenBeschreibung { get; }
         public string AktivUmschaltenBeschreibung { get; }
+        public string Fahrer { get; }
+        public Visibility FahrerSichtbarkeit { get; }
+        public string WartungStatus { get; }
+        public SolidColorBrush WartungFarbe { get; }
+        public string WartungDetail { get; }
+        public Visibility WartungDetailSichtbarkeit { get; }
     }
 }
