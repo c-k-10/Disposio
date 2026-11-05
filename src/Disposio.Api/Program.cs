@@ -6,6 +6,7 @@ using Npgsql;
 
 // Disposio.Api - Schnittstelle zwischen Fahrer-App und Neon.
 // Phase 0: Health-Check. Phase 1: Anmeldung (M01) und Profil (M09). Phase 2: Touren (M02 bis M05).
+// Phase 3: GPS-Positionen, ETA mit TomTom, Abschluss (M10, M12).
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -45,6 +46,16 @@ builder.Services.AddHttpClient<PasswortPruefer>(client =>
     client.DefaultRequestHeaders.Add("Origin", "http://localhost:3000");
 });
 
+// TomTom Routing API fuer die ETA. Schluessel: lokal User-Secret TomTom:Key, auf Render TomTom__Key.
+// Ohne Schluessel laeuft alles ausser der ETA.
+builder.Services.AddHttpClient(EtaRechner.HttpName, client =>
+{
+    client.BaseAddress = new Uri("https://api.tomtom.com/");
+    client.Timeout = TimeSpan.FromSeconds(20);
+});
+builder.Services.AddSingleton<EtaRechner>();
+builder.Services.AddHostedService<PositionenAufraeumen>();
+
 // Render gibt den Port ueber die Umgebungsvariable PORT vor
 var port = Environment.GetEnvironmentVariable("PORT");
 if (!string.IsNullOrEmpty(port))
@@ -57,7 +68,7 @@ var app = builder.Build();
 app.UseAuthentication();
 app.UseAuthorization();
 
-app.MapGet("/", () => Results.Ok(new { name = "Disposio.Api", version = "0.3" }));
+app.MapGet("/", () => Results.Ok(new { name = "Disposio.Api", version = "0.4" }));
 
 app.MapGet("/health", async (NpgsqlDataSource db) =>
 {
@@ -77,5 +88,6 @@ app.MapGet("/health", async (NpgsqlDataSource db) =>
 app.MapAuthEndpoints();
 app.MapProfilEndpoints();
 app.MapTourEndpoints();
+app.MapPositionEndpoints();
 
 app.Run();

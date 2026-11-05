@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../services/api_client.dart';
+import '../services/gps_dienst.dart';
 import '../texte.dart';
 import '../theme/disposio_theme.dart';
 import 'profil_seite.dart';
@@ -11,6 +13,11 @@ import 'touren_seite.dart';
 class StartSeite extends StatefulWidget {
   const StartSeite({super.key});
 
+  static const tabChat = 1;
+
+  /// Aktiver Tab. Andere Seiten koennen so wechseln, z. B. M10 „Disposition kontaktieren“ zum Chat.
+  static final tab = ValueNotifier<int>(0);
+
   @override
   State<StartSeite> createState() => _StartSeiteState();
 }
@@ -18,23 +25,50 @@ class StartSeite extends StatefulWidget {
 class _StartSeiteState extends State<StartSeite> {
   static const _tabUebertragung = 2;
 
-  int _tab = 0;
+  @override
+  void initState() {
+    super.initState();
+    StartSeite.tab.value = 0;
+    _gpsFortsetzen();
+  }
+
+  /// Nach einem Neustart der App: laeuft noch eine Tour, GPS wieder einschalten (ohne Rueckfrage).
+  Future<void> _gpsFortsetzen() async {
+    try {
+      final touren = await ApiClient().touren();
+      for (final t in touren) {
+        if (t.status == TourDetails.unterwegs) {
+          await GpsDienst.starten(t.tourId);
+          return;
+        }
+      }
+    } on ApiFehler {
+      // Offline: beim Oeffnen der Tour wird es erneut versucht
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
+    return ValueListenableBuilder<int>(
+      valueListenable: StartSeite.tab,
+      builder: (context, tab, _) => _geruest(tab),
+    );
+  }
+
+  Widget _geruest(int tab) {
     final seiten = [
       const TourenSeite(),
       _Platzhalter(titel: Texte.t('chat_titel'), hinweis: Texte.t('chat_hinweis')),
       _Platzhalter(titel: Texte.t('uebertragung_titel'), hinweis: Texte.t('uebertragung_hinweis')),
-      ProfilSeite(zuUebertragungen: () => setState(() => _tab = _tabUebertragung)),
+      ProfilSeite(zuUebertragungen: () => StartSeite.tab.value = _tabUebertragung),
     ];
 
     return Scaffold(
       appBar: AppBar(title: const Text('DISPOSIO')),
-      body: seiten[_tab],
+      body: seiten[tab],
       bottomNavigationBar: NavigationBar(
-        selectedIndex: _tab,
-        onDestinationSelected: (i) => setState(() => _tab = i),
+        selectedIndex: tab,
+        onDestinationSelected: (i) => StartSeite.tab.value = i,
         destinations: [
           NavigationDestination(icon: const Icon(Icons.route_outlined), label: Texte.t('tab_touren')),
           NavigationDestination(icon: const Icon(Icons.chat_bubble_outline), label: Texte.t('tab_chat')),

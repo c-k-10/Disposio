@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:permission_handler/permission_handler.dart';
 
 import '../services/api_client.dart';
 import '../services/sitzung.dart';
@@ -195,7 +196,10 @@ class _ProfilSeiteState extends State<ProfilSeite> {
           OutlinedButton.icon(
             icon: const Icon(Icons.security),
             label: Text(Texte.t('berechtigungen')),
-            onPressed: () => _meldung(Texte.t('berechtigungen_hinweis')),
+            // Phase 3: oeffnet die App-Einstellungen von Android (Standort, Benachrichtigungen)
+            onPressed: () async {
+              if (!await openAppSettings()) _meldung(Texte.t('berechtigungen_fehler'));
+            },
           ),
           const SizedBox(height: 8),
           OutlinedButton.icon(

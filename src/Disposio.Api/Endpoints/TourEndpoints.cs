@@ -9,7 +9,7 @@ public sealed record StoppStatusAnfrage(string? Aktion);
 public sealed record ProblemAnfrage(long? StoppId, string? Art, string? Beschreibung, int? DauerMinuten);
 
 /// <summary>
-/// Phase 2: Touren des Fahrers (Wireframes M02 bis M05).
+/// Phase 2: Touren des Fahrers (Wireframes M02 bis M05). Phase 3: ETA je Stopp, Pause seit (M10), Abschluss (M12).
 /// Eine Tour gehoert dem Fahrer, wenn tour.fahrer_id und tour.unternehmen_id zum Token passen.
 /// Jede Aktion schreibt eine STATUSMELDUNG und setzt tour.status bzw. tourstopp.status.
 /// </summary>
@@ -41,6 +41,7 @@ public static class TourEndpoints
         touren.MapGet("/{id:long}", DetailsAsync);
         touren.MapPost("/{id:long}/status", TourStatusAsync);
         touren.MapPost("/{id:long}/problem", ProblemAsync);
+        touren.MapGet("/{id:long}/abschluss", AbschlussAsync);
 
         app.MapPost("/stopps/{id:long}/status", StoppStatusAsync).RequireAuthorization();
     }
@@ -106,7 +107,9 @@ public static class TourEndpoints
 
         object tour;
         await using (var befehl = new NpgsqlCommand("""
-            SELECT t.tournummer, t.startzeit, t.endzeit, t.startort, t.zielort, t.status, fz.kennzeichen, fz.fahrzeugtyp
+            SELECT t.tournummer, t.startzeit, t.endzeit, t.startort, t.zielort, t.status, fz.kennzeichen, fz.fahrzeugtyp,
+                   (SELECT max(m.zeitstempel) FROM public.statusmeldung m
+                    WHERE m.tour_id = t.tour_id AND m.stopp_id IS NULL AND m.status = 'Pause')
             FROM public.tour t
             LEFT JOIN public.fahrzeug fz ON fz.fahrzeug_id = t.fahrzeug_id
             WHERE t.tour_id = $1 AND t.fahrer_id = $2 AND t.unternehmen_id = $3
@@ -129,6 +132,8 @@ public static class TourEndpoints
                 zielort = leser.GetString(4),
                 status = leser.GetString(5),
                 fahrzeug = leser.IsDBNull(6) ? null : new { kennzeichen = leser.GetString(6), typ = leser.GetString(7) },
+                // M10: Beginn der aktuellen Pause (letzte Meldung "Pause")
+                pauseSeit = leser.GetString(5) == TourPausiert && !leser.IsDBNull(8) ? leser.GetDateTime(8) : (DateTime?)null,
             };
         }
 
@@ -179,7 +184,8 @@ public static class TourEndpoints
         var stopps = new List<object>();
         await using (var befehl = new NpgsqlCommand("""
             SELECT stopp_id, reihenfolge, art, bezeichnung, adresse, breitengrad, laengengrad,
-                   zeitfenster_von, zeitfenster_bis, geplante_ankunft, ist_ankunft, ist_abfahrt, status
+                   zeitfenster_von, zeitfenster_bis, geplante_ankunft, ist_ankunft, ist_abfahrt, status,
+                   aktuelle_eta, eta_berechnet_am
             FROM public.tourstopp
             WHERE tour_id = $1
             ORDER BY reihenfolge
@@ -190,6 +196,8 @@ public static class TourEndpoints
             while (await leser.ReadAsync())
             {
                 var stoppId = leser.GetInt64(0);
+                var status = leser.GetString(12);
+                DateTime? eta = leser.IsDBNull(13) ? null : leser.GetDateTime(13);
                 stopps.Add(new
                 {
                     stoppId,
@@ -204,7 +212,11 @@ public static class TourEndpoints
                     geplanteAnkunft = leser.IsDBNull(9) ? (DateTime?)null : leser.GetDateTime(9),
                     istAnkunft = leser.IsDBNull(10) ? (DateTime?)null : leser.GetDateTime(10),
                     istAbfahrt = leser.IsDBNull(11) ? (DateTime?)null : leser.GetDateTime(11),
-                    status = leser.GetString(12),
+                    status,
+                    // Phase 3: ETA aus TomTom (siehe EtaRechner). Verspaetet, wenn nach dem Zeitfenster.
+                    aktuelleEta = eta,
+                    etaBerechnetAm = leser.IsDBNull(14) ? (DateTime?)null : leser.GetDateTime(14),
+                    verspaetet = status != StoppErledigt && eta > leser.GetDateTime(8),
                     auftraege = auftraege.GetValueOrDefault(stoppId) ?? new List<object>(),
                 });
             }
@@ -331,6 +343,43 @@ public static class TourEndpoints
         await tx.CommitAsync();
 
         return Results.Ok(new { status = neuerStatus });
+    }
+
+    /// <summary>M12: offene Stopps und ob die Tour beendet werden darf.</summary>
+    private static async Task<IResult> AbschlussAsync(long id, ClaimsPrincipal nutzer, NpgsqlDataSource db)
+    {
+        var ids = Ids.Aus(nutzer);
+        await using var verbindung = await db.OpenConnectionAsync();
+        await using var tx = await verbindung.BeginTransactionAsync();
+        if (!await GueltigAsync(verbindung, tx, ids))
+        {
+            return Results.Unauthorized();
+        }
+
+        string status;
+        await using (var befehl = new NpgsqlCommand("""
+            SELECT status FROM public.tour WHERE tour_id = $1 AND fahrer_id = $2 AND unternehmen_id = $3
+            """, verbindung, tx))
+        {
+            befehl.Parameters.Add(new() { Value = id });
+            befehl.Parameters.Add(new() { Value = ids.FahrerId });
+            befehl.Parameters.Add(new() { Value = ids.UnternehmenId });
+            if (await befehl.ExecuteScalarAsync() is not string gelesen)
+            {
+                return TourFehlt();
+            }
+            status = gelesen;
+        }
+
+        var offene = await OffeneStoppsAsync(verbindung, tx, id);
+        await tx.CommitAsync();
+        return Results.Ok(new
+        {
+            status,
+            darfBeenden = status is TourUnterwegs or TourPausiert,
+            // Bei offenen Stopps beendet die App mit erzwingen: true
+            offeneStopps = offene,
+        });
     }
 
     /// <summary>M03/M04: Angekommen, Entladen, Stopp abschliessen. Nur bei laufender Fahrt.</summary>
@@ -506,7 +555,7 @@ public static class TourEndpoints
     }
 
     /// <summary>Wie im Profil: Konto aktiv, Firma nicht gesperrt, Fahrer-Rolle vorhanden.</summary>
-    private static async Task<bool> GueltigAsync(NpgsqlConnection verbindung, NpgsqlTransaction? tx, Ids ids)
+    internal static async Task<bool> GueltigAsync(NpgsqlConnection verbindung, NpgsqlTransaction? tx, Ids ids)
     {
         await using var befehl = new NpgsqlCommand($"""
             SELECT 1 FROM public.benutzer b JOIN public.fahrer f ON f.benutzer_id = b.benutzer_id
@@ -525,7 +574,7 @@ public static class TourEndpoints
         await befehl.ExecuteNonQueryAsync();
     }
 
-    private sealed record Ids(long BenutzerId, long FahrerId, long UnternehmenId)
+    internal sealed record Ids(long BenutzerId, long FahrerId, long UnternehmenId)
     {
         public static Ids Aus(ClaimsPrincipal nutzer) => new(
             AnmeldeClaims.Lesen(nutzer, AnmeldeClaims.BenutzerId),

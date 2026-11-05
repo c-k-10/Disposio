@@ -1,6 +1,14 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
     <!-- Ohne diese Berechtigung erreicht die Release-App die API nicht -->
     <uses-permission android:name="android.permission.INTERNET"/>
+    <!-- Phase 3: GPS waehrend der Fahrt, auch bei ausgeschaltetem Bildschirm (Vordergrunddienst mit Benachrichtigung) -->
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION"/>
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION"/>
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE"/>
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_LOCATION"/>
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
+    <!-- Haelt die CPU waehrend der Fahrt wach (geolocator enableWakeLock) -->
+    <uses-permission android:name="android.permission.WAKE_LOCK"/>
     <application
         android:label="Disposio Fahrer"
         android:name="${applicationName}"

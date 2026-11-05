@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import 'screens/login_seite.dart';
 import 'screens/start_seite.dart';
+import 'services/gps_dienst.dart';
 import 'services/sitzung.dart';
 import 'texte.dart';
 import 'theme/disposio_theme.dart';
@@ -12,6 +13,8 @@ Future<void> main() async {
   final sprache = await Sitzung.lesen('sprache');
   if (sprache != null) Texte.setzen(sprache);
   await Sitzung.laden();
+  // GPS-Puffer laden und alle 60 s senden (Phase 3)
+  await GpsDienst.init();
   runApp(const DisposioFahrerApp());
 }
 

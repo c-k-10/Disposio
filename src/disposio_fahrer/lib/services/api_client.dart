@@ -104,6 +104,7 @@ class TourDetails {
         status = json['tour']['status'] as String,
         kennzeichen = json['tour']['fahrzeug']?['kennzeichen'] as String?,
         fahrzeugtyp = json['tour']['fahrzeug']?['typ'] as String?,
+        pauseSeit = _zeit(json['tour']['pauseSeit']),
         stopps = [
           for (final s in json['stopps'] as List) Stopp.ausJson(s as Map<String, dynamic>),
         ];
@@ -118,6 +119,9 @@ class TourDetails {
   final String? kennzeichen;
   final String? fahrzeugtyp;
   final List<Stopp> stopps;
+
+  /// M10: Beginn der aktuellen Pause, nur bei Status Pausiert.
+  final DateTime? pauseSeit;
 
   bool get bereit => status == geplant || status == zugewiesen;
 
@@ -153,6 +157,9 @@ class Stopp {
         istAnkunft = _zeit(json['istAnkunft']),
         istAbfahrt = _zeit(json['istAbfahrt']),
         status = json['status'] as String,
+        aktuelleEta = _zeit(json['aktuelleEta']),
+        etaBerechnetAm = _zeit(json['etaBerechnetAm']),
+        verspaetet = json['verspaetet'] as bool? ?? false,
         auftraege = [
           for (final a in json['auftraege'] as List) Auftrag.ausJson(a as Map<String, dynamic>),
         ];
@@ -171,6 +178,26 @@ class Stopp {
   final DateTime? istAbfahrt;
   final String status;
   final List<Auftrag> auftraege;
+
+  /// Phase 3: voraussichtliche Ankunft (TomTom). [verspaetet] = ETA nach dem Zeitfenster.
+  final DateTime? aktuelleEta;
+  final DateTime? etaBerechnetAm;
+  final bool verspaetet;
+}
+
+/// M12: offene Stopps vor dem Abschliessen.
+class TourAbschluss {
+  TourAbschluss.ausJson(Map<String, dynamic> json)
+      : status = json['status'] as String,
+        darfBeenden = json['darfBeenden'] as bool,
+        offeneStopps = [
+          for (final s in json['offeneStopps'] as List)
+            '${(s as Map<String, dynamic>)['reihenfolge']}. ${s['bezeichnung']}',
+        ];
+
+  final String status;
+  final bool darfBeenden;
+  final List<String> offeneStopps;
 }
 
 class Auftrag {
@@ -261,9 +288,24 @@ class ApiClient {
 
   /// [aktion]: starten, pausieren, fortsetzen, beenden.
   /// Beenden mit offenen Stopps wirft ApiFehler('offene_stopps'), ausser [erzwingen] ist true.
-  Future<void> tourStatus(int tourId, String aktion, {bool erzwingen = false}) async {
+  Future<void> tourStatus(int tourId, String aktion, {bool erzwingen = false, String? bemerkung}) async {
     final antwort = await _senden(() => _client.post(Uri.parse('$apiUrl/touren/$tourId/status'),
-        headers: _kopf(), body: jsonEncode({'aktion': aktion, 'erzwingen': erzwingen})));
+        headers: _kopf(), body: jsonEncode({'aktion': aktion, 'erzwingen': erzwingen, 'bemerkung': bemerkung})));
+    _auswerten(antwort);
+  }
+
+  /// Phase 3 (M12): offene Stopps und ob beendet werden darf.
+  Future<TourAbschluss> abschluss(int tourId) async {
+    final antwort =
+        await _senden(() => _client.get(Uri.parse('$apiUrl/touren/$tourId/abschluss'), headers: _kopf()));
+    return TourAbschluss.ausJson(_auswerten(antwort) as Map<String, dynamic>);
+  }
+
+  /// Phase 3: gesammelte GPS-Punkte senden (hoechstens 100).
+  /// Ist die Tour nicht mehr unterwegs, kommt ApiFehler('tour_nicht_unterwegs').
+  Future<void> positionenSenden(int tourId, List<Map<String, dynamic>> punkte) async {
+    final antwort = await _senden(() => _client.post(Uri.parse('$apiUrl/touren/$tourId/positionen'),
+        headers: _kopf(), body: jsonEncode(punkte)));
     _auswerten(antwort);
   }
 

@@ -113,6 +113,31 @@ class StatusZeile extends StatelessWidget {
   }
 }
 
+/// Phase 3: voraussichtliche Ankunft, z. B. "ETA 14:35". Rot mit "verspätet", wenn nach dem Zeitfenster.
+class EtaText extends StatelessWidget {
+  const EtaText(this.stopp, {super.key, this.gross = false});
+
+  final Stopp stopp;
+  final bool gross;
+
+  static const rot = Color(0xFFC62828);
+
+  @override
+  Widget build(BuildContext context) {
+    final eta = stopp.aktuelleEta;
+    if (eta == null) return const SizedBox.shrink();
+    final zusatz = stopp.verspaetet ? ' · ${Texte.t('verspaetet')}' : '';
+    return Text(
+      '${Texte.t('eta')} ${uhrzeit(eta)}$zusatz',
+      style: TextStyle(
+        color: stopp.verspaetet ? rot : DisposioFarben.dunkelblau,
+        fontWeight: FontWeight.w700,
+        fontSize: gross ? 16 : null,
+      ),
+    );
+  }
+}
+
 /// Fehlertext mit "Erneut versuchen".
 class LadeFehler extends StatelessWidget {
   const LadeFehler({super.key, required this.text, required this.erneut});

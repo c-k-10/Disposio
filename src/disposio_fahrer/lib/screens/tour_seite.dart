@@ -1,14 +1,19 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../services/api_client.dart';
+import '../services/gps_dienst.dart';
 import '../texte.dart';
 import '../theme/disposio_theme.dart';
 import '../widgets/tour_bausteine.dart';
+import 'abschluss_seite.dart';
+import 'pause_seite.dart';
 import 'problem_seite.dart';
 import 'stopp_seite.dart';
 
 /// Wireframe M03: Aktive Tour. Fahrt starten, naechster Stopp, Angekommen/Entladen/Pause/Problem,
-/// Tour abschliessen. GPS kommt in Phase 3, bis dahin zeigt die Statuszeile "GPS aus".
+/// Tour abschliessen. Phase 3: GPS waehrend der Fahrt, ETA je Stopp, Pause (M10) und Abschluss (M12).
 class TourSeite extends StatefulWidget {
   const TourSeite({super.key, required this.tourId});
 
@@ -23,20 +28,99 @@ class _TourSeiteState extends State<TourSeite> {
   TourDetails? _tour;
   String? _fehler;
   bool _arbeitet = false;
+  bool _pauseGezeigt = false;
+  Timer? _aktualisieren;
 
   @override
   void initState() {
     super.initState();
     _laden();
+    // Waehrend der Fahrt jede Minute neu laden, damit neue ETAs erscheinen
+    _aktualisieren = Timer.periodic(const Duration(seconds: 60), (_) {
+      if (_tour?.status == TourDetails.unterwegs && !_arbeitet) _laden();
+    });
+  }
+
+  @override
+  void dispose() {
+    _aktualisieren?.cancel();
+    super.dispose();
   }
 
   Future<void> _laden() async {
     setState(() => _fehler = null);
     try {
       final tour = await _api.tour(widget.tourId);
-      if (mounted) setState(() => _tour = tour);
+      if (!mounted) return;
+      setState(() => _tour = tour);
+      await _gpsAbgleichen(tour);
+      // Pausierte Tour geoeffnet: einmal M10 zeigen
+      if (tour.status == TourDetails.pausiert && !_pauseGezeigt && !_arbeitet && mounted) {
+        _pauseGezeigt = true;
+        await _pauseZeigen(tour);
+      }
     } on ApiFehler catch (e) {
       if (mounted) setState(() => _fehler = e.text);
+    }
+  }
+
+  /// GPS laeuft genau dann, wenn die Tour unterwegs ist (z. B. nach Neustart der App).
+  Future<void> _gpsAbgleichen(TourDetails tour) async {
+    if (tour.status == TourDetails.unterwegs) {
+      await GpsDienst.starten(tour.tourId);
+    } else if (GpsDienst.tourId == tour.tourId) {
+      await GpsDienst.stoppen();
+    }
+  }
+
+  /// Vor dem ersten „Fahrt starten“: kurzer Hinweis, dann fragt Android nach Standort und Benachrichtigungen.
+  Future<void> _berechtigungEinholen() async {
+    if (await GpsDienst.berechtigt() || !mounted) return;
+    await showDialog<void>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(Texte.t('gps_hinweis_titel')),
+        content: Text(Texte.t('gps_hinweis')),
+        actions: [
+          FilledButton(onPressed: () => Navigator.pop(context), child: Text(Texte.t('weiter'))),
+        ],
+      ),
+    );
+    await GpsDienst.berechtigungAnfragen();
+  }
+
+  Future<void> _starten() => _aktion(() async {
+        await _berechtigungEinholen();
+        await _api.tourStatus(widget.tourId, 'starten');
+        final gps = await GpsDienst.starten(widget.tourId);
+        return Texte.t(gps ? 'gemeldet' : 'gps_nicht_gestartet');
+      });
+
+  Future<void> _fortsetzen() => _aktion(() async {
+        await _api.tourStatus(widget.tourId, 'fortsetzen');
+        final gps = await GpsDienst.starten(widget.tourId);
+        return Texte.t(gps ? 'gemeldet' : 'gps_nicht_gestartet');
+      });
+
+  Future<void> _pausieren() async {
+    await _aktion(() async {
+      // Gesammelte Punkte vorher senden, in der Pause lehnt die API sie ab
+      await GpsDienst.jetztSenden();
+      await _api.tourStatus(widget.tourId, 'pausieren');
+      await GpsDienst.stoppen();
+      _pauseGezeigt = true;
+      return null;
+    });
+    final tour = _tour;
+    if (tour != null && tour.status == TourDetails.pausiert && mounted) await _pauseZeigen(tour);
+  }
+
+  Future<void> _pauseZeigen(TourDetails tour) async {
+    final fortgesetzt =
+        await Navigator.push<bool>(context, MaterialPageRoute(builder: (_) => PauseSeite(tour: tour)));
+    if (fortgesetzt == true && mounted) {
+      meldung(context, Texte.t('gemeldet'));
+      _laden();
     }
   }
 
@@ -58,64 +142,21 @@ class _TourSeiteState extends State<TourSeite> {
   String _fehlerText(ApiFehler e) =>
       e.code == 'andere_tour_aktiv' ? '${e.text} (${e.daten['tournummer']})' : e.text;
 
-  Future<void> _tourStatus(String aktion) =>
-      _aktion(() async {
-        await _api.tourStatus(widget.tourId, aktion);
-        return Texte.t('gemeldet');
-      });
-
   Future<void> _stoppStatus(Stopp stopp, String aktion) =>
       _aktion(() async {
         await _api.stoppStatus(stopp.stoppId, aktion);
         return Texte.t('gemeldet');
       });
 
+  /// M12: eigener Bildschirm zum Abschliessen.
   Future<void> _beenden(TourDetails tour) async {
-    final offene = [for (final s in tour.offeneStopps) '${s.reihenfolge}. ${s.bezeichnung}'];
-    if (await _frageBeenden(offene) != true) return;
-    await _aktion(() async {
-      try {
-        await _api.tourStatus(widget.tourId, 'beenden', erzwingen: offene.isNotEmpty);
-      } on ApiFehler catch (e) {
-        // Die Anzeige war veraltet: Server kennt noch offene Stopps, also erneut nachfragen
-        if (e.code != 'offene_stopps') rethrow;
-        final liste = [
-          for (final s in e.daten['stopps'] as List) '${s['reihenfolge']}. ${s['bezeichnung']}',
-        ];
-        if (!mounted || await _frageBeenden(liste) != true) return null;
-        await _api.tourStatus(widget.tourId, 'beenden', erzwingen: true);
-      }
-      return Texte.t('tour_beendet');
-    });
-  }
-
-  /// Rueckfrage vor dem Abschliessen. Bei offenen Stopps werden diese aufgelistet.
-  Future<bool?> _frageBeenden(List<String> offeneStopps) {
-    return showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text(Texte.t('tour_abschliessen')),
-        content: offeneStopps.isEmpty
-            ? Text(Texte.t('tour_abschliessen_frage'))
-            : Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(Texte.t('offene_stopps_frage')),
-                  const SizedBox(height: 8),
-                  for (final s in offeneStopps) Text('• $s'),
-                ],
-              ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(context, false), child: Text(Texte.t('abbrechen'))),
-          FilledButton(
-            style: FilledButton.styleFrom(minimumSize: const Size(0, 44)),
-            onPressed: () => Navigator.pop(context, true),
-            child: Text(Texte.t(offeneStopps.isEmpty ? 'tour_abschliessen' : 'trotzdem_abschliessen')),
-          ),
-        ],
-      ),
+    final beendet = await Navigator.push<bool>(
+      context,
+      MaterialPageRoute(builder: (_) => AbschlussSeite(tourId: tour.tourId, tournummer: tour.tournummer)),
     );
+    if (!mounted) return;
+    if (beendet == true) meldung(context, Texte.t('tour_beendet'));
+    _laden();
   }
 
   Future<void> _problem(TourDetails tour, Stopp? stopp) async {
@@ -135,8 +176,9 @@ class _TourSeiteState extends State<TourSeite> {
   }
 
   String _statusZeile(String status) => switch (status) {
-        TourDetails.unterwegs => Texte.t('status_unterwegs'),
-        TourDetails.pausiert => Texte.t('status_pausiert'),
+        TourDetails.unterwegs =>
+          Texte.t(GpsDienst.aktiv.value && GpsDienst.tourId == widget.tourId ? 'unterwegs_gps_an' : 'unterwegs_gps_aus'),
+        TourDetails.pausiert => Texte.t('pause_gps_pausiert'),
         TourDetails.abgeschlossen => Texte.t('status_abgeschlossen'),
         _ => Texte.t('bereit_gps_aus'),
       };
@@ -176,19 +218,22 @@ class _TourSeiteState extends State<TourSeite> {
         if (tour.kennzeichen != null)
           Text('${Texte.t('fahrzeug')}: ${tour.kennzeichen} (${tour.fahrzeugtyp})', style: leise),
         const SizedBox(height: 12),
-        StatusZeile(_statusZeile(tour.status)),
+        ValueListenableBuilder<bool>(
+          valueListenable: GpsDienst.aktiv,
+          builder: (context, _, _) => StatusZeile(_statusZeile(tour.status)),
+        ),
         const SizedBox(height: 12),
         if (tour.bereit)
           _GrosserKnopf(
             icon: Icons.play_arrow,
             text: Texte.t('fahrt_starten'),
-            onPressed: frei ? () => _tourStatus('starten') : null,
+            onPressed: frei ? _starten : null,
           ),
         if (tour.status == TourDetails.pausiert)
           _GrosserKnopf(
             icon: Icons.play_arrow,
             text: Texte.t('fahrt_fortsetzen'),
-            onPressed: frei ? () => _tourStatus('fortsetzen') : null,
+            onPressed: frei ? _fortsetzen : null,
           ),
         if (naechster != null)
           _NaechsterStoppKarte(
@@ -227,7 +272,7 @@ class _TourSeiteState extends State<TourSeite> {
             _Kachel(
               icon: Icons.pause,
               text: Texte.t('pause'),
-              onPressed: unterwegs && frei ? () => _tourStatus('pausieren') : null,
+              onPressed: unterwegs && frei ? _pausieren : null,
             ),
             const SizedBox(width: 8),
             _Kachel(
@@ -248,8 +293,13 @@ class _TourSeiteState extends State<TourSeite> {
                 child: Text('${stopp.reihenfolge}', style: const TextStyle(fontSize: 12)),
               ),
               title: Text(stopp.bezeichnung),
-              subtitle: Text(
-                  '${stoppArtText(stopp.art)} · ${zeitfenster(stopp.zeitfensterVon, stopp.zeitfensterBis)}'),
+              subtitle: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('${stoppArtText(stopp.art)} · ${zeitfenster(stopp.zeitfensterVon, stopp.zeitfensterBis)}'),
+                  if (stopp.status != Stopp.erledigt && stopp.aktuelleEta != null) EtaText(stopp),
+                ],
+              ),
               trailing: StatusBadge.stopp(stopp.status),
               onTap: () => _stoppOeffnen(stopp),
             ),
@@ -354,6 +404,7 @@ class _NaechsterStoppKarte extends StatelessWidget {
             Text(stopp.adresse),
             const SizedBox(height: 4),
             Text('${Texte.t('zeitfenster')}: ${zeitfenster(stopp.zeitfensterVon, stopp.zeitfensterBis)}', style: leise),
+            if (stopp.aktuelleEta != null) EtaText(stopp, gross: true),
             if (ware.isNotEmpty) Text(ware, style: leise),
             const SizedBox(height: 12),
             Row(
