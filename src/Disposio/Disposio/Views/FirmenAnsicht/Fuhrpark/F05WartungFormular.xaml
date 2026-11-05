@@ -1,0 +1,118 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- F05 „Wartung erfassen“: einen Wartungstermin planen (#89), einen offenen Termin als erledigt eintragen
+     oder eine durchgeführte Wartung ohne Termin nachtragen (Datum, Kilometerstand, Kosten, Bemerkung). -->
+<UserControl
+    x:Class="Disposio.Views.F05WartungFormular"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+    <Border Style="{StaticResource KarteStyle}">
+        <StackPanel Spacing="22">
+            <StackPanel Spacing="6">
+                <TextBlock x:Name="FormularTitel" Text="Wartungstermin anlegen" Style="{StaticResource UeberschriftText}" />
+                <TextBlock x:Name="TerminInfo" Style="{StaticResource HinweisText}" Visibility="Collapsed" />
+            </StackPanel>
+
+            <!-- Fahrzeug und Wartungsart. Beim Erledigen eines Termins stehen beide schon fest. -->
+            <Grid x:Name="AuswahlBereich" ColumnSpacing="18">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
+                <StackPanel>
+                    <TextBlock Text="Fahrzeug *" Style="{StaticResource FeldLabel}" />
+                    <ComboBox x:Name="FahrzeugBox" Style="{StaticResource FormComboBox}" PlaceholderText="Bitte wählen"
+                              AutomationProperties.Name="Fahrzeug" SelectionChanged="Fahrzeug_SelectionChanged" />
+                </StackPanel>
+                <StackPanel Grid.Column="1">
+                    <TextBlock Text="Wartungsart *" Style="{StaticResource FeldLabel}" />
+                    <ComboBox x:Name="ArtBox" Style="{StaticResource FormComboBox}" PlaceholderText="Bitte wählen"
+                              AutomationProperties.Name="Wartungsart" />
+                </StackPanel>
+            </Grid>
+
+            <!-- Termin planen. -->
+            <Grid x:Name="TerminBereich" ColumnSpacing="18">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
+                <StackPanel>
+                    <TextBlock Text="Termin *" Style="{StaticResource FeldLabel}" />
+                    <CalendarDatePicker x:Name="TerminPicker" Style="{StaticResource FormDatePicker}"
+                                        PlaceholderText="Datum wählen" DateFormat="{}{day.integer(2)}.{month.integer(2)}.{year.full}"
+                                        AutomationProperties.Name="Termin" />
+                </StackPanel>
+                <StackPanel Grid.Column="1">
+                    <TextBlock Text="Oder fällig bei Kilometerstand" Style="{StaticResource FeldLabel}" />
+                    <TextBox x:Name="FaelligKmBox" Style="{StaticResource FormTextBox}" MaxLength="11" InputScope="Number"
+                             PlaceholderText="optional, z. B. 250.000" AutomationProperties.Name="Fällig bei Kilometerstand" />
+                </StackPanel>
+            </Grid>
+
+            <!-- Durchgeführte Wartung dokumentieren. -->
+            <StackPanel x:Name="DurchfuehrungBereich" Spacing="16" Visibility="Collapsed">
+                <Grid ColumnSpacing="18">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+                    <StackPanel>
+                        <TextBlock Text="Durchgeführt am *" Style="{StaticResource FeldLabel}" />
+                        <CalendarDatePicker x:Name="DatumPicker" Style="{StaticResource FormDatePicker}"
+                                            PlaceholderText="Datum wählen" DateFormat="{}{day.integer(2)}.{month.integer(2)}.{year.full}"
+                                            AutomationProperties.Name="Durchgeführt am" />
+                    </StackPanel>
+                    <StackPanel Grid.Column="1">
+                        <TextBlock Text="Kilometerstand *" Style="{StaticResource FeldLabel}" />
+                        <TextBox x:Name="KilometerBox" Style="{StaticResource FormTextBox}" MaxLength="11" InputScope="Number"
+                                 PlaceholderText="z. B. 184.250" AutomationProperties.Name="Kilometerstand" />
+                    </StackPanel>
+                    <StackPanel Grid.Column="2">
+                        <TextBlock Text="Kosten (€)" Style="{StaticResource FeldLabel}" />
+                        <TextBox x:Name="KostenBox" Style="{StaticResource FormTextBox}" MaxLength="12"
+                                 PlaceholderText="z. B. 450,50" AutomationProperties.Name="Kosten in Euro" />
+                    </StackPanel>
+                </Grid>
+
+                <TextBlock Text="Folgetermin (optional)" Style="{StaticResource UeberschriftText}" FontSize="17" />
+                <Grid ColumnSpacing="18">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+                    <StackPanel>
+                        <TextBlock Text="Nächster Termin" Style="{StaticResource FeldLabel}" />
+                        <CalendarDatePicker x:Name="FolgePicker" Style="{StaticResource FormDatePicker}"
+                                            PlaceholderText="Datum wählen" DateFormat="{}{day.integer(2)}.{month.integer(2)}.{year.full}"
+                                            AutomationProperties.Name="Nächster Termin" />
+                    </StackPanel>
+                    <StackPanel Grid.Column="1">
+                        <TextBlock Text="Oder bei Kilometerstand" Style="{StaticResource FeldLabel}" />
+                        <TextBox x:Name="FolgeKmBox" Style="{StaticResource FormTextBox}" MaxLength="11" InputScope="Number"
+                                 PlaceholderText="optional" AutomationProperties.Name="Nächster Termin bei Kilometerstand" />
+                    </StackPanel>
+                </Grid>
+            </StackPanel>
+
+            <StackPanel>
+                <TextBlock Text="Bemerkung" Style="{StaticResource FeldLabel}" />
+                <TextBox x:Name="BemerkungBox" Style="{StaticResource FormTextBox}" MaxLength="500" AcceptsReturn="True"
+                         TextWrapping="Wrap" MinHeight="80" PlaceholderText="optional, z. B. Werkstatt, Befund, Teile"
+                         AutomationProperties.Name="Bemerkung" />
+            </StackPanel>
+
+            <StackPanel Spacing="10">
+                <TextBlock x:Name="HinweisAnzeige" Style="{StaticResource HinweisText}" />
+                <TextBlock x:Name="FehlerAnzeige" Style="{StaticResource FehlerText}" Visibility="Collapsed" />
+                <StackPanel Orientation="Horizontal" Spacing="12">
+                    <Button x:Name="SpeichernButton" Content="Termin speichern" Style="{StaticResource PrimaryButton}"
+                            Click="Speichern_Click" />
+                    <Button x:Name="AbbrechenButton" Content="Abbrechen" Style="{StaticResource DashboardButton}"
+                            Click="Abbrechen_Click" />
+                </StackPanel>
+            </StackPanel>
+        </StackPanel>
+    </Border>
+</UserControl>

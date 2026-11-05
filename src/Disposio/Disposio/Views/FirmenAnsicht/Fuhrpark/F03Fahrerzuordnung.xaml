@@ -1,0 +1,182 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- F03 „Fahrer – Fahrzeug zuweisen“ (US-03, #83–#88): neue Zuordnung anlegen, laufende Zuordnungen sehen,
+     Fahrer wechseln oder Zuordnung beenden. Beendete Zuordnungen stehen mit Zeitraum in der Historie. -->
+<UserControl
+    x:Class="Disposio.Views.F03Fahrerzuordnung"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:local="using:Disposio.Views">
+
+    <StackPanel Spacing="18">
+        <!-- Status links, „Erneut laden“ rechts. -->
+        <Grid ColumnSpacing="12">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+            <StackPanel Orientation="Horizontal" Spacing="12" VerticalAlignment="Center">
+                <ProgressRing x:Name="LadeAnzeige" Width="20" Height="20" IsActive="False" Visibility="Collapsed" />
+                <TextBlock x:Name="StatusText" Style="{StaticResource HinweisText}" VerticalAlignment="Center" TextWrapping="Wrap" />
+            </StackPanel>
+            <Button x:Name="NeuLadenButton" Grid.Column="1" Content="Erneut laden"
+                    Style="{StaticResource DashboardButton}" Click="NeuLaden_Click" />
+        </Grid>
+
+        <!-- #83 Fahrer aus der Fahrerliste wählen, #84 nur verfügbare Fahrzeuge. -->
+        <Border Style="{StaticResource KarteStyle}">
+            <StackPanel Spacing="14">
+                <TextBlock Text="Neue Zuordnung" Style="{StaticResource UeberschriftText}" />
+                <TextBlock Style="{StaticResource HinweisText}" TextWrapping="Wrap"
+                           Text="Zur Wahl stehen nur verfügbare Fahrzeuge: aktiv, nicht in Wartung oder gesperrt und noch ohne Fahrer. Die Zuordnung gilt ab sofort." />
+                <Grid ColumnSpacing="18">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="1.3*" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+                    <StackPanel>
+                        <TextBlock Text="Fahrzeug *" Style="{StaticResource FeldLabel}" />
+                        <ComboBox x:Name="FahrzeugBox" Style="{StaticResource FormComboBox}" PlaceholderText="Bitte wählen"
+                                  AutomationProperties.Name="Fahrzeug" />
+                    </StackPanel>
+                    <StackPanel Grid.Column="1">
+                        <TextBlock Text="Fahrer *" Style="{StaticResource FeldLabel}" />
+                        <ComboBox x:Name="FahrerBox" Style="{StaticResource FormComboBox}" PlaceholderText="Bitte wählen"
+                                  AutomationProperties.Name="Fahrer" />
+                    </StackPanel>
+                    <StackPanel Grid.Column="2">
+                        <TextBlock Text="Bemerkung" Style="{StaticResource FeldLabel}" />
+                        <TextBox x:Name="BemerkungBox" Style="{StaticResource FormTextBox}" MaxLength="300"
+                                 PlaceholderText="optional" AutomationProperties.Name="Bemerkung" />
+                    </StackPanel>
+                </Grid>
+                <TextBlock x:Name="FehlerAnzeige" Style="{StaticResource FehlerText}" Visibility="Collapsed" />
+                <Button x:Name="ZuordnenButton" Content="Fahrer zuordnen" Style="{StaticResource PrimaryButton}"
+                        Click="Zuordnen_Click" />
+            </StackPanel>
+        </Border>
+
+        <!-- #85 aktuelle Zuordnungen, #86 ändern (Fahrer wechseln) oder beenden. -->
+        <Border Style="{StaticResource KarteStyle}">
+            <StackPanel Spacing="12">
+                <TextBlock Text="Aktuelle Zuordnungen" Style="{StaticResource UeberschriftText}" />
+
+                <Border BorderBrush="{StaticResource BorderBrush}" BorderThickness="0,0,0,1" Padding="0,0,0,10">
+                    <Grid ColumnSpacing="16">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="250" />
+                        </Grid.ColumnDefinitions>
+                        <Grid ColumnSpacing="16">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="1.2*" />
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="1.3*" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Text="Fahrzeug" Style="{StaticResource HinweisText}" FontWeight="SemiBold" />
+                            <TextBlock Grid.Column="1" Text="Fahrer" Style="{StaticResource HinweisText}" FontWeight="SemiBold" />
+                            <TextBlock Grid.Column="2" Text="Seit" Style="{StaticResource HinweisText}" FontWeight="SemiBold" />
+                            <TextBlock Grid.Column="3" Text="Bemerkung" Style="{StaticResource HinweisText}" FontWeight="SemiBold" />
+                        </Grid>
+                        <TextBlock Grid.Column="1" Text="Aktionen" Style="{StaticResource HinweisText}" FontWeight="SemiBold" />
+                    </Grid>
+                </Border>
+
+                <ItemsControl x:Name="AktuelleListe">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate x:DataType="local:ZuordnungZeile">
+                            <Border BorderBrush="{StaticResource BorderBrush}" BorderThickness="0,0,0,1" Padding="0,12">
+                                <Grid ColumnSpacing="16">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="250" />
+                                    </Grid.ColumnDefinitions>
+                                    <Grid ColumnSpacing="16">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="1.2*" />
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="1.3*" />
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Text="{x:Bind Kennzeichen}" Style="{StaticResource NormalText}" FontWeight="SemiBold" VerticalAlignment="Center" />
+                                        <TextBlock Grid.Column="1" Text="{x:Bind Fahrer}" Style="{StaticResource NormalText}" VerticalAlignment="Center" />
+                                        <TextBlock Grid.Column="2" Text="{x:Bind Seit}" Style="{StaticResource NormalText}" VerticalAlignment="Center" />
+                                        <TextBlock Grid.Column="3" Text="{x:Bind Bemerkung}" Style="{StaticResource HinweisText}"
+                                                   TextWrapping="Wrap" VerticalAlignment="Center" />
+                                    </Grid>
+                                    <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                                        <Button Content="Fahrer wechseln" Style="{StaticResource DashboardButton}"
+                                                MinHeight="34" Padding="12,4" FontSize="13" Click="Wechseln_Click"
+                                                AutomationProperties.Name="{x:Bind WechselnBeschreibung}" />
+                                        <Button Content="Beenden" Style="{StaticResource DashboardButton}"
+                                                MinHeight="34" Padding="12,4" FontSize="13" Click="Beenden_Click"
+                                                AutomationProperties.Name="{x:Bind BeendenBeschreibung}" />
+                                    </StackPanel>
+                                </Grid>
+                            </Border>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+
+                <TextBlock x:Name="AktuelleLeerText" Visibility="Collapsed" Style="{StaticResource HinweisText}"
+                           Text="Zurzeit ist keinem Fahrzeug ein Fahrer zugeordnet." />
+            </StackPanel>
+        </Border>
+
+        <!-- #88 beendete Zuordnungen mit Zeitraum. -->
+        <Border Style="{StaticResource KarteStyle}">
+            <StackPanel Spacing="12">
+                <Grid ColumnSpacing="12">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="260" />
+                    </Grid.ColumnDefinitions>
+                    <TextBlock Text="Historie" Style="{StaticResource UeberschriftText}" VerticalAlignment="Center" />
+                    <ComboBox x:Name="HistorieFilterBox" Grid.Column="1" Style="{StaticResource FormComboBox}"
+                              HorizontalAlignment="Stretch" AutomationProperties.Name="Historie nach Fahrzeug filtern"
+                              SelectionChanged="HistorieFilter_SelectionChanged" />
+                </Grid>
+
+                <Border BorderBrush="{StaticResource BorderBrush}" BorderThickness="0,0,0,1" Padding="0,0,0,10">
+                    <Grid ColumnSpacing="16">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="1.2*" />
+                            <ColumnDefinition Width="1.6*" />
+                            <ColumnDefinition Width="1.3*" />
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Text="Fahrzeug" Style="{StaticResource HinweisText}" FontWeight="SemiBold" />
+                        <TextBlock Grid.Column="1" Text="Fahrer" Style="{StaticResource HinweisText}" FontWeight="SemiBold" />
+                        <TextBlock Grid.Column="2" Text="Zeitraum" Style="{StaticResource HinweisText}" FontWeight="SemiBold" />
+                        <TextBlock Grid.Column="3" Text="Bemerkung" Style="{StaticResource HinweisText}" FontWeight="SemiBold" />
+                    </Grid>
+                </Border>
+
+                <ItemsControl x:Name="HistorieListe">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate x:DataType="local:ZuordnungZeile">
+                            <Border BorderBrush="{StaticResource BorderBrush}" BorderThickness="0,0,0,1" Padding="0,10">
+                                <Grid ColumnSpacing="16">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="1.2*" />
+                                        <ColumnDefinition Width="1.6*" />
+                                        <ColumnDefinition Width="1.3*" />
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Text="{x:Bind Kennzeichen}" Style="{StaticResource NormalText}" FontWeight="SemiBold" VerticalAlignment="Center" />
+                                    <TextBlock Grid.Column="1" Text="{x:Bind Fahrer}" Style="{StaticResource NormalText}" VerticalAlignment="Center" />
+                                    <TextBlock Grid.Column="2" Text="{x:Bind Zeitraum}" Style="{StaticResource NormalText}" VerticalAlignment="Center" />
+                                    <TextBlock Grid.Column="3" Text="{x:Bind Bemerkung}" Style="{StaticResource HinweisText}"
+                                               TextWrapping="Wrap" VerticalAlignment="Center" />
+                                </Grid>
+                            </Border>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+
+                <TextBlock x:Name="HistorieLeerText" Visibility="Collapsed" Style="{StaticResource HinweisText}" />
+            </StackPanel>
+        </Border>
+    </StackPanel>
+</UserControl>

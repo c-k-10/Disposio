@@ -19,6 +19,29 @@ Ansicht. Die Ansichten tragen dieselben Wireframe-IDs wie der Prototyp (K01, D04
   Tankvorgänge erhalten bleiben. Inaktive Fahrzeuge sind in F01 zuerst ausgeblendet. Im
   Aktionsprotokoll stehen „Fahrzeug angelegt“, „Fahrzeug geändert“, „Fahrzeug inaktiv gesetzt“ und
   „Fahrzeug aktiviert“. Voraussetzung: `Services/004_fahrzeug_aktiv.sql` wurde in Neon ausgeführt.
+  Je Fahrzeug zeigt F01 außerdem den **aktuellen Fahrer** (aus F03) und den **Wartungsstatus** als
+  Ampel mit Text (aus F04, #92). Können diese Zusatzdaten nicht geladen werden, erscheint die
+  Fahrzeugliste trotzdem, mit dem Hinweis im Status.
+- **F03 „Fahrer – Fahrzeug zuweisen“** (US-03, #83–#88) ordnet einem Fahrzeug ab sofort einen Fahrer
+  zu. Zur Wahl stehen alle Fahrer mit aktivem Konto (#83) und nur **verfügbare** Fahrzeuge: aktiv,
+  nicht in Wartung/gesperrt und ohne laufende Zuordnung (#84). Laufende Zuordnungen stehen in einer
+  eigenen Liste (#85) und lassen sich **wechseln** (alte endet jetzt, neue beginnt im selben Befehl)
+  oder **beenden** (#86). Doppelbelegungen verhindert zusätzlich die Datenbank mit einer
+  Ausschlussregel auf überlappende Zeiträume (#87), auch bei zwei gleichzeitigen Klicks. Beendete
+  Zuordnungen werden nie gelöscht und stehen mit Zeitraum „von – bis“ in der Historie, filterbar
+  nach Fahrzeug (#88). Tabelle: `public.fahrer_fahrzeug_zuordnung` (`gueltig_bis` leer = läuft noch).
+- **F04 „Wartung“** (US-05, #89–#92) zeigt alle offenen Wartungstermine, dringendste zuerst, mit
+  **Ampel** (#90): rot = überfällig (Datum vorbei oder Kilometerstand erreicht), orange = bald fällig
+  (≤ 14 Tage oder ≤ 1.000 km), grün = geplant. Die Bedeutung steht immer auch als Text daneben.
+  Darunter die **Wartungshistorie** (#91) mit Datum, Kilometerstand, Kosten und Bemerkung, filterbar
+  nach Fahrzeug. **F05** legt einen Termin an (#89), trägt einen Termin als erledigt ein oder trägt
+  eine Wartung ohne Termin nach; optional entsteht gleich der Folgetermin. Eine Zeile in
+  `public.wartung` ist entweder `Geplant` (datum = Termin) oder `Erledigt` (datum = Durchführung).
+  Die Schwellen (14 Tage, 1.000 km) und die Wartungsarten stehen nur in `Models/Wartung.cs`.
+  In der Statistik (G02) zählen nur erledigte Wartungen.
+  Voraussetzung für F03–F05: `Services/010_fahrerzuordnung_wartung.sql` wurde in Neon ausgeführt.
+  Im Aktionsprotokoll stehen „Fahrer zugeordnet“, „Fahrer gewechselt“, „Fahrerzuordnung beendet“,
+  „Wartungstermin angelegt“, „Wartungstermin entfernt“ und „Wartung eingetragen“.
 - Alle anderen Ansichten sind Platzhalter. Sie zeigen Titel, Zweck und Wireframe-ID und werden
   einzeln mit Inhalt gefüllt (siehe „So legt man eine neue Ansicht an“).
 - **G02 „Kennzahlen & Statistik“** zeigt je Kalendermonat Touren, Aufträge, Tankvorgänge (Liter,
@@ -176,6 +199,12 @@ alle Büro-Rollen, ohne dass ein Testkonto nötig ist. Wie beim Dashboard gilt d
 | `Services/004_fahrzeug_aktiv.sql` | Ergänzt die Spalte `fahrzeug.aktiv` (Standard: aktiv). |
 | `Views/FirmenAnsicht/Fuhrpark/F01Fuhrpark.xaml` | Fahrzeugliste mit „Erneut laden“, „+ Fahrzeug anlegen“, „Inaktive anzeigen“ und je Zeile „Bearbeiten“ und „Inaktiv setzen“ / „Aktivieren“. |
 | `Views/FirmenAnsicht/Fuhrpark/F02FahrzeugFormular.xaml` | Formular „Fahrzeug anlegen / bearbeiten“ mit Pflichtfeldprüfung. |
+| `Models/Fahrerzuordnung.cs`, `Services/FahrerzuordnungRepository.cs` | Zuordnungen, Fahrerliste und freie Fahrzeuge laden; zuordnen, wechseln, beenden (US-03). |
+| `Models/Wartung.cs`, `Services/WartungRepository.cs` | Wartungstermine und Historie laden; Termin anlegen/entfernen, Durchführung eintragen; Ampelregeln (US-05). |
+| `Services/010_fahrerzuordnung_wartung.sql` | Ausschlussregel gegen Doppelbelegung, Regeln und Spalte `kilometerstand_bei_durchfuehrung` für Wartungen. |
+| `Views/FirmenAnsicht/Fuhrpark/F03Fahrerzuordnung.xaml` | Neue Zuordnung, laufende Zuordnungen mit „Fahrer wechseln“ / „Beenden“, Historie. |
+| `Views/FirmenAnsicht/Fuhrpark/F04Wartung.xaml` | Offene Termine mit Ampel, Wartungshistorie mit Fahrzeugfilter. |
+| `Views/FirmenAnsicht/Fuhrpark/F05WartungFormular.xaml` | Termin planen, Termin erledigen oder Wartung nachtragen. |
 
 ## Nächste Schritte
 
