@@ -1,0 +1,20 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Fahrer-App (Render)",
+      "request": "launch",
+      "type": "dart",
+      "cwd": "src/disposio_fahrer",
+      "program": "lib/main.dart",
+      "toolArgs": ["--dart-define=API_URL=https://disposio.onrender.com"]
+    },
+    {
+      "name": "Fahrer-App (Lokal)",
+      "request": "launch",
+      "type": "dart",
+      "cwd": "src/disposio_fahrer",
+      "program": "lib/main.dart"
+    }
+  ]
+}

@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- D08 „Live-Karte & Verkehr“: links Suche nach Fahrer oder Kennzeichen, rechts die OpenStreetMap-Karte
-     (Leaflet) im WebView2 mit Verkehrslage von TomTom. Positionen kommen später aus der Fahrer-App. -->
+     (Leaflet) im WebView2 mit Verkehrslage von TomTom und den Live-Positionen aus der Fahrer-App. -->
 <UserControl
     x:Class="Disposio.Views.D08LiveKarte"
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"

@@ -18,8 +18,9 @@ namespace Disposio.Views
     // - Verkehrsfluss: Straßen grün/orange/rot eingefärbt (fertige Kartenbilder)
     // - Störungen: eigene runde Symbole mit Popup, geladen über die Incident Details API (echte Daten)
     // Ohne TomTom-Schlüssel erscheint die Karte trotzdem, nur ohne Verkehr.
-    // Links steht eine Suche nach Fahrer oder Kennzeichen. Positionen gibt es erst mit der Fahrer-App;
-    // der Filter wird aber schon jetzt an die Karte übergeben (filterSetzen), damit die Marker ihn später nutzen.
+    // Links steht eine Suche nach Fahrer oder Kennzeichen; der Filter wird an die Karte übergeben (filterSetzen).
+    // Live-Positionen: Je aktiver Tour (Unterwegs oder Pausiert) zeigt die Karte den neuesten Punkt aus der
+    // Fahrer-App (gps_position), alle 30 Sekunden neu geladen. Grau = älter als 5 Minuten, orange = Pause.
     public sealed partial class D08LiveKarte : UserControl
     {
         // Die Karten-HTML wird über diesen lokalen https-Hostnamen geladen.
@@ -41,11 +42,20 @@ namespace Disposio.Views
         private CancellationTokenSource? _laden;
         private bool _objekteGeladen;
 
+        // Live-Positionen der aktiven Touren, alle 30 Sekunden neu.
+        private static readonly TimeSpan PositionsAbstand = TimeSpan.FromSeconds(30);
+        private static readonly JsonSerializerOptions JsonOptionen = new(JsonSerializerDefaults.Web);
+        private readonly LivePositionRepository _positionen = new();
+        private IReadOnlyList<LivePosition> _live = Array.Empty<LivePosition>();
+        private string _liveListenStand = "";
+        private DispatcherTimer? _positionsTakt;
+        private bool _positionenLaden;
+
         // ---- BEISPIEL-FAHRZEUG ----
-        // Bis die Fahrer-App echte Standorte sendet, steht das erste Fahrzeug der Firma zur Ansicht an einer
-        // festen Stelle in Nürnberg (Hafen). Zum Abschalten einfach auf false setzen.
+        // Stand vor der Fahrer-App: das erste Fahrzeug der Firma an einer festen Stelle in Nürnberg (Hafen).
+        // Seit Phase 3 kommen echte Standorte aus der Fahrer-App, deshalb abgeschaltet (true = wieder zeigen).
         // Gibt es noch kein Fahrzeug (oder in der Vorschau), erscheint ein erfundenes Kennzeichen.
-        private const bool BeispielFahrzeugZeigen = true;
+        private const bool BeispielFahrzeugZeigen = false;
         private const double BeispielBreite = 49.4106;
         private const double BeispielLaenge = 11.0487;
         private const string BeispielOrt = "Nürnberg Hafen";
@@ -71,6 +81,8 @@ namespace Disposio.Views
             {
                 // Beim Verlassen der Ansicht Laden abbrechen und den Browser-Prozess der Karte freigeben.
                 _laden?.Cancel();
+                _positionsTakt?.Stop();
+                _positionsTakt = null;
                 Karte.Close();
             };
         }
@@ -144,7 +156,8 @@ namespace Disposio.Views
             _treffer = _objekte.Where(objekt => (art is null || objekt.Art == art) && objekt.Passt(suche)).ToArray();
             string? beispiel = BeispielObjekt?.Schluessel;
             TrefferListe.ItemsSource = _treffer
-                .Select(objekt => new KartenZeile(objekt, objekt.Schluessel == beispiel ? $"Beispielposition · {BeispielOrt}" : null))
+                .Select(objekt => new KartenZeile(objekt, LiveText(objekt.Schluessel)
+                    ?? (objekt.Schluessel == beispiel ? $"Beispielposition · {BeispielOrt}" : null)))
                 .ToList();
             AuswahlHinweis.Visibility = Visibility.Collapsed;
 
@@ -180,10 +193,72 @@ namespace Disposio.Views
                 }
             }
 
-            AuswahlHinweis.Text = gefunden
-                ? $"{zeile.Name} wird auf der Karte gezeigt (Beispielposition, keine echten Standortdaten)."
-                : $"Für {zeile.Name} gibt es noch keine Position. Sie erscheint hier, sobald die Fahrer-App Standorte sendet.";
+            LivePosition? live = LiveFuer(zeile.Schluessel);
+            AuswahlHinweis.Text = gefunden && live is not null
+                ? $"{zeile.Name} wird auf der Karte gezeigt: Tour {live.Tournummer}, Stand {live.Stand} Uhr" +
+                  (live.Veraltet ? " (veraltet)." : ".")
+                : gefunden
+                    ? $"{zeile.Name} wird auf der Karte gezeigt (Beispielposition, keine echten Standortdaten)."
+                    : $"Für {zeile.Name} gibt es zurzeit keine Position. Sie erscheint, sobald eine Tour unterwegs ist " +
+                      "und die Fahrer-App Standorte sendet.";
             AuswahlHinweis.Visibility = Visibility.Visible;
+        }
+
+        // ---- Live-Positionen der aktiven Touren ----
+
+        // Text in der Trefferliste, z. B. „Tour T-12 · Unterwegs“. Ohne Uhrzeit, damit die Liste nur neu
+        // aufgebaut wird, wenn sich wirklich etwas ändert (sonst ginge alle 30 Sekunden die Auswahl verloren).
+        private string? LiveText(string schluessel) => LiveFuer(schluessel) is LivePosition live
+            ? $"Tour {live.Tournummer} · {(live.Veraltet ? "Position veraltet" : live.Pausiert ? "Pause" : "Unterwegs")}"
+            : null;
+
+        private LivePosition? LiveFuer(string schluessel) =>
+            _live.FirstOrDefault(live => live.FahrerSchluessel == schluessel || live.FahrzeugSchluessel == schluessel);
+
+        private void PositionsTaktStarten()
+        {
+            if (_kontext.IstVorschau || _positionsTakt is not null)
+                return;
+            _positionsTakt = new DispatcherTimer { Interval = PositionsAbstand };
+            _positionsTakt.Tick += async (_, _) => await PositionenAktualisierenAsync();
+            _positionsTakt.Start();
+        }
+
+        // Lädt die neuesten Positionen und gibt sie an die Karte (positionenSetzen).
+        // Schlägt das fehl, bleiben die bisherigen Marker stehen; der nächste Takt versucht es erneut.
+        private async Task PositionenAktualisierenAsync()
+        {
+            if (_kontext.IstVorschau || !_kartenBereit || _positionenLaden)
+                return;
+
+            _positionenLaden = true;
+            try
+            {
+                _live = await _positionen.LadenAsync();
+                await Karte.ExecuteScriptAsync($"positionenSetzen({JsonSerializer.Serialize(_live, JsonOptionen)})");
+
+                string stand = string.Join("|", _live.Select(live =>
+                    $"{live.FahrerSchluessel};{live.FahrzeugSchluessel};{LiveText(live.FahrerSchluessel ?? live.FahrzeugSchluessel ?? "")}"));
+                if (stand != _liveListenStand && _objekteGeladen)
+                {
+                    _liveListenStand = stand;
+                    FilterAnwenden();
+                }
+            }
+            catch (UnauthorizedAccessException)
+            {
+                // Rolle entzogen oder Konto deaktiviert: Sitzung beenden, Anmeldung zeigen.
+                _positionsTakt?.Stop();
+                _kontext.ZugriffBeenden();
+            }
+            catch (Exception)
+            {
+                // Keine Verbindung oder die Ansicht wurde gerade verlassen.
+            }
+            finally
+            {
+                _positionenLaden = false;
+            }
         }
 
         // Setzt das Beispiel-Fahrzeug auf die Karte, sobald Karte und Liste fertig sind.
@@ -306,10 +381,13 @@ namespace Disposio.Views
                     AktualisierenKnopf.IsEnabled = true;
                     await FilterAnKarteAsync();
                     await BeispielZeigenAsync();
+                    // Erst Live-Positionen (Fahrer-App), danach die Tour aus D07, damit deren Ausschnitt gilt
+                    await PositionenAktualisierenAsync();
+                    PositionsTaktStarten();
                     await TourZeigenAsync();
                     if (_hatSchluessel)
                     {
-                        ZeigeStatus("Karte mit Verkehrslage geladen. Fahrzeugpositionen folgen in einem späteren Schritt.");
+                        ZeigeStatus("Karte mit Verkehrslage geladen. Fahrzeugpositionen werden alle 30 Sekunden aktualisiert.");
                         FlussSchalter.IsEnabled = true;
                         StoerungenSchalter.IsEnabled = true;
                         ArtenKnopf.IsEnabled = StoerungenSchalter.IsOn;
@@ -347,7 +425,7 @@ namespace Disposio.Views
 
         // ---- Aktualisieren-Knopf ----
 
-        // Lädt sofort neu: Verkehrsfluss-Bilder, Störungen (ohne auf die 5 Minuten zu warten) und die Liste.
+        // Lädt sofort neu: Verkehrsfluss-Bilder, Störungen (ohne auf die 5 Minuten zu warten), Positionen und die Liste.
         // Die automatische Aktualisierung bleibt daneben unverändert.
         private async void Aktualisieren_Click(object sender, RoutedEventArgs e)
         {
@@ -370,6 +448,7 @@ namespace Disposio.Views
                 // Liste neu laden (nicht in der Vorschau und nicht, wenn sie gerade schon lädt).
                 if (!_kontext.IstVorschau && _laden is null)
                     await ObjekteLadenAsync();
+                await PositionenAktualisierenAsync();
 
                 // Kurz warten, damit ein Doppelklick nicht gleich die nächste Abfrage startet.
                 await Task.Delay(1500);
@@ -536,6 +615,13 @@ namespace Disposio.Views
                         padding: 2px 7px; border-radius: 6px; box-shadow: 0 1px 4px rgba(0, 0, 0, .35);
                     }
                     .fahrzeug .hinweis { color: #B3261E; font-size: 12px; margin-top: 4px; }
+
+                    /* Live-Positionen: Stopps mit ETA im Popup, verspätete rot */
+                    .fahrzeug-symbol .schild.veraltet { color: #5F6368; }
+                    .fahrzeug .stopps { margin-top: 6px; border-top: 1px solid #E0E0E0; padding-top: 4px; }
+                    .fahrzeug .stopp { margin-top: 2px; }
+                    .fahrzeug .stopp.spaet { color: #B3261E; font-weight: 600; }
+                    .fahrzeug .stopp.erledigt { color: #80868B; }
 
                     /* Popup beim Anklicken */
                     .stoerung { font-size: 13px; line-height: 1.4; min-width: 200px; }
@@ -790,16 +876,17 @@ namespace Disposio.Views
                         }
 
                         // Filter aus der Suche links. null = alles zeigen, sonst eine Liste von Schlüsseln wie "Fahrzeug:12".
-                        // Noch gibt es keine Fahrer- und Fahrzeugmarker (die Positionen kommen aus der Fahrer-App).
-                        // Später: Jeder Marker bekommt seinen Schlüssel, und hier werden die nicht passenden ausgeblendet.
                         // Fahrer- und Fahrzeugmarker, je mit Schlüssel. Ausgeblendete Marker bleiben hier gespeichert.
+                        // Ein Tour-Marker hat zwei Schlüssel (Fahrer und Fahrzeug); er ist sichtbar, wenn einer passt.
                         const objekte = new Map();          // Schlüssel → Marker
+                        const markerSchluessel = new Map(); // Marker → alle seine Schlüssel
                         const objektEbene = L.layerGroup().addTo(karte);
                         window.kartenFilter = null;
 
                         const filterAnwenden = () => {
-                            for (const [schluessel, marker] of objekte) {
-                                const sichtbar = !window.kartenFilter || window.kartenFilter.has(schluessel);
+                            for (const marker of new Set(objekte.values())) {
+                                const schluessel = markerSchluessel.get(marker) ?? [];
+                                const sichtbar = !window.kartenFilter || schluessel.some(s => window.kartenFilter.has(s));
                                 if (sichtbar) objektEbene.addLayer(marker); else objektEbene.removeLayer(marker);
                             }
                         };
@@ -840,6 +927,7 @@ namespace Disposio.Views
                                     <div class="hinweis">Beispielposition – echte Standorte kommen mit der Fahrer-App.</div>
                                 </div>`);
                             objekte.set(d.schluessel, marker);
+                            markerSchluessel.set(marker, [d.schluessel]);
                             filterAnwenden();
                         };
 
@@ -867,6 +955,83 @@ namespace Disposio.Views
                                     .addTo(tourEbene);
                             });
                             karte.fitBounds(L.latLngBounds(punkte), { padding: [60, 60], maxZoom: 13 });
+                        };
+
+                        // ---- Live-Positionen der aktiven Touren (von C# alle 30 Sekunden über positionenSetzen) ----
+                        // Blau = unterwegs, orange mit Pause-Zeichen = pausiert, grau = Position älter als 5 Minuten.
+                        const PAUSE = '<rect x="6.5" y="5" width="4" height="14" rx="1" fill="#fff"/>'
+                                    + '<rect x="13.5" y="5" width="4" height="14" rx="1" fill="#fff"/>';
+                        const touren = new Map();           // Tour-Id → Marker
+                        let erstePositionen = true;
+
+                        const tourFarbe = p => p.veraltet ? "#9AA0A6" : p.pausiert ? "#E8710A" : "#1A73E8";
+
+                        const tourSymbol = p => {
+                            const f = tourFarbe(p);
+                            const zeichen = p.pausiert ? PAUSE : LKW.replaceAll("#1A73E8", f);
+                            const zusatz = p.veraltet ? " · veraltet" : p.pausiert ? " · Pause" : "";
+                            return L.divIcon({
+                                className: "fahrzeug-symbol",
+                                html: `<div class="fz"><div class="punkt" style="background:${f}"><svg viewBox="0 0 24 24">${zeichen}</svg></div>`
+                                    + `<span class="schild${p.veraltet ? " veraltet" : ""}">${escapeHtml(p.tournummer)} · ${escapeHtml(p.fahrer)}${zusatz}</span></div>`,
+                                iconSize: null,
+                                iconAnchor: [18, 18],
+                                popupAnchor: [0, -16]
+                            });
+                        };
+
+                        const tourPopup = p => {
+                            const stopps = (p.stopps ?? []).map(s => {
+                                const erledigt = s.status === "Erledigt";
+                                const eta = erledigt ? "erledigt" : s.eta ? `ETA ${s.eta}` : "noch keine ETA";
+                                const spaet = s.verspaetet ? ` · verspätet (Zeitfenster bis ${escapeHtml(s.zeitfensterBis)})` : "";
+                                return `<div class="stopp${s.verspaetet ? " spaet" : ""}${erledigt ? " erledigt" : ""}">`
+                                    + `${s.reihenfolge}. ${escapeHtml(s.bezeichnung)} · ${eta}${spaet}</div>`;
+                            }).join("");
+                            const minuten = Math.round(p.alterSekunden / 60);
+                            return `<div class="stoerung fahrzeug">
+                                <div class="titel">${escapeHtml(p.tournummer)} · ${escapeHtml(p.fahrer)}</div>
+                                <div>${p.kennzeichen ? escapeHtml(p.kennzeichen) + " · " : ""}${p.pausiert ? "Pause" : "Unterwegs"}</div>
+                                <div class="ort">Stand ${escapeHtml(p.stand)} Uhr</div>
+                                ${p.veraltet ? `<div class="hinweis">Veraltet: letzte Position vor ${minuten} Min.</div>` : ""}
+                                ${stopps ? `<div class="stopps">${stopps}</div>` : ""}
+                            </div>`;
+                        };
+
+                        window.positionenSetzen = liste => {
+                            // Beendete Touren entfernen
+                            const aktiv = new Set(liste.map(p => p.tourId));
+                            for (const [tourId, marker] of touren) {
+                                if (aktiv.has(tourId)) continue;
+                                objektEbene.removeLayer(marker);
+                                for (const s of markerSchluessel.get(marker) ?? []) if (objekte.get(s) === marker) objekte.delete(s);
+                                markerSchluessel.delete(marker);
+                                touren.delete(tourId);
+                            }
+
+                            // Vorhandene Marker verschieben (ein offenes Popup bleibt offen), neue anlegen
+                            for (const p of liste) {
+                                let marker = touren.get(p.tourId);
+                                if (marker) {
+                                    marker.setLatLng([p.breite, p.laenge]);
+                                } else {
+                                    marker = L.marker([p.breite, p.laenge], { keyboard: false }).bindPopup("");
+                                    touren.set(p.tourId, marker);
+                                }
+                                marker.setIcon(tourSymbol(p));
+                                marker.setPopupContent(tourPopup(p));
+                                marker.setZIndexOffset(p.veraltet ? 500 : 1000);
+                                const schluessel = [p.fahrerSchluessel, p.fahrzeugSchluessel].filter(Boolean);
+                                markerSchluessel.set(marker, schluessel);
+                                for (const s of schluessel) objekte.set(s, marker);
+                            }
+                            filterAnwenden();
+
+                            // Beim ersten Mal die Karte auf die aktiven Touren ausrichten
+                            if (erstePositionen && liste.length) {
+                                erstePositionen = false;
+                                karte.fitBounds(L.latLngBounds(liste.map(p => [p.breite, p.laenge])).pad(0.3), { maxZoom: 13 });
+                            }
                         };
 
                         // Wird von C# über den Knopf „Aktualisieren“ aufgerufen.
