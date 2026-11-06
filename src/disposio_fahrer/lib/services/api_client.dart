@@ -233,6 +233,74 @@ class Auftrag {
   final String? kundenreferenz;
 }
 
+/// Phase 4 (M08): Eintrag in der Chat-Liste.
+class ChatKurz {
+  ChatKurz.ausJson(Map<String, dynamic> json)
+      : chatId = json['chatId'] as int,
+        tourId = json['tourId'] as int,
+        tournummer = json['tournummer'] as String,
+        tourStatus = json['tourStatus'] as String,
+        disponent = json['disponent'] as String,
+        schreibbar = json['schreibbar'] as bool,
+        letzterText = json['letzteNachricht']?['text'] as String?,
+        letzteZeit = _zeit(json['letzteNachricht']?['zeit']),
+        letzteEigen = json['letzteNachricht']?['eigen'] as bool? ?? false,
+        ungelesen = json['ungelesen'] as int;
+
+  final int chatId;
+  final int tourId;
+  final String tournummer;
+  final String tourStatus;
+  final String disponent;
+
+  /// false: Chat geschlossen oder Tour seit mehr als 7 Tagen beendet.
+  final bool schreibbar;
+  final String? letzterText;
+  final DateTime? letzteZeit;
+  final bool letzteEigen;
+
+  /// Ungelesene Nachrichten der Disposition.
+  final int ungelesen;
+}
+
+/// Phase 4 (M08): eine Nachricht im Verlauf. [text] ist bei Nachrichten der Disposition
+/// die Uebersetzung in die Sprache des Fahrers (wenn vorhanden), [original] immer der Originaltext.
+class ChatNachricht {
+  ChatNachricht.ausJson(Map<String, dynamic> json)
+      : nachrichtId = json['nachrichtId'] as int,
+        text = json['text'] as String,
+        original = json['original'] as String,
+        uebersetzt = json['uebersetzt'] as bool,
+        eigen = json['eigen'] as bool,
+        zeit = _zeit(json['zeit'])!,
+        gelesen = json['gelesen'] as bool;
+
+  final int nachrichtId;
+  final String text;
+  final String original;
+  final bool uebersetzt;
+  final bool eigen;
+  final DateTime zeit;
+
+  /// Bei eigenen Nachrichten: hat die Disposition sie gelesen?
+  bool gelesen;
+}
+
+class ChatVerlauf {
+  ChatVerlauf.ausJson(Map<String, dynamic> json)
+      : schreibbar = json['schreibbar'] as bool,
+        nachrichten = [
+          for (final n in json['nachrichten'] as List) ChatNachricht.ausJson(n as Map<String, dynamic>),
+        ],
+        eigeneUngelesen = {for (final id in json['eigeneUngelesen'] as List) id as int};
+
+  final bool schreibbar;
+  final List<ChatNachricht> nachrichten;
+
+  /// IDs eigener Nachrichten, die die Disposition noch nicht gelesen hat.
+  final Set<int> eigeneUngelesen;
+}
+
 /// Zeiten kommen als UTC von der API und werden in Ortszeit angezeigt.
 DateTime? _zeit(Object? wert) => wert == null ? null : DateTime.parse(wert as String).toLocal();
 
@@ -327,6 +395,39 @@ class ApiClient {
           'beschreibung': beschreibung,
           'dauerMinuten': dauerMinuten,
         })));
+    _auswerten(antwort);
+  }
+
+  /// Phase 4 (M08): alle Chats des Fahrers.
+  Future<List<ChatKurz>> chats() async {
+    final antwort = await _senden(() => _client.get(Uri.parse('$apiUrl/chats'), headers: _kopf()));
+    return [for (final c in _auswerten(antwort) as List) ChatKurz.ausJson(c as Map<String, dynamic>)];
+  }
+
+  /// Phase 4 (M03/M10): Chat der Tour, wird beim ersten Mal angelegt.
+  /// Ohne Disponent an der Tour kommt ApiFehler('kein_disponent').
+  Future<ChatKurz> tourChat(int tourId) async {
+    final antwort = await _senden(() => _client.get(Uri.parse('$apiUrl/touren/$tourId/chat'), headers: _kopf()));
+    return ChatKurz.ausJson(_auswerten(antwort) as Map<String, dynamic>);
+  }
+
+  /// Ohne [seit] die letzten 100 Nachrichten, sonst neuere als die Nachricht [seit] (und die der letzten 30 s).
+  Future<ChatVerlauf> nachrichten(int chatId, {int? seit}) async {
+    final adresse = '$apiUrl/chats/$chatId/nachrichten${seit == null ? '' : '?seit=$seit'}';
+    final antwort = await _senden(() => _client.get(Uri.parse(adresse), headers: _kopf()));
+    return ChatVerlauf.ausJson(_auswerten(antwort) as Map<String, dynamic>);
+  }
+
+  Future<ChatNachricht> nachrichtSenden(int chatId, String text) async {
+    final antwort = await _senden(() => _client.post(Uri.parse('$apiUrl/chats/$chatId/nachrichten'),
+        headers: _kopf(), body: jsonEncode({'text': text})));
+    return ChatNachricht.ausJson(_auswerten(antwort) as Map<String, dynamic>);
+  }
+
+  /// Alle Nachrichten der Disposition in diesem Chat als gelesen markieren.
+  Future<void> gelesen(int chatId) async {
+    final antwort =
+        await _senden(() => _client.post(Uri.parse('$apiUrl/chats/$chatId/gelesen'), headers: _kopf()));
     _auswerten(antwort);
   }
 

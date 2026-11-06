@@ -1,15 +1,17 @@
 import 'package:flutter/material.dart';
 
 import '../services/api_client.dart';
+import '../services/chat_dienst.dart';
 import '../services/gps_dienst.dart';
 import '../texte.dart';
 import '../theme/disposio_theme.dart';
+import 'chat_seite.dart';
 import 'profil_seite.dart';
 import 'touren_seite.dart';
 
 /// Grundgeruest mit der unteren Leiste aus den Wireframes:
 /// Touren · Chat · Uebertragung · Profil.
-/// Touren seit Phase 2 (M02). Chat und Uebertragung kommen in den naechsten Phasen (M08, M11).
+/// Touren seit Phase 2 (M02), Chat seit Phase 4 (M08). Uebertragung kommt mit M11.
 class StartSeite extends StatefulWidget {
   const StartSeite({super.key});
 
@@ -30,6 +32,7 @@ class _StartSeiteState extends State<StartSeite> {
     super.initState();
     StartSeite.tab.value = 0;
     _gpsFortsetzen();
+    ChatDienst.abfragen();
   }
 
   /// Nach einem Neustart der App: laeuft noch eine Tour, GPS wieder einschalten (ohne Rueckfrage).
@@ -58,7 +61,7 @@ class _StartSeiteState extends State<StartSeite> {
   Widget _geruest(int tab) {
     final seiten = [
       const TourenSeite(),
-      _Platzhalter(titel: Texte.t('chat_titel'), hinweis: Texte.t('chat_hinweis')),
+      const ChatListeSeite(),
       _Platzhalter(titel: Texte.t('uebertragung_titel'), hinweis: Texte.t('uebertragung_hinweis')),
       ProfilSeite(zuUebertragungen: () => StartSeite.tab.value = _tabUebertragung),
     ];
@@ -71,7 +74,18 @@ class _StartSeiteState extends State<StartSeite> {
         onDestinationSelected: (i) => StartSeite.tab.value = i,
         destinations: [
           NavigationDestination(icon: const Icon(Icons.route_outlined), label: Texte.t('tab_touren')),
-          NavigationDestination(icon: const Icon(Icons.chat_bubble_outline), label: Texte.t('tab_chat')),
+          NavigationDestination(
+            // Abzeichen mit der Zahl ungelesener Nachrichten der Disposition
+            icon: ValueListenableBuilder<int>(
+              valueListenable: ChatDienst.ungelesen,
+              builder: (context, anzahl, _) => Badge(
+                isLabelVisible: anzahl > 0,
+                label: Text('$anzahl'),
+                child: const Icon(Icons.chat_bubble_outline),
+              ),
+            ),
+            label: Texte.t('tab_chat'),
+          ),
           NavigationDestination(icon: const Icon(Icons.sync), label: Texte.t('tab_uebertragung')),
           NavigationDestination(icon: const Icon(Icons.person_outline), label: Texte.t('tab_profil')),
         ],

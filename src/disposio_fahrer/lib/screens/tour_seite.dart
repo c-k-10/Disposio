@@ -8,6 +8,7 @@ import '../texte.dart';
 import '../theme/disposio_theme.dart';
 import '../widgets/tour_bausteine.dart';
 import 'abschluss_seite.dart';
+import 'chat_seite.dart';
 import 'pause_seite.dart';
 import 'problem_seite.dart';
 import 'stopp_seite.dart';
@@ -281,6 +282,14 @@ class _TourSeiteState extends State<TourSeite> {
               onPressed: tour.status != TourDetails.abgeschlossen && frei ? () => _problem(tour, naechster) : null,
             ),
           ],
+        ),
+        const SizedBox(height: 8),
+        // Phase 4: Chat dieser Tour (M08)
+        OutlinedButton.icon(
+          style: OutlinedButton.styleFrom(minimumSize: const Size.fromHeight(52), backgroundColor: Colors.white),
+          icon: const Icon(Icons.chat_bubble_outline),
+          label: Text(Texte.t('disposition_kontaktieren')),
+          onPressed: () => dispositionKontaktieren(context, tour.tourId),
         ),
         const SizedBox(height: 16),
         Text(Texte.t('alle_stopps'), style: const TextStyle(fontWeight: FontWeight.w700)),

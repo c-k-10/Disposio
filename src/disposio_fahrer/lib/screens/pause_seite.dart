@@ -7,7 +7,7 @@ import '../services/gps_dienst.dart';
 import '../texte.dart';
 import '../theme/disposio_theme.dart';
 import '../widgets/tour_bausteine.dart';
-import 'start_seite.dart';
+import 'chat_seite.dart';
 
 /// Wireframe M10: Fahrt pausiert. GPS ist aus, bis „Fahrt fortsetzen“ gedrueckt wird.
 /// Gibt true zurueck, wenn die Fahrt fortgesetzt wurde.
@@ -54,11 +54,8 @@ class _PauseSeiteState extends State<PauseSeite> {
     }
   }
 
-  /// Chat kommt in Phase 4 (M08). Bis dahin oeffnet sich der Chat-Tab mit Hinweis.
-  void _kontaktieren() {
-    StartSeite.tab.value = StartSeite.tabChat;
-    Navigator.popUntil(context, (route) => route.isFirst);
-  }
+  /// Phase 4: oeffnet den Chat dieser Tour (M08).
+  void _kontaktieren() => dispositionKontaktieren(context, widget.tour.tourId);
 
   String _dauer() {
     final d = DateTime.now().difference(_seit);

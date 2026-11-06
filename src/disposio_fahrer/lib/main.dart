@@ -2,8 +2,10 @@ import 'package:flutter/material.dart';
 
 import 'screens/login_seite.dart';
 import 'screens/start_seite.dart';
+import 'services/chat_dienst.dart';
 import 'services/gps_dienst.dart';
 import 'services/sitzung.dart';
+import 'services/vorlese_dienst.dart';
 import 'texte.dart';
 import 'theme/disposio_theme.dart';
 
@@ -15,6 +17,9 @@ Future<void> main() async {
   await Sitzung.laden();
   // GPS-Puffer laden und alle 60 s senden (Phase 3)
   await GpsDienst.init();
+  // Chat alle 5 s abfragen, Puffer nachsenden, neue Nachrichten vorlesen (Phase 4)
+  await VorleseDienst.init();
+  await ChatDienst.init();
   runApp(const DisposioFahrerApp());
 }
 

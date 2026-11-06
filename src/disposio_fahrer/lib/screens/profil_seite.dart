@@ -3,6 +3,7 @@ import 'package:permission_handler/permission_handler.dart';
 
 import '../services/api_client.dart';
 import '../services/sitzung.dart';
+import '../services/vorlese_dienst.dart';
 import '../texte.dart';
 import '../theme/disposio_theme.dart';
 
@@ -166,6 +167,19 @@ class _ProfilSeiteState extends State<ProfilSeite> {
               value: _verfuegbarkeit == _verfuegbar,
               activeTrackColor: DisposioFarben.dunkelblau,
               onChanged: _speichert ? null : _verfuegbarkeitAendern,
+            ),
+          ),
+          // Phase 4: neue Nachrichten der Disposition waehrend der Fahrt vorlesen
+          Card(
+            child: ValueListenableBuilder<bool>(
+              valueListenable: VorleseDienst.an,
+              builder: (context, an, _) => SwitchListTile(
+                title: Text(Texte.t('nachrichten_vorlesen')),
+                subtitle: Text(Texte.t('nachrichten_vorlesen_hinweis')),
+                value: an,
+                activeTrackColor: DisposioFarben.dunkelblau,
+                onChanged: VorleseDienst.setzen,
+              ),
             ),
           ),
           Card(

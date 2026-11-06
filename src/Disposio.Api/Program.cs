@@ -6,7 +6,7 @@ using Npgsql;
 
 // Disposio.Api - Schnittstelle zwischen Fahrer-App und Neon.
 // Phase 0: Health-Check. Phase 1: Anmeldung (M01) und Profil (M09). Phase 2: Touren (M02 bis M05).
-// Phase 3: GPS-Positionen, ETA mit TomTom, Abschluss (M10, M12).
+// Phase 3: GPS-Positionen, ETA mit TomTom, Abschluss (M10, M12). Phase 4: Chat mit Uebersetzung (M08).
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -56,6 +56,11 @@ builder.Services.AddHttpClient(EtaRechner.HttpName, client =>
 builder.Services.AddSingleton<EtaRechner>();
 builder.Services.AddHostedService<PositionenAufraeumen>();
 
+// DeepL fuer die Chat-Uebersetzung. Schluessel: lokal User-Secret DeepL:Key, auf Render DeepL__Key.
+// Ohne Schluessel laeuft der Chat, nur ohne Uebersetzung.
+builder.Services.AddHttpClient(Uebersetzer.HttpName, client => client.Timeout = TimeSpan.FromSeconds(10));
+builder.Services.AddSingleton<Uebersetzer>();
+
 // Render gibt den Port ueber die Umgebungsvariable PORT vor
 var port = Environment.GetEnvironmentVariable("PORT");
 if (!string.IsNullOrEmpty(port))
@@ -68,7 +73,7 @@ var app = builder.Build();
 app.UseAuthentication();
 app.UseAuthorization();
 
-app.MapGet("/", () => Results.Ok(new { name = "Disposio.Api", version = "0.4" }));
+app.MapGet("/", () => Results.Ok(new { name = "Disposio.Api", version = "0.5" }));
 
 app.MapGet("/health", async (NpgsqlDataSource db) =>
 {
@@ -89,5 +94,6 @@ app.MapAuthEndpoints();
 app.MapProfilEndpoints();
 app.MapTourEndpoints();
 app.MapPositionEndpoints();
+app.MapChatEndpoints();
 
 app.Run();
