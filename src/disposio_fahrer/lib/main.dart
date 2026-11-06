@@ -6,6 +6,7 @@ import 'services/chat_dienst.dart';
 import 'services/gps_dienst.dart';
 import 'services/sitzung.dart';
 import 'services/vorlese_dienst.dart';
+import 'services/warteschlange.dart';
 import 'texte.dart';
 import 'theme/disposio_theme.dart';
 
@@ -20,6 +21,8 @@ Future<void> main() async {
   // Chat alle 5 s abfragen, Puffer nachsenden, neue Nachrichten vorlesen (Phase 4)
   await VorleseDienst.init();
   await ChatDienst.init();
+  // Nachweise, Fotos, Tankvorgaenge und Schaeden: lokal speichern, bei Netz senden (Phase 5, M11)
+  await Warteschlange.init();
   runApp(const DisposioFahrerApp());
 }
 

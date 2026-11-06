@@ -3,15 +3,16 @@ import 'package:flutter/material.dart';
 import '../services/api_client.dart';
 import '../services/chat_dienst.dart';
 import '../services/gps_dienst.dart';
+import '../services/warteschlange.dart';
 import '../texte.dart';
-import '../theme/disposio_theme.dart';
 import 'chat_seite.dart';
 import 'profil_seite.dart';
 import 'touren_seite.dart';
+import 'uebertragung_seite.dart';
 
 /// Grundgeruest mit der unteren Leiste aus den Wireframes:
 /// Touren · Chat · Uebertragung · Profil.
-/// Touren seit Phase 2 (M02), Chat seit Phase 4 (M08). Uebertragung kommt mit M11.
+/// Touren seit Phase 2 (M02), Chat seit Phase 4 (M08), Uebertragung seit Phase 5 (M11).
 class StartSeite extends StatefulWidget {
   const StartSeite({super.key});
 
@@ -33,6 +34,7 @@ class _StartSeiteState extends State<StartSeite> {
     StartSeite.tab.value = 0;
     _gpsFortsetzen();
     ChatDienst.abfragen();
+    Warteschlange.senden();
   }
 
   /// Nach einem Neustart der App: laeuft noch eine Tour, GPS wieder einschalten (ohne Rueckfrage).
@@ -62,7 +64,7 @@ class _StartSeiteState extends State<StartSeite> {
     final seiten = [
       const TourenSeite(),
       const ChatListeSeite(),
-      _Platzhalter(titel: Texte.t('uebertragung_titel'), hinweis: Texte.t('uebertragung_hinweis')),
+      const UebertragungSeite(),
       ProfilSeite(zuUebertragungen: () => StartSeite.tab.value = _tabUebertragung),
     ];
 
@@ -86,7 +88,17 @@ class _StartSeiteState extends State<StartSeite> {
             ),
             label: Texte.t('tab_chat'),
           ),
-          NavigationDestination(icon: const Icon(Icons.sync), label: Texte.t('tab_uebertragung')),
+          NavigationDestination(
+            // Phase 5: Abzeichen mit der Zahl noch nicht gesendeter Eintraege (M11)
+            icon: ListenableBuilder(
+              listenable: UebertragungSeite.aenderungen,
+              builder: (context, _) {
+                final anzahl = UebertragungSeite.offen();
+                return Badge(isLabelVisible: anzahl > 0, label: Text('$anzahl'), child: const Icon(Icons.sync));
+              },
+            ),
+            label: Texte.t('tab_uebertragung'),
+          ),
           NavigationDestination(icon: const Icon(Icons.person_outline), label: Texte.t('tab_profil')),
         ],
       ),
@@ -94,26 +106,3 @@ class _StartSeiteState extends State<StartSeite> {
   }
 }
 
-class _Platzhalter extends StatelessWidget {
-  const _Platzhalter({required this.titel, required this.hinweis});
-
-  final String titel;
-  final String hinweis;
-
-  @override
-  Widget build(BuildContext context) {
-    return ListView(
-      padding: const EdgeInsets.all(16),
-      children: [
-        Text(titel, style: Theme.of(context).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w700)),
-        const SizedBox(height: 12),
-        Card(
-          child: Padding(
-            padding: const EdgeInsets.all(16),
-            child: Text(hinweis, style: const TextStyle(color: DisposioFarben.textLeise)),
-          ),
-        ),
-      ],
-    );
-  }
-}

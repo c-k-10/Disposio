@@ -5,6 +5,7 @@ import '../services/api_client.dart';
 import '../texte.dart';
 import '../theme/disposio_theme.dart';
 import '../widgets/tour_bausteine.dart';
+import 'ablieferung_seite.dart';
 import 'problem_seite.dart';
 
 /// Wireframe M04: Stoppdetails mit Adresse, Zeitfenster, Auftraegen und Navigation.
@@ -73,6 +74,15 @@ class _StoppSeiteState extends State<StoppSeite> {
       // Keine App fuer den Link vorhanden
     }
     if (!geoeffnet && mounted) meldung(context, Texte.t('navigation_fehler'));
+  }
+
+  /// M06/M07: Ablieferung dokumentieren. Danach ist der Stopp abgeschlossen (wenn Netz da war).
+  Future<void> _ablieferung(TourDetails tour, Stopp stopp) async {
+    await Navigator.push<bool>(
+      context,
+      MaterialPageRoute(builder: (_) => AblieferungSeite(tour: tour, stopp: stopp)),
+    );
+    await _laden();
   }
 
   Future<void> _problem(TourDetails tour) async {
@@ -177,11 +187,16 @@ class _StoppSeiteState extends State<StoppSeite> {
           child: Text(Texte.t('stopp_abschliessen')),
         ),
         const SizedBox(height: 8),
-        // Foto und Unterschrift kommen in Phase 5
-        OutlinedButton.icon(
+        // Phase 5: M06/M07, danach wird der Stopp abgeschlossen. Nur bei Zustellungen nach „Angekommen“.
+        FilledButton.icon(
           icon: const Icon(Icons.photo_camera_outlined),
           label: Text(Texte.t('ablieferung_dokumentieren')),
-          onPressed: () => meldung(context, Texte.t('kommt_phase5')),
+          onPressed: unterwegs &&
+                  frei &&
+                  stopp.auftraege.any((a) => a.vorgangArt == 'Zustellung') &&
+                  (stopp.status == Stopp.angekommen || stopp.status == Stopp.entladen)
+              ? () => _ablieferung(tour, stopp)
+              : null,
         ),
         const SizedBox(height: 8),
         OutlinedButton.icon(

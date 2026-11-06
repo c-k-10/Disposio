@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import '../services/api_client.dart';
 import '../texte.dart';
 import '../theme/disposio_theme.dart';
-import '../widgets/tour_bausteine.dart';
+import 'schaden_seite.dart';
 
 /// Wireframe M05: Problem melden. Gibt true zurueck, wenn gemeldet wurde.
 /// Vorlaeufig ohne Foto; die API speichert es als Statusmeldung.
@@ -148,11 +148,13 @@ class _ProblemSeiteState extends State<ProblemSeite> {
             child: Text(Texte.t('abbrechen')),
           ),
           const SizedBox(height: 8),
-          // Schadensmeldung (M07) kommt in Phase 5
+          // Phase 5: Schadensmeldung (M15)
           TextButton.icon(
             icon: const Icon(Icons.car_crash_outlined),
             label: Text(Texte.t('fahrzeugschaden')),
-            onPressed: () => meldung(context, Texte.t('kommt_phase5')),
+            onPressed: _sendet
+                ? null
+                : () => Navigator.push(context, MaterialPageRoute(builder: (_) => const SchadenSeite())),
           ),
         ],
       ),

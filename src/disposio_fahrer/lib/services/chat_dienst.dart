@@ -88,6 +88,9 @@ class ChatDienst {
 
   static List<WartendeNachricht> wartend(int chatId) => [for (final n in _puffer) if (n.chatId == chatId) n];
 
+  /// Phase 5 (M11): noch nicht gesendete Nachrichten in allen Chats.
+  static int get wartendAnzahl => _puffer.length;
+
   /// Verlauf geoeffnet: ganz laden und Nachrichten der Disposition als gelesen melden.
   static Future<void> oeffnen(int chatId) async {
     _offenerChat = chatId;

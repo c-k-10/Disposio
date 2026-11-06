@@ -7,6 +7,7 @@ using Npgsql;
 // Disposio.Api - Schnittstelle zwischen Fahrer-App und Neon.
 // Phase 0: Health-Check. Phase 1: Anmeldung (M01) und Profil (M09). Phase 2: Touren (M02 bis M05).
 // Phase 3: GPS-Positionen, ETA mit TomTom, Abschluss (M10, M12). Phase 4: Chat mit Uebersetzung (M08).
+// Phase 5: Ablieferung (M06/M07), Dokumente ueber Cloudinary, Tanken (M14), Schaden (M15).
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -61,6 +62,12 @@ builder.Services.AddHostedService<PositionenAufraeumen>();
 builder.Services.AddHttpClient(Uebersetzer.HttpName, client => client.Timeout = TimeSpan.FromSeconds(10));
 builder.Services.AddSingleton<Uebersetzer>();
 
+// Cloudinary fuer Fotos, Unterschriften und Belege. Zugang: lokal User-Secret Cloudinary:Url,
+// auf Render Cloudinary__Url (cloudinary://key:secret@cloud). Ohne Zugang antwortet nur POST /dokumente mit 503.
+builder.Services.AddHttpClient(BildSpeicher.HttpName, client => client.Timeout = TimeSpan.FromSeconds(60));
+builder.Services.AddSingleton<BildSpeicher>();
+builder.Services.AddSingleton<Wiederholschutz>();
+
 // Render gibt den Port ueber die Umgebungsvariable PORT vor
 var port = Environment.GetEnvironmentVariable("PORT");
 if (!string.IsNullOrEmpty(port))
@@ -73,7 +80,7 @@ var app = builder.Build();
 app.UseAuthentication();
 app.UseAuthorization();
 
-app.MapGet("/", () => Results.Ok(new { name = "Disposio.Api", version = "0.5" }));
+app.MapGet("/", () => Results.Ok(new { name = "Disposio.Api", version = "0.6" }));
 
 app.MapGet("/health", async (NpgsqlDataSource db) =>
 {
@@ -95,5 +102,8 @@ app.MapProfilEndpoints();
 app.MapTourEndpoints();
 app.MapPositionEndpoints();
 app.MapChatEndpoints();
+app.MapAblieferungEndpoints();
+app.MapDokumentEndpoints();
+app.MapMeldungEndpoints();
 
 app.Run();

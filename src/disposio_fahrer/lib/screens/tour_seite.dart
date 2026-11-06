@@ -12,6 +12,7 @@ import 'chat_seite.dart';
 import 'pause_seite.dart';
 import 'problem_seite.dart';
 import 'stopp_seite.dart';
+import 'tanken_seite.dart';
 
 /// Wireframe M03: Aktive Tour. Fahrt starten, naechster Stopp, Angekommen/Entladen/Pause/Problem,
 /// Tour abschliessen. Phase 3: GPS waehrend der Fahrt, ETA je Stopp, Pause (M10) und Abschluss (M12).
@@ -291,6 +292,9 @@ class _TourSeiteState extends State<TourSeite> {
           label: Text(Texte.t('disposition_kontaktieren')),
           onPressed: () => dispositionKontaktieren(context, tour.tourId),
         ),
+        const SizedBox(height: 8),
+        // Phase 5: Tanken (M14) und Schaden (M15)
+        const TankenSchadenKnoepfe(),
         const SizedBox(height: 16),
         Text(Texte.t('alle_stopps'), style: const TextStyle(fontWeight: FontWeight.w700)),
         for (final stopp in tour.stopps)

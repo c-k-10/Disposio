@@ -6,6 +6,8 @@ import '../services/sitzung.dart';
 import '../services/vorlese_dienst.dart';
 import '../texte.dart';
 import '../theme/disposio_theme.dart';
+import 'tanken_seite.dart';
+import 'uebertragung_seite.dart';
 
 /// Wireframe M09: Profil mit Fahrerdaten, Verfuegbarkeit, App-Sprache und Abmelden.
 class ProfilSeite extends StatefulWidget {
@@ -87,7 +89,10 @@ class _ProfilSeiteState extends State<ProfilSeite> {
       context: context,
       builder: (context) => AlertDialog(
         title: Text(Texte.t('abmelden')),
-        content: Text(Texte.t('abmelden_frage')),
+        // Phase 5: nicht gesendete Eintraege gehen beim Abmelden verloren
+        content: Text(UebertragungSeite.offen() > 0
+            ? '${Texte.t('abmelden_frage')}\n\n${Texte.t('abmelden_offen')} ${UebertragungSeite.offen()}'
+            : Texte.t('abmelden_frage')),
         actions: [
           TextButton(onPressed: () => Navigator.pop(context, false), child: Text(Texte.t('abbrechen'))),
           FilledButton(
@@ -207,6 +212,9 @@ class _ProfilSeiteState extends State<ProfilSeite> {
             ),
           ),
           const SizedBox(height: 6),
+          // Phase 5: Tanken (M14) und Schaden (M15) auch ohne geoeffnete Tour
+          const TankenSchadenKnoepfe(),
+          const SizedBox(height: 8),
           OutlinedButton.icon(
             icon: const Icon(Icons.security),
             label: Text(Texte.t('berechtigungen')),

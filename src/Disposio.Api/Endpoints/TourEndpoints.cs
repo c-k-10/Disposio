@@ -142,7 +142,7 @@ public static class TourEndpoints
         await using (var befehl = new NpgsqlCommand("""
             SELECT sa.stopp_id, sa.vorgang_art, a.auftragsnummer, k.firmenname, a.anzahl, a.verpackungstyp,
                    a.gewicht_kg, a.gutart, a.gefahrgut, a.temperatur_min_c, a.temperatur_max_c,
-                   a.ansprechpartner, a.lade_entladeequipment, a.avisierung_erforderlich, a.kundenreferenz
+                   a.ansprechpartner, a.lade_entladeequipment, a.avisierung_erforderlich, a.kundenreferenz, a.auftrag_id
             FROM public.stopp_auftrag sa
             JOIN public.tourstopp s ON s.stopp_id = sa.stopp_id
             JOIN public.auftrag a ON a.auftrag_id = sa.auftrag_id
@@ -163,6 +163,8 @@ public static class TourEndpoints
                 }
                 liste.Add(new
                 {
+                    // Phase 5: fuer den Ablieferungsnachweis (M06), auch ohne Netz
+                    auftragId = leser.GetInt64(15),
                     vorgangArt = leser.GetString(1),
                     auftragsnummer = leser.GetString(2),
                     kunde = leser.GetString(3),

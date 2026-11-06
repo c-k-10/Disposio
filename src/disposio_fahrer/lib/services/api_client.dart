@@ -18,11 +18,16 @@ const apiUrl = String.fromEnvironment(
 
 /// Fehler der API. [code] ist ein Schluessel aus texte.dart, z. B. 'anmeldung_fehlgeschlagen'.
 /// [daten] enthaelt die ganze Fehlerantwort, z. B. die offenen Stopps bei 'offene_stopps'.
+/// [status] ist der HTTP-Status (0 = keine Antwort, z. B. offline).
 class ApiFehler implements Exception {
-  ApiFehler(this.code, [this.daten = const {}]);
+  ApiFehler(this.code, [this.daten = const {}, this.status = 0]);
 
   final String code;
   final Map<String, dynamic> daten;
+  final int status;
+
+  /// Spaeter erneut versuchen lohnt sich: offline, Zeitueberschreitung oder Fehler beim Server (5xx).
+  bool get voruebergehend => status == 0 || status >= 500;
 
   String get text => Texte.t(code);
 
@@ -202,7 +207,8 @@ class TourAbschluss {
 
 class Auftrag {
   Auftrag.ausJson(Map<String, dynamic> json)
-      : vorgangArt = json['vorgangArt'] as String,
+      : auftragId = json['auftragId'] as int,
+        vorgangArt = json['vorgangArt'] as String,
         auftragsnummer = json['auftragsnummer'] as String,
         kunde = json['kunde'] as String,
         anzahl = json['anzahl'] as int,
@@ -217,6 +223,7 @@ class Auftrag {
         avisierungErforderlich = json['avisierungErforderlich'] as bool,
         kundenreferenz = json['kundenreferenz'] as String?;
 
+  final int auftragId;
   final String vorgangArt;
   final String auftragsnummer;
   final String kunde;
@@ -299,6 +306,49 @@ class ChatVerlauf {
 
   /// IDs eigener Nachrichten, die die Disposition noch nicht gelesen hat.
   final Set<int> eigeneUngelesen;
+}
+
+/// Phase 5 (M06): Zustellauftrag eines Stopps mit Soll-Anzahl und dem letzten gesendeten Nachweis.
+class ZustellAuftrag {
+  ZustellAuftrag.ausJson(Map<String, dynamic> json)
+      : auftragId = json['auftragId'] as int,
+        auftragsnummer = json['auftragsnummer'] as String,
+        kunde = json['kunde'] as String,
+        sollAnzahl = json['sollAnzahl'] as int,
+        verpackungstyp = json['verpackungstyp'] as String,
+        nachgewiesen = json['nachweis']?['anzahl'] as int?;
+
+  /// Ohne Netz aus den schon geladenen Tourdaten.
+  ZustellAuftrag.ausTour(Auftrag a)
+      : auftragId = a.auftragId,
+        auftragsnummer = a.auftragsnummer,
+        kunde = a.kunde,
+        sollAnzahl = a.anzahl,
+        verpackungstyp = a.verpackungstyp,
+        nachgewiesen = null;
+
+  final int auftragId;
+  final String auftragsnummer;
+  final String kunde;
+  final int sollAnzahl;
+  final String verpackungstyp;
+
+  /// Anzahl im zuletzt gesendeten Nachweis, null = noch keiner.
+  final int? nachgewiesen;
+}
+
+/// Phase 5 (M14/M15): Fahrzeug der aktiven oder letzten Tour.
+class AktuellesFahrzeug {
+  AktuellesFahrzeug.ausJson(Map<String, dynamic> json)
+      : kennzeichen = json['kennzeichen'] as String,
+        typ = json['typ'] as String,
+        kilometerstand = json['kilometerstand'] as int,
+        aktiveTourId = json['aktiveTourId'] as int?;
+
+  final String kennzeichen;
+  final String typ;
+  final int kilometerstand;
+  final int? aktiveTourId;
 }
 
 /// Zeiten kommen als UTC von der API und werden in Ortszeit angezeigt.
@@ -431,6 +481,39 @@ class ApiClient {
     _auswerten(antwort);
   }
 
+  /// Phase 5 (M06): Zustellauftraege eines Stopps.
+  Future<List<ZustellAuftrag>> zustellAuftraege(int stoppId) async {
+    final antwort =
+        await _senden(() => _client.get(Uri.parse('$apiUrl/stopps/$stoppId/auftraege'), headers: _kopf()));
+    return [for (final a in _auswerten(antwort) as List) ZustellAuftrag.ausJson(a as Map<String, dynamic>)];
+  }
+
+  /// Phase 5 (M14/M15): aktuelles Fahrzeug mit letztem Kilometerstand.
+  Future<AktuellesFahrzeug> fahrzeug() async {
+    final antwort = await _senden(() => _client.get(Uri.parse('$apiUrl/fahrzeug'), headers: _kopf()));
+    return AktuellesFahrzeug.ausJson(_auswerten(antwort) as Map<String, dynamic>);
+  }
+
+  /// Phase 5: Eintrag der Warteschlange senden (JSON). Gibt die Antwort der API zurueck, z. B. {nachweisId: 12}.
+  Future<Map<String, dynamic>> jsonSenden(String pfad, Map<String, dynamic> daten) async {
+    final antwort = await _senden(
+        () => _client.post(Uri.parse('$apiUrl$pfad'), headers: _kopf(), body: jsonEncode(daten)));
+    return _auswerten(antwort) as Map<String, dynamic>;
+  }
+
+  /// Phase 5: Foto, Unterschrift oder Beleg hochladen. [felder] enthaelt art, clientId und genau einen
+  /// Eigentuemer (nachweisId, tankvorgangId oder schadenId).
+  Future<Map<String, dynamic>> dokumentSenden(String dateipfad, Map<String, String> felder) async {
+    final antwort = await _senden(() async {
+      final anfrage = http.MultipartRequest('POST', Uri.parse('$apiUrl/dokumente'))
+        ..headers.addAll({if (Sitzung.token != null) 'Authorization': 'Bearer ${Sitzung.token}'})
+        ..fields.addAll(felder)
+        ..files.add(await http.MultipartFile.fromPath('datei', dateipfad));
+      return http.Response.fromStream(await _client.send(anfrage));
+    });
+    return _auswerten(antwort) as Map<String, dynamic>;
+  }
+
   /// Phase 0: prueft, ob API und Datenbank erreichbar sind.
   /// Gibt einen lesbaren Text fuer die Anzeige zurueck.
   Future<String> verbindungTesten() async {
@@ -479,6 +562,7 @@ class ApiClient {
       // Kein JSON, z. B. leere 401-Antwort
     }
     final code = daten['fehler'] as String?;
-    throw ApiFehler(code ?? (antwort.statusCode == 401 ? 'anmeldung_fehlgeschlagen' : 'unbekannter_fehler'), daten);
+    throw ApiFehler(code ?? (antwort.statusCode == 401 ? 'anmeldung_fehlgeschlagen' : 'unbekannter_fehler'), daten,
+        antwort.statusCode);
   }
 }

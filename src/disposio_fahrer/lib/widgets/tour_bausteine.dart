@@ -12,6 +12,9 @@ String uhrzeit(DateTime z) => '${_zwei(z.hour)}:${_zwei(z.minute)}';
 
 String datum(DateTime z) => '${_zwei(z.day)}.${_zwei(z.month)}.${z.year}';
 
+/// Datum fuer die API (Phase 5), z. B. "2026-11-06".
+String datumFuerApi(DateTime z) => '${z.year}-${_zwei(z.month)}-${_zwei(z.day)}';
+
 bool _gleicherTag(DateTime a, DateTime b) => a.year == b.year && a.month == b.month && a.day == b.day;
 
 /// "Heute" oder Datum, danach Uhrzeit, z. B. "Heute 06:00".

@@ -4,6 +4,7 @@ import '../services/api_client.dart';
 import '../texte.dart';
 import '../theme/disposio_theme.dart';
 import '../widgets/tour_bausteine.dart';
+import 'tanken_seite.dart';
 import 'tour_seite.dart';
 
 /// Wireframe M02: Meine Touren. Aktive Tour zuerst, dann heute und die naechsten 7 Tage.
@@ -55,26 +56,8 @@ class _TourenSeiteState extends State<TourenSeite> {
         children: [
           Text(Texte.t('touren_titel'), style: titelStil),
           const SizedBox(height: 12),
-          // Tanken (M06) und Schaden (M07) kommen in Phase 5
-          Row(
-            children: [
-              Expanded(
-                child: OutlinedButton.icon(
-                  icon: const Icon(Icons.local_gas_station_outlined),
-                  label: Text(Texte.t('tanken')),
-                  onPressed: () => meldung(context, Texte.t('kommt_phase5')),
-                ),
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: OutlinedButton.icon(
-                  icon: const Icon(Icons.car_crash_outlined),
-                  label: Text(Texte.t('schaden')),
-                  onPressed: () => meldung(context, Texte.t('kommt_phase5')),
-                ),
-              ),
-            ],
-          ),
+          // Phase 5: Tanken (M14) und Schaden (M15)
+          const TankenSchadenKnoepfe(),
           const SizedBox(height: 12),
           if (_fehler != null)
             LadeFehler(text: '${Texte.t('touren_laden_fehlgeschlagen')} $_fehler', erneut: _laden)

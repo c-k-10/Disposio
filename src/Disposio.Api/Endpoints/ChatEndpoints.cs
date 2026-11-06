@@ -68,6 +68,24 @@ public static class ChatEndpoints
             return Results.Unauthorized();
         }
 
+        var (chatId, fehler) = await ChatDerTourAsync(verbindung, tx, ids, id);
+        if (chatId is null)
+        {
+            return Fehler(fehler!, fehler == "tour_nicht_gefunden" ? 404 : 409);
+        }
+
+        var chat = (await ChatsAsync(verbindung, tx, ids, chatId)).Single();
+        await tx.CommitAsync();
+        return Results.Ok(chat);
+    }
+
+    /// <summary>
+    /// Chat der Tour holen, beim ersten Mal anlegen. Ohne Chat kommt der Fehlercode
+    /// tour_nicht_gefunden oder kein_disponent zurueck.
+    /// </summary>
+    private static async Task<(long? ChatId, string? Fehler)> ChatDerTourAsync(NpgsqlConnection verbindung,
+        NpgsqlTransaction tx, TourEndpoints.Ids ids, long tourId)
+    {
         // Tour sperren, damit zwei gleichzeitige Aufrufe nicht zwei Chats anlegen
         long? disponent;
         await using (var befehl = new NpgsqlCommand("""
@@ -76,61 +94,90 @@ public static class ChatEndpoints
             FOR UPDATE
             """, verbindung, tx))
         {
-            befehl.Parameters.Add(new() { Value = id });
+            befehl.Parameters.Add(new() { Value = tourId });
             befehl.Parameters.Add(new() { Value = ids.FahrerId });
             befehl.Parameters.Add(new() { Value = ids.UnternehmenId });
             await using var leser = await befehl.ExecuteReaderAsync();
             if (!await leser.ReadAsync())
             {
-                return Fehler("tour_nicht_gefunden", 404);
+                return (null, "tour_nicht_gefunden");
             }
             disponent = leser.IsDBNull(0) ? null : leser.GetInt64(0);
         }
 
-        long chatId;
         await using (var befehl = new NpgsqlCommand("""
             SELECT chat_id FROM public.chat WHERE tour_id = $1 AND fahrer_benutzer_id = $2
             ORDER BY chat_id LIMIT 1
             """, verbindung, tx))
         {
-            befehl.Parameters.Add(new() { Value = id });
+            befehl.Parameters.Add(new() { Value = tourId });
             befehl.Parameters.Add(new() { Value = ids.BenutzerId });
             if (await befehl.ExecuteScalarAsync() is long vorhanden)
             {
-                chatId = vorhanden;
-            }
-            else
-            {
-                // Neuer Chat nur mit einem Disponenten der eigenen Firma
-                if (disponent is not long disponentId || disponentId == ids.BenutzerId)
-                {
-                    return Fehler("kein_disponent", 409);
-                }
-                await using var pruefen = new NpgsqlCommand(
-                    "SELECT 1 FROM public.benutzer WHERE benutzer_id = $1 AND unternehmen_id = $2", verbindung, tx);
-                pruefen.Parameters.Add(new() { Value = disponentId });
-                pruefen.Parameters.Add(new() { Value = ids.UnternehmenId });
-                if (await pruefen.ExecuteScalarAsync() is null)
-                {
-                    return Fehler("kein_disponent", 409);
-                }
-
-                await using var anlegen = new NpgsqlCommand("""
-                    INSERT INTO public.chat (erstellungsdatum, status, tour_id, fahrer_benutzer_id, disponent_benutzer_id)
-                    VALUES (now(), $1, $2, $3, $4)
-                    RETURNING chat_id
-                    """, verbindung, tx);
-                anlegen.Parameters.Add(new() { Value = ChatOffen });
-                anlegen.Parameters.Add(new() { Value = id });
-                anlegen.Parameters.Add(new() { Value = ids.BenutzerId });
-                anlegen.Parameters.Add(new() { Value = disponentId });
-                chatId = (long)(await anlegen.ExecuteScalarAsync())!;
+                return (vorhanden, null);
             }
         }
 
-        var chat = (await ChatsAsync(verbindung, tx, ids, chatId)).Single();
-        await tx.CommitAsync();
-        return Results.Ok(chat);
+        // Neuer Chat nur mit einem Disponenten der eigenen Firma
+        if (disponent is not long disponentId || disponentId == ids.BenutzerId)
+        {
+            return (null, "kein_disponent");
+        }
+        await using (var pruefen = new NpgsqlCommand(
+            "SELECT 1 FROM public.benutzer WHERE benutzer_id = $1 AND unternehmen_id = $2", verbindung, tx))
+        {
+            pruefen.Parameters.Add(new() { Value = disponentId });
+            pruefen.Parameters.Add(new() { Value = ids.UnternehmenId });
+            if (await pruefen.ExecuteScalarAsync() is null)
+            {
+                return (null, "kein_disponent");
+            }
+        }
+
+        await using var anlegen = new NpgsqlCommand("""
+            INSERT INTO public.chat (erstellungsdatum, status, tour_id, fahrer_benutzer_id, disponent_benutzer_id)
+            VALUES (now(), $1, $2, $3, $4)
+            RETURNING chat_id
+            """, verbindung, tx);
+        anlegen.Parameters.Add(new() { Value = ChatOffen });
+        anlegen.Parameters.Add(new() { Value = tourId });
+        anlegen.Parameters.Add(new() { Value = ids.BenutzerId });
+        anlegen.Parameters.Add(new() { Value = disponentId });
+        return ((long)(await anlegen.ExecuteScalarAsync())!, null);
+    }
+
+    /// <summary>
+    /// Phase 5: automatische Nachricht des Fahrers an die Disposition seiner Tour (z. B. Fahrzeug nicht fahrbereit).
+    /// [text] bekommt die Sprache des Fahrers und liefert den Text in dieser Sprache.
+    /// Gibt false zurueck, wenn es keinen Chat gibt (kein Disponent) oder der Chat geschlossen ist.
+    /// </summary>
+    internal static async Task<bool> AutomatischSendenAsync(NpgsqlDataSource db, Uebersetzer uebersetzer,
+        TourEndpoints.Ids ids, long tourId, Func<string, string> text)
+    {
+        await using var verbindung = await db.OpenConnectionAsync();
+        long chatId;
+        await using (var tx = await verbindung.BeginTransactionAsync())
+        {
+            var (gefunden, _) = await ChatDerTourAsync(verbindung, tx, ids, tourId);
+            if (gefunden is not long id)
+            {
+                return false;
+            }
+            chatId = id;
+            await tx.CommitAsync();
+        }
+
+        if (await ChatAsync(verbindung, ids, chatId) is not { Schreibbar: true } chat)
+        {
+            return false;
+        }
+        var inhalt = text(chat.FahrerSprache);
+        if (inhalt.Length > MaxZeichen)
+        {
+            inhalt = inhalt[..MaxZeichen];
+        }
+        await SpeichernAsync(verbindung, uebersetzer, chat, ids, chatId, inhalt);
+        return true;
     }
 
     /// <summary>
@@ -260,6 +307,14 @@ public static class ChatEndpoints
             }
         }
 
+        var neu = await SpeichernAsync(verbindung, uebersetzer, chat, ids, id, text);
+        return Results.Created($"/chats/{id}/nachrichten", neu.FuerFahrer(ids.BenutzerId, chat.FahrerSprache));
+    }
+
+    /// <summary>Speichert eine Nachricht des Fahrers, sofort in die Sprache des Disponenten uebersetzt (wenn moeglich).</summary>
+    private static async Task<Nachricht> SpeichernAsync(NpgsqlConnection verbindung, Uebersetzer uebersetzer,
+        ChatDaten chat, TourEndpoints.Ids ids, long chatId, string text)
+    {
         // Sofort in die Sprache des Disponenten uebersetzen
         string status;
         string? uebersetzung = null;
@@ -290,12 +345,11 @@ public static class ChatEndpoints
             befehl.Parameters.Add(new() { Value = chat.DisponentSprache });
             befehl.Parameters.Add(new() { Value = status });
             befehl.Parameters.Add(new() { Value = Gesendet });
-            befehl.Parameters.Add(new() { Value = id });
+            befehl.Parameters.Add(new() { Value = chatId });
             befehl.Parameters.Add(new() { Value = ids.BenutzerId });
             await using var leser = await befehl.ExecuteReaderAsync();
             await leser.ReadAsync();
-            var neu = Nachricht.Lesen(leser);
-            return Results.Created($"/chats/{id}/nachrichten", neu.FuerFahrer(ids.BenutzerId, chat.FahrerSprache));
+            return Nachricht.Lesen(leser);
         }
     }
 
