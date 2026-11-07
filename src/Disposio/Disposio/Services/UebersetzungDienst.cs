@@ -23,6 +23,24 @@ public static class UebersetzungDienst
     /// true = übersetzt (oder nicht nötig). false = fehlgeschlagen oder Server nicht erreichbar; die Nachricht
     /// bleibt im Original gespeichert und kann mit „Erneut übersetzen“ noch einmal versucht werden.
     /// </summary>
+    /// <summary>
+    /// Übersetzt den Fahrertext eines offenen Winston-Vorschlags (D10). Ergebnis steht danach in
+    /// winston_vorschlag.fahrertext_uebersetzt. false = gerade nicht möglich.
+    /// </summary>
+    public static async Task<bool> VorschlagUebersetzenAsync(long vorschlagId, CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            using var antwort = await Http.PostAsJsonAsync(FunktionsUrl, new { vorschlagId }, cancellationToken)
+                .ConfigureAwait(false);
+            return antwort.IsSuccessStatusCode;
+        }
+        catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException)
+        {
+            return false;
+        }
+    }
+
     public static async Task<bool> UebersetzenAsync(long nachrichtId, CancellationToken cancellationToken = default)
     {
         try

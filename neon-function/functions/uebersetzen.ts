@@ -7,6 +7,10 @@
 //   3. Die Funktion liest Text und Sprachen aus der Datenbank, fragt DeepL und speichert das Ergebnis:
 //      'uebersetzt' (mit uebersetzungstext) oder 'fehlgeschlagen'. Ein erneuter Aufruf versucht es noch einmal.
 //
+// Zweite Aufgabe (D10 „Kundenkommunikation“): { vorschlagId } übersetzt den Fahrertext eines offenen
+// Verspätungsvorschlags (winston_vorschlag.fahrertext_original -> fahrertext_uebersetzt), solange die
+// Übersetzung noch leer ist. Die Desktop-App zeigt sie vor der Freigabe als Vorschau an.
+//
 // Wer darf aufrufen: jeder – die Funktion nimmt nur eine Nachrichten-Id an und übersetzt nur Nachrichten,
 // die noch auf eine Übersetzung warten. Fremder Text kann so nicht übersetzt werden, und der DeepL-Schlüssel
 // bleibt auf dem Server.
@@ -98,6 +102,38 @@ export async function uebersetzen(nachrichtId: number, abfrage: Abfrage, deepl: 
     : { status: 200, body: { status: neuerStatus, uebersetzung } };
 }
 
+// Fahrertext eines offenen Winston-Vorschlags übersetzen. Nur wenn die Übersetzung leer ist.
+export async function vorschlagUebersetzen(vorschlagId: number, abfrage: Abfrage, deepl: DeepL | null) {
+  const rows = await abfrage(
+    `SELECT fahrertext_original, ausgangssprache, fahrersprache, fahrertext_uebersetzt, status
+     FROM public.winston_vorschlag WHERE vorschlag_id = $1::bigint`, [vorschlagId]);
+  if (rows.length === 0) return { status: 404, body: { fehler: 'Vorschlag nicht gefunden.' } };
+
+  const v = rows[0];
+  if (v.status !== 'offen' || v.fahrertext_uebersetzt)
+    return { status: 200, body: { uebersetzung: v.fahrertext_uebersetzt } };
+
+  const quelle = QUELLE[v.ausgangssprache];
+  const ziel = ZIEL[v.fahrersprache];
+  let uebersetzung: string | null = null;
+  if (quelle && ziel && quelle === ziel.slice(0, 2)) {
+    uebersetzung = v.fahrertext_original;
+  } else if (quelle && ziel && deepl) {
+    try {
+      uebersetzung = await deepl(v.fahrertext_original, quelle, ziel);
+    } catch (fehler) {
+      console.error('uebersetzen (Vorschlag): DeepL', (fehler as Error)?.message);
+    }
+  }
+  if (uebersetzung === null) return { status: 502, body: { fehler: 'Die Übersetzung ist gerade nicht möglich.' } };
+
+  await abfrage(
+    `UPDATE public.winston_vorschlag SET fahrertext_uebersetzt = $2
+     WHERE vorschlag_id = $1::bigint AND status = 'offen' AND fahrertext_uebersetzt IS NULL`,
+    [vorschlagId, uebersetzung]);
+  return { status: 200, body: { uebersetzung } };
+}
+
 export async function bearbeiten(request: Request, abfrage: Abfrage, deepl: DeepL | null): Promise<Response> {
   const antwort = (status: number, body: unknown) => Response.json(body, { status, headers: CORS });
   if (request.method === 'OPTIONS') return new Response(null, { status: 204, headers: CORS });
@@ -105,11 +141,16 @@ export async function bearbeiten(request: Request, abfrage: Abfrage, deepl: Deep
 
   let body: any;
   try { body = JSON.parse(await request.text()); } catch { return antwort(400, { fehler: 'Ungültige Anfrage.' }); }
+  const vorschlagId = Number(body?.vorschlagId);
   const id = Number(body?.nachrichtId);
-  if (!Number.isSafeInteger(id) || id <= 0) return antwort(400, { fehler: 'nachrichtId fehlt.' });
+  const istVorschlag = Number.isSafeInteger(vorschlagId) && vorschlagId > 0;
+  if (!istVorschlag && (!Number.isSafeInteger(id) || id <= 0))
+    return antwort(400, { fehler: 'nachrichtId oder vorschlagId fehlt.' });
 
   try {
-    const ergebnis = await uebersetzen(id, abfrage, deepl);
+    const ergebnis = istVorschlag
+      ? await vorschlagUebersetzen(vorschlagId, abfrage, deepl)
+      : await uebersetzen(id, abfrage, deepl);
     return antwort(ergebnis.status, ergebnis.body);
   } catch (fehler) {
     console.error('uebersetzen:', (fehler as Error)?.message);

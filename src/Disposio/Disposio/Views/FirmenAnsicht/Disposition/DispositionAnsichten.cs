@@ -19,6 +19,8 @@ namespace Disposio.Views
             "D07" => new D07Tourdetails(kontext),
             "D08" => new D08LiveKarte(kontext),
             "D09" => new D09Nachrichten(kontext),
+            "D10" => new D10Kundenkommunikation(kontext),
+            "D11" => new D11Frachtdokumente(kontext),
             "D16" => new D16SendungZuweisen(kontext),
             _ => null
         };

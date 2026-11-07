@@ -32,6 +32,7 @@ public sealed class SystemzustandRepository
         ("unternehmen", "anmelde_code", "009_web_anmeldung.sql"),
         ("wartung", "kilometerstand_bei_durchfuehrung", "010_fahrerzuordnung_wartung.sql"),
         ("benutzer", "letzte_abmeldung", "011_letzte_abmeldung.sql"),
+        ("dokument", "bemerkung", "014_dokument_bemerkung.sql"),
     };
 
     private static readonly HttpClient Http = new() { Timeout = TimeSpan.FromSeconds(10) };
