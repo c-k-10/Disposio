@@ -83,6 +83,7 @@
                         <RowDefinition Height="Auto" />
                         <RowDefinition Height="*" />
                         <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
                     </Grid.RowDefinitions>
 
                     <TextBlock Text="Fahrer &amp; Fahrzeuge" Style="{StaticResource UeberschriftText}" />
@@ -101,7 +102,8 @@
 
                     <TextBlock x:Name="TrefferText" Grid.Row="3" Style="{StaticResource HinweisText}" />
 
-                    <!-- Höhe passend zur Karte rechts. Die Liste scrollt selbst. -->
+                    <!-- Höhe passend zur Karte rechts. Die Liste scrollt selbst.
+                         Sind unten die Details offen, wird sie im Code niedriger (ListenHoeheMitDetails). -->
                     <ListView x:Name="TrefferListe" Grid.Row="4" Height="430" SelectionMode="Single"
                               Margin="-12,0" SelectionChanged="TrefferListe_SelectionChanged">
                         <ListView.ItemTemplate>
@@ -127,7 +129,45 @@
                     </ListView>
 
                     <TextBlock x:Name="AuswahlHinweis" Grid.Row="5" Style="{StaticResource HinweisText}"
-                               Visibility="Collapsed" />
+                               TextWrapping="Wrap" Visibility="Collapsed" />
+
+                    <!-- Details zum ausgewählten Fahrzeug: erscheinen beim Klick in die Liste oder auf einen Marker,
+                         wenn das Fahrzeug gerade eine aktive Tour hat. Werden mit den Positionen alle 30 s erneuert. -->
+                    <Border x:Name="DetailsRahmen" Grid.Row="6" Visibility="Collapsed" Padding="14,12"
+                            CornerRadius="12" BorderThickness="1"
+                            Background="{StaticResource InputBrush}" BorderBrush="{StaticResource BorderBrush}">
+                        <StackPanel Spacing="6">
+                            <Grid ColumnSpacing="8">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <TextBlock x:Name="DetailsTitel" Style="{StaticResource NormalText}" FontWeight="SemiBold"
+                                           FontSize="16" TextWrapping="Wrap" VerticalAlignment="Center" />
+                                <Button Grid.Column="1" Click="DetailsSchliessen_Click" Padding="6"
+                                        Background="Transparent" BorderThickness="0"
+                                        AutomationProperties.Name="Details schließen"
+                                        ToolTipService.ToolTip="Details schließen">
+                                    <FontIcon Glyph="&#xE711;" FontSize="12" Foreground="{StaticResource MutedTextBrush}" />
+                                </Button>
+                            </Grid>
+                            <TextBlock x:Name="DetailsUntertitel" Style="{StaticResource HinweisText}" TextWrapping="Wrap" />
+                            <TextBlock x:Name="DetailsStatus" Style="{StaticResource NormalText}" FontSize="13" TextWrapping="Wrap" />
+                            <TextBlock x:Name="DetailsNaechsterStopp" Style="{StaticResource NormalText}" FontSize="13" TextWrapping="Wrap" />
+                            <TextBlock x:Name="DetailsFortschritt" Style="{StaticResource HinweisText}" FontSize="13" TextWrapping="Wrap" />
+                            <Grid ColumnSpacing="8" Margin="0,6,0,0">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="*" />
+                                </Grid.ColumnDefinitions>
+                                <Button Content="Tour öffnen" Style="{StaticResource PrimaryButton}" HorizontalAlignment="Stretch"
+                                        Click="DetailsTour_Click" AutomationProperties.Name="Tourdetails öffnen" />
+                                <Button Grid.Column="1" Content="Chat öffnen" Style="{StaticResource DashboardButton}"
+                                        HorizontalAlignment="Stretch" Click="DetailsChat_Click"
+                                        AutomationProperties.Name="Chat mit dem Fahrer öffnen" />
+                            </Grid>
+                        </StackPanel>
+                    </Border>
                 </Grid>
             </Border>
 

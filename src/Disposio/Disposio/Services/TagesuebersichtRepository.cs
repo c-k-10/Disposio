@@ -44,10 +44,11 @@ public sealed class TagesuebersichtRepository
                (SELECT count(*) FROM public.auftrag a
                 WHERE a.unternehmen_id = $1::bigint AND a.tour_id IS NULL
                   AND a.abholdatum <= h.tag AND a.lieferdatum >= h.tag),
-               -- Freigabe offen = Vorschlag von Winston, über den noch niemand entschieden hat.
+               -- Freigabe offen = Vorschlag von Winston, über den noch niemand entschieden hat (D10).
+               -- Status „offen“: veraltete Vorschläge (Verspätung erledigt) zählen nicht mit.
                (SELECT count(*) FROM public.winston_vorschlag v
                 JOIN public.auftrag a ON a.auftrag_id = v.auftrag_id
-                WHERE a.unternehmen_id = $1::bigint
+                WHERE a.unternehmen_id = $1::bigint AND v.status = 'offen'
                   AND NOT EXISTS (SELECT 1 FROM public.freigabe fr WHERE fr.vorschlag_id = v.vorschlag_id)),
                (SELECT count(*) FROM public.schadensmeldung s
                 JOIN public.fahrzeug fz ON fz.fahrzeug_id = s.fahrzeug_id
@@ -89,16 +90,22 @@ public sealed class TagesuebersichtRepository
             WHERE fz.unternehmen_id = $1::bigint AND s.datum >= (f.seit AT TIME ZONE 'Europe/Berlin')::date
 
             UNION ALL
-            -- Neue Sendungen, zusammengefasst: in der App angelegt oder über die Webseite angefragt.
-            SELECT 'neue_sendungen', max(p.zeitpunkt), true, count(*)::text,
-                   (count(*) FILTER (WHERE p.akteur_art = 'Webseite'))::text, NULL::bigint
-            FROM public.aktionsprotokoll p, fenster f
+            -- US-25: Jede neue Sendung einzeln, mit Auftragsnummer und Auftraggeber (in der App angelegt oder über
+            -- die Webseite angefragt). Das Protokoll kennt nur den Text „Sendung <Nummer>“ (App) bzw.
+            -- „Sendung <Nummer> über die Webseite“ (neon-function/sendung.ts), darüber wird der Auftrag gefunden.
+            -- b = Auftraggeber | Webseite? (t/f) | aktueller Status, getrennt mit |
+            SELECT 'neue_sendung', p.zeitpunkt, true, a.auftragsnummer::text,
+                   COALESCE(NULLIF(k.firmenname, ''), '') || '|' || COALESCE(p.akteur_art = 'Webseite', false)::text || '|' || COALESCE(a.status, ''),
+                   a.auftrag_id
+            FROM public.aktionsprotokoll p
+            JOIN public.auftrag a ON a.unternehmen_id = p.unternehmen_id
+                 AND p.detail IN ('Sendung ' || a.auftragsnummer, 'Sendung ' || a.auftragsnummer || ' über die Webseite')
+            LEFT JOIN public.kunde k ON k.kunde_id = a.kunde_id AND k.unternehmen_id = a.unternehmen_id, fenster f
             WHERE p.unternehmen_id = $1::bigint AND p.aktion IN ('Sendung angelegt', 'Sendung angefragt')
               AND p.zeitpunkt >= f.seit
-            HAVING count(*) > 0
         ) x
         ORDER BY x.zeit
-        LIMIT 30
+        LIMIT 50
         """;
 
     // „Heute priorisieren“: art, vier Texte, Id. Sortiert nach Dringlichkeit (x.rang), dann Zeit.
@@ -142,11 +149,13 @@ public sealed class TagesuebersichtRepository
               AND lower(t.status) NOT SIMILAR TO '%(abgeschlossen|beendet|storniert)%'
 
             UNION ALL
-            -- 4. Über die Webseite angefragte Sendungen, die noch niemand angesehen hat.
-            SELECT 4, NULL, 'angefragt', count(*)::text, min(to_char(a.abholdatum, 'YYYY-MM-DD')), NULL, NULL, NULL
-            FROM public.auftrag a, h
+            -- 4. US-25: Über die Webseite angefragte Sendungen, einzeln mit Auftragsnummer und Auftraggeber.
+            --    Der Hinweis bleibt, solange die Sendung den Status „Angefragt“ hat, also bis sie bearbeitet ist.
+            SELECT 4, (a.abholdatum::timestamp AT TIME ZONE 'Europe/Berlin'), 'angefragt', a.auftragsnummer::text,
+                   COALESCE(NULLIF(k.firmenname, ''), ''), to_char(a.abholdatum, 'YYYY-MM-DD'), NULL, a.auftrag_id
+            FROM public.auftrag a
+            LEFT JOIN public.kunde k ON k.kunde_id = a.kunde_id AND k.unternehmen_id = a.unternehmen_id, h
             WHERE a.unternehmen_id = $1::bigint AND a.status = 'Angefragt' AND a.lieferdatum >= h.tag
-            HAVING count(*) > 0
 
             UNION ALL
             -- 5. Unverplante Sendungen heute mit Stellplätzen, Lademetern und Gewicht.
@@ -237,10 +246,7 @@ public sealed class TagesuebersichtRepository
                 b.Length > 0 ? $"{b}: Kunde nicht angetroffen." : "Kunde nicht angetroffen.", "Tourdetails", "D07", id),
             "schaden" => new SchichtEreignis(zeit, genau, "Schaden gemeldet",
                 $"{a} · {b}", "Meldung", "D15", id),
-            "neue_sendungen" => new SchichtEreignis(zeit, genau,
-                a == "1" ? "1 neue Sendung eingegangen" : $"{a} neue Sendungen eingegangen",
-                b == "0" ? "In der App erfasst." : $"Davon {b} über die Webseite angefragt.",
-                "Sendungen prüfen", "D02", null),
+            "neue_sendung" => NeueSendung(zeit, genau, a, b, id),
             _ => null
         };
     }
@@ -253,21 +259,42 @@ public sealed class TagesuebersichtRepository
         return Required(row, 0) switch
         {
             "spaet" => new TagesHinweis($"Lieferfenster {a} überschritten",
-                $"ETA {b} · {c} Min. nach Fensterende · Tour {d}", "Tour prüfen", "D07", id),
+                // Wie im Wireframe: „Nachricht prüfen“ öffnet die Kundenkommunikation (D10). Winston macht erst ab mehr als
+                // 15 Minuten einen Vorschlag; bei kleineren Verspätungen führt der Knopf zur Tour.
+                $"ETA {b} · {c} Min. nach Fensterende · Tour {d}",
+                int.TryParse(c, out int minuten) && minuten > KundenkommunikationRepository.SchwelleMinuten ? "Nachricht prüfen" : "Tour prüfen",
+                minuten > KundenkommunikationRepository.SchwelleMinuten ? "D10" : "D07", id),
             "schaden_tour" => new TagesHinweis($"Offener Schaden an {a}",
                 $"Fahrzeug fährt heute Tour {b} · {c}", "Meldung prüfen", "D15", id),
             "ohne_zuweisung" => new TagesHinweis($"Tour {a} ohne {d}",
                 $"Start {b} · {c}", "Zuweisen", "D06", id),
             "angefragt" => new TagesHinweis(
-                a == "1" ? "1 Web-Anfrage ungeprüft" : $"{a} Web-Anfragen ungeprüft",
-                $"Status „Angefragt“ · erste Abholung am {DateOnly.ParseExact(b, "yyyy-MM-dd", CultureInfo.InvariantCulture).ToString("dd.MM.", Deutsch)}",
-                "Sendungen prüfen", "D02", null),
+                $"Neue Web-Anfrage {a} · {Auftraggeber(b)}",
+                $"Status „Angefragt“ · Abholung am {DateOnly.ParseExact(c, "yyyy-MM-dd", CultureInfo.InvariantCulture).ToString("dd.MM.", Deutsch)}",
+                "Auftrag öffnen", "D03", id),
             "unverplant" => new TagesHinweis(
                 a == "1" ? "1 Sendung unverplant" : $"{a} Sendungen unverplant",
                 $"{b} Stellplätze · {Dezimal(c)} Ldm · {Tausender(d)} kg", "Verplanung prüfen", "D02", null),
             _ => null
         };
     }
+
+    // US-25: Eine neue Sendung in „Seit Ihrer letzten Schicht“. Der Knopf öffnet die Sendung direkt in D03.
+    // details = "Auftraggeber|true/false (Webseite)|Status"
+    private static SchichtEreignis NeueSendung(DateTime zeit, bool genau, string auftragsnummer, string details, long? id)
+    {
+        string[] teile = details.Split('|');
+        string kunde = Auftraggeber(teile[0]);
+        bool webseite = teile.Length > 1 && teile[1] == "true";
+        string status = teile.Length > 2 ? teile[2] : "";
+        string herkunft = webseite ? "über die Webseite angefragt" : "in der App erfasst";
+        return new SchichtEreignis(zeit, genau, $"Neuer Auftrag {auftragsnummer} · {kunde}",
+            status.Length > 0 ? $"{herkunft} · Status „{status}“" : herkunft,
+            "Auftrag öffnen", "D03", id);
+    }
+
+    private static string Auftraggeber(string name) =>
+        string.IsNullOrWhiteSpace(name) ? "Auftraggeber unbekannt" : name;
 
     // "4/6" -> "4 von 6 Stopps erledigt."
     private static string StoppText(string anteil)

@@ -72,12 +72,17 @@ WHERE chat_id = $1 AND benutzer_id <> $2 AND NOT gelesen;
 Umgekehrt macht es die Desktop-App genauso: Öffnet ein Disponent den Chat, werden die Nachrichten des Fahrers als
 gelesen markiert.
 
-**Ohne Fahrer-App testen** (im Neon SQL Editor, `<id>` = `nachricht_id` einer eigenen Nachricht):
+**Ohne Fahrer-App testen** (im Neon SQL Editor; nimmt automatisch die neueste Nachricht eines Disponenten):
 
 ```sql
-UPDATE public.nachricht SET uebertragungsstatus = 'zugestellt' WHERE nachricht_id = <id>;                       -- ✓✓ Zugestellt
-UPDATE public.nachricht SET gelesen = true, gelesen_am = now() WHERE nachricht_id = <id>;                        -- ✓✓ Gelesen
-UPDATE public.nachricht SET uebertragungsstatus = 'gesendet', gelesen = false, gelesen_am = NULL WHERE nachricht_id = <id>;  -- zurück
+-- ✓✓ Zugestellt
+UPDATE public.nachricht SET uebertragungsstatus = 'zugestellt'
+WHERE nachricht_id = (SELECT n.nachricht_id FROM public.nachricht n JOIN public.chat c ON c.chat_id = n.chat_id
+                      WHERE n.benutzer_id <> c.fahrer_benutzer_id ORDER BY n.nachricht_id DESC LIMIT 1);
+-- ✓✓ Gelesen
+UPDATE public.nachricht SET uebertragungsstatus = 'zugestellt', gelesen = true, gelesen_am = now()
+WHERE nachricht_id = (SELECT n.nachricht_id FROM public.nachricht n JOIN public.chat c ON c.chat_id = n.chat_id
+                      WHERE n.benutzer_id <> c.fahrer_benutzer_id ORDER BY n.nachricht_id DESC LIMIT 1);
 ```
 
 ## Neon Function `uebersetzen`
@@ -87,6 +92,9 @@ UPDATE public.nachricht SET uebertragungsstatus = 'gesendet', gelesen = false, g
 - Übersetzt nur Nachrichten mit Status `ausstehend` oder `fehlgeschlagen`. Ein zweiter Aufruf ist also ein „Erneut versuchen“.
 - Antwort `200 { status, uebersetzung }` oder `502 { status: "fehlgeschlagen", fehler }`
 - Der DeepL-Schlüssel liegt nur als Umgebungsvariable `DEEPL_API_KEY` auf dem Server.
+- Zweite Aufgabe für D10 „Kundenkommunikation“: `POST { "vorschlagId": 7 }` übersetzt den Fahrertext eines offenen
+  Winston-Vorschlags (`winston_vorschlag.fahrertext_original` → `fahrertext_uebersetzt`). Nach „Freigeben & senden“
+  landet dieser Text als normale Chat-Nachricht beim Fahrer.
 
 Veröffentlichen (im Ordner `neon-function`):
 

@@ -1,0 +1,160 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- D10 „Kundenkommunikation“: Verspätungsvorschläge von Winston (winston_vorschlag) prüfen, bearbeiten,
+     „Freigeben & senden“ oder mit Grund verwerfen. Ohne Freigabe wird nichts gesendet.
+     Kunde: E-Mail-Versand wird simuliert (Aktionsprotokoll). Fahrer: Chat-Nachricht (D09 / Fahrer-App). -->
+<UserControl
+    x:Class="Disposio.Views.D10Kundenkommunikation"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+    <StackPanel Spacing="16">
+        <!-- Status, Auswahl bei mehreren Vorschlägen, Aktualisieren -->
+        <Grid ColumnSpacing="12">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+            <StackPanel Orientation="Horizontal" Spacing="12" VerticalAlignment="Center">
+                <ProgressRing x:Name="LadeAnzeige" Width="20" Height="20" IsActive="False" Visibility="Collapsed" />
+                <TextBlock x:Name="StatusText" Style="{StaticResource HinweisText}" VerticalAlignment="Center" />
+            </StackPanel>
+            <ComboBox x:Name="VorschlagAuswahl" Grid.Column="1" MinWidth="320" Style="{StaticResource FormComboBox}"
+                      Visibility="Collapsed" SelectionChanged="VorschlagAuswahl_SelectionChanged"
+                      AutomationProperties.Name="Offenen Vorschlag wählen" />
+            <Button Grid.Column="2" Content="Aktualisieren" Style="{StaticResource DashboardButton}" Click="Aktualisieren_Click" />
+        </Grid>
+
+        <TextBlock x:Name="LeerText" Visibility="Collapsed" Style="{StaticResource HinweisText}"
+                   Text="Keine offenen Vorschläge. Winston meldet sich, sobald eine ETA mehr als 15 Minuten nach dem Ende eines Lieferfensters liegt." />
+
+        <StackPanel x:Name="Formular" Spacing="16" Visibility="Collapsed">
+            <!-- Begründung von Winston (Akzentbalken wie in D02) -->
+            <Border Background="{StaticResource SurfaceBrush}" BorderBrush="{StaticResource BorderBrush}"
+                    BorderThickness="1" CornerRadius="12">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+                    <Border Width="5" Background="{StaticResource AccentBrush}" CornerRadius="12,0,0,12" />
+                    <StackPanel Grid.Column="1" Margin="20,12" Spacing="2">
+                        <TextBlock x:Name="BegruendungText" Style="{StaticResource NormalText}" />
+                        <TextBlock x:Name="KontextText" Style="{StaticResource HinweisText}" />
+                    </StackPanel>
+                </Grid>
+            </Border>
+
+            <TextBlock Text="* Pflichtfeld" Style="{StaticResource HinweisText}" FontSize="13" />
+
+            <Grid ColumnSpacing="20">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
+
+                <!-- An den Kunden -->
+                <Border Style="{StaticResource KarteStyle}">
+                    <StackPanel Spacing="12">
+                        <TextBlock Text="An den Kunden" Style="{StaticResource UeberschriftText}" />
+                        <Grid ColumnSpacing="14">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+                            <StackPanel>
+                                <TextBlock Text="Empfänger *" Style="{StaticResource FeldLabel}" />
+                                <TextBox x:Name="EmpfaengerBox" Style="{StaticResource FormTextBox}" InputScope="EmailSmtpAddress"
+                                         MaxLength="254" TextChanged="Feld_TextChanged" AutomationProperties.Name="Empfänger E-Mail" />
+                            </StackPanel>
+                            <StackPanel Grid.Column="1">
+                                <TextBlock Text="Betreff *" Style="{StaticResource FeldLabel}" />
+                                <TextBox x:Name="BetreffBox" Style="{StaticResource FormTextBox}" MaxLength="200"
+                                         TextChanged="Feld_TextChanged" AutomationProperties.Name="Betreff" />
+                            </StackPanel>
+                        </Grid>
+                        <StackPanel>
+                            <TextBlock Text="Nachricht *" Style="{StaticResource FeldLabel}" />
+                            <TextBox x:Name="KundentextBox" Style="{StaticResource FormTextBox}" AcceptsReturn="True"
+                                     TextWrapping="Wrap" Height="280" MaxLength="4000" TextChanged="Feld_TextChanged"
+                                     ScrollViewer.VerticalScrollBarVisibility="Auto" AutomationProperties.Name="Nachricht an den Kunden" />
+                            <TextBlock Text="Keine internen Tour- oder Stoppnummern." Style="{StaticResource HinweisText}"
+                                       FontSize="13" Margin="0,6,0,0" />
+                        </StackPanel>
+                    </StackPanel>
+                </Border>
+
+                <!-- An den Fahrer -->
+                <Border Grid.Column="1" Style="{StaticResource KarteStyle}">
+                    <StackPanel Spacing="12">
+                        <TextBlock Text="An den Fahrer" Style="{StaticResource UeberschriftText}" />
+                        <Grid ColumnSpacing="14">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+                            <StackPanel>
+                                <TextBlock Text="Empfänger / Kanal *" Style="{StaticResource FeldLabel}" />
+                                <TextBox x:Name="FahrerKanalBox" Style="{StaticResource FormTextBox}" IsReadOnly="True"
+                                         AutomationProperties.Name="Empfänger und Kanal" />
+                            </StackPanel>
+                            <StackPanel Grid.Column="1">
+                                <TextBlock Text="Sprache *" Style="{StaticResource FeldLabel}" />
+                                <ComboBox x:Name="SpracheAuswahl" Style="{StaticResource FormComboBox}" HorizontalAlignment="Stretch"
+                                          SelectionChanged="Sprache_SelectionChanged" AutomationProperties.Name="Sprache für den Fahrer" />
+                            </StackPanel>
+                        </Grid>
+                        <StackPanel>
+                            <TextBlock Text="Nachricht *" Style="{StaticResource FeldLabel}" />
+                            <TextBox x:Name="FahrertextBox" Style="{StaticResource FormTextBox}" AcceptsReturn="True"
+                                     TextWrapping="Wrap" Height="280" MaxLength="1000" TextChanged="Feld_TextChanged"
+                                     ScrollViewer.VerticalScrollBarVisibility="Auto" AutomationProperties.Name="Nachricht an den Fahrer" />
+                            <TextBlock x:Name="FahrerHinweis" Text="Vorschau in Empfängersprache." Style="{StaticResource HinweisText}"
+                                       FontSize="13" Margin="0,6,0,0" />
+                            <HyperlinkButton x:Name="AusgangsfassungKnopf" Content="▶ Deutsche Ausgangsfassung" Padding="0,4"
+                                             Click="Ausgangsfassung_Click" />
+                            <StackPanel x:Name="AusgangsfassungBereich" Spacing="8" Visibility="Collapsed">
+                                <TextBox x:Name="DeutschBox" Style="{StaticResource FormTextBox}" AcceptsReturn="True"
+                                         TextWrapping="Wrap" MinHeight="80" MaxLength="1000" TextChanged="Feld_TextChanged"
+                                         AutomationProperties.Name="Deutsche Ausgangsfassung für den Fahrer" />
+                                <Button x:Name="NeuUebersetzenKnopf" Content="Neu übersetzen" Style="{StaticResource DashboardButton}"
+                                        HorizontalAlignment="Left" MinHeight="36" Padding="14,4" Click="NeuUebersetzen_Click" />
+                            </StackPanel>
+                        </StackPanel>
+                    </StackPanel>
+                </Border>
+            </Grid>
+
+            <TextBlock x:Name="BerechnungText" Style="{StaticResource HinweisText}" />
+            <TextBlock x:Name="EtaWarnung" Style="{StaticResource FehlerText}" Visibility="Collapsed" />
+
+            <Grid ColumnSpacing="12">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <TextBlock x:Name="FehlerText" Style="{StaticResource FehlerText}" VerticalAlignment="Center" />
+                <Button Grid.Column="1" Content="Abbrechen" Style="{StaticResource DashboardButton}" Click="Abbrechen_Click" />
+                <Button x:Name="FreigebenKnopf" Grid.Column="2" Content="Freigeben &amp; senden" Style="{StaticResource PrimaryButton}"
+                        Click="Freigeben_Click" />
+            </Grid>
+
+            <!-- Vorschlag verwerfen (aufklappbar) -->
+            <Border Background="{StaticResource SurfaceBrush}" BorderBrush="{StaticResource BorderBrush}"
+                    BorderThickness="1" CornerRadius="12" Padding="20,10">
+                <StackPanel Spacing="10">
+                    <HyperlinkButton x:Name="VerwerfenKnopf" Content="▶ Vorschlag verwerfen" Padding="0,4" Click="VerwerfenAufklappen_Click" />
+                    <StackPanel x:Name="VerwerfenBereich" Spacing="8" Visibility="Collapsed" Margin="0,0,0,8">
+                        <TextBlock Text="Grund *" Style="{StaticResource FeldLabel}" />
+                        <TextBox x:Name="GrundBox" Style="{StaticResource FormTextBox}" MaxLength="500"
+                                 PlaceholderText="z. B. Kunde wurde bereits telefonisch informiert"
+                                 AutomationProperties.Name="Grund für das Verwerfen" />
+                        <Button Content="Verwerfen" Style="{StaticResource DashboardButton}" HorizontalAlignment="Left"
+                                Click="Verwerfen_Click" />
+                    </StackPanel>
+                </StackPanel>
+            </Border>
+        </StackPanel>
+    </StackPanel>
+</UserControl>

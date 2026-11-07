@@ -51,6 +51,16 @@ namespace Disposio.Views
         private DispatcherTimer? _positionsTakt;
         private bool _positionenLaden;
 
+        // Details zum ausgewählten Fahrzeug (unten links): gemerkt wird die Tour, nicht die Zeile der Liste,
+        // weil die Auswahl auch über einen Klick auf den Marker kommen kann.
+        // Die Karte meldet Klicks per postMessage, z. B. „tour-gewaehlt:17“ oder „chat-oeffnen:17“.
+        private const string TourGewaehltNachricht = "tour-gewaehlt:";
+        private const string TourOeffnenNachricht = "tour-oeffnen:";
+        private const string ChatOeffnenNachricht = "chat-oeffnen:";
+        private const double ListenHoehe = 430;
+        private const double ListenHoeheMitDetails = 220;
+        private long? _detailsTourId;
+
         // ---- BEISPIEL-FAHRZEUG ----
         // Stand vor der Fahrer-App: das erste Fahrzeug der Firma an einer festen Stelle in Nürnberg (Hafen).
         // Seit Phase 3 kommen echte Standorte aus der Fahrer-App, deshalb abgeschaltet (true = wieder zeigen).
@@ -193,16 +203,92 @@ namespace Disposio.Views
                 }
             }
 
+            // Mit aktiver Tour: Details unten mit Absprung zu Tour und Chat. Ohne Tour: nur ein Hinweis.
             LivePosition? live = LiveFuer(zeile.Schluessel);
-            AuswahlHinweis.Text = gefunden && live is not null
-                ? $"{zeile.Name} wird auf der Karte gezeigt: Tour {live.Tournummer}, Stand {live.Stand} Uhr" +
-                  (live.Veraltet ? " (veraltet)." : ".")
-                : gefunden
-                    ? $"{zeile.Name} wird auf der Karte gezeigt (Beispielposition, keine echten Standortdaten)."
-                    : $"Für {zeile.Name} gibt es zurzeit keine Position. Sie erscheint, sobald eine Tour unterwegs ist " +
-                      "und die Fahrer-App Standorte sendet.";
+            if (live is not null)
+            {
+                DetailsZeigen(live);
+                return;
+            }
+
+            DetailsAusblenden();
+            AuswahlHinweis.Text = gefunden
+                ? $"{zeile.Name} wird auf der Karte gezeigt (Beispielposition, keine echten Standortdaten)."
+                : $"Für {zeile.Name} gibt es zurzeit keine Position. Sie erscheint, sobald eine Tour unterwegs ist " +
+                  "und die Fahrer-App Standorte sendet.";
             AuswahlHinweis.Visibility = Visibility.Visible;
         }
+
+        // ---- Details zum ausgewählten Fahrzeug ----
+
+        // Füllt den Kasten unten links. Wird auch alle 30 Sekunden mit den neuen Positionen aufgerufen.
+        private void DetailsZeigen(LivePosition live)
+        {
+            _detailsTourId = live.TourId;
+
+            DetailsTitel.Text = $"Tour {live.Tournummer}";
+            DetailsUntertitel.Text = string.IsNullOrWhiteSpace(live.Kennzeichen)
+                ? live.Fahrer
+                : $"{live.Kennzeichen} · {live.Fahrer}";
+
+            long minuten = live.AlterSekunden / 60;
+            string alter = minuten < 1 ? "gerade eben" : $"vor {minuten} Min.";
+            DetailsStatus.Text = $"{(live.Pausiert ? "Pause" : "Unterwegs")} · Position {live.Stand} Uhr ({alter})" +
+                                 (live.Veraltet ? " – veraltet" : "");
+            DetailsStatus.Foreground = D09Nachrichten.Farbe(live.Veraltet ? "MutedTextBrush" : "TextBrush");
+
+            // Nächster Stopp = erster noch nicht erledigter in der Reihenfolge der Tour.
+            List<LiveStopp> offen = live.Stopps.Where(stopp => stopp.Status != "Erledigt").ToList();
+            LiveStopp? naechster = offen.FirstOrDefault();
+            DetailsNaechsterStopp.Text = naechster is null
+                ? (live.Stopps.Count == 0 ? "Für diese Tour sind keine Stopps hinterlegt." : "Alle Stopps sind erledigt.")
+                : $"Nächster Stopp: {naechster.Reihenfolge}. {naechster.Bezeichnung} · " +
+                  (naechster.Eta is { } eta ? $"ETA {eta} Uhr" : "noch keine ETA") +
+                  (naechster.Verspaetet ? $" (Zeitfenster bis {naechster.ZeitfensterBis} Uhr)" : "");
+            DetailsNaechsterStopp.Foreground = D09Nachrichten.Farbe(naechster?.Verspaetet == true ? "ErrorBrush" : "TextBrush");
+
+            int verspaetet = offen.Count(stopp => stopp.Verspaetet);
+            DetailsFortschritt.Text = $"{live.Stopps.Count - offen.Count} von {live.Stopps.Count} Stopps erledigt" +
+                                      (verspaetet > 0 ? $" · {verspaetet} verspätet" : "");
+            DetailsFortschritt.Visibility = live.Stopps.Count == 0 ? Visibility.Collapsed : Visibility.Visible;
+
+            AuswahlHinweis.Visibility = Visibility.Collapsed;
+            DetailsRahmen.Visibility = Visibility.Visible;
+            TrefferListe.Height = ListenHoeheMitDetails;
+        }
+
+        private void DetailsAusblenden()
+        {
+            _detailsTourId = null;
+            DetailsRahmen.Visibility = Visibility.Collapsed;
+            TrefferListe.Height = ListenHoehe;
+        }
+
+        private void DetailsSchliessen_Click(object sender, RoutedEventArgs e)
+        {
+            DetailsAusblenden();
+            TrefferListe.SelectedItem = null;
+        }
+
+        // Absprung zu D07 (Tourdetails) und D09 (Nachrichten). Beide bekommen die Tour-Id als Startwert.
+        private void DetailsTour_Click(object sender, RoutedEventArgs e)
+        {
+            if (_detailsTourId is long tourId)
+                _kontext.Oeffnen("D07", tourId);
+        }
+
+        private void DetailsChat_Click(object sender, RoutedEventArgs e)
+        {
+            if (_detailsTourId is long tourId)
+                _kontext.Oeffnen("D09", tourId);
+        }
+
+        // Liest die Tour-Id aus einer Nachricht der Karte, z. B. „tour-gewaehlt:17“.
+        private static long? TourIdAus(string nachricht, string praefix) =>
+            nachricht.StartsWith(praefix, StringComparison.Ordinal)
+            && long.TryParse(nachricht[praefix.Length..], out long tourId)
+                ? tourId
+                : null;
 
         // ---- Live-Positionen der aktiven Touren ----
 
@@ -243,6 +329,21 @@ namespace Disposio.Views
                 {
                     _liveListenStand = stand;
                     FilterAnwenden();
+                }
+
+                // Offene Details mit den neuen Daten erneuern. Ist die Tour nicht mehr aktiv, Details schließen.
+                if (_detailsTourId is long detailsTour)
+                {
+                    if (_live.FirstOrDefault(live => live.TourId == detailsTour) is LivePosition aktuell)
+                    {
+                        DetailsZeigen(aktuell);
+                    }
+                    else
+                    {
+                        DetailsAusblenden();
+                        AuswahlHinweis.Text = "Die gewählte Tour ist nicht mehr unterwegs und wird deshalb nicht mehr angezeigt.";
+                        AuswahlHinweis.Visibility = Visibility.Visible;
+                    }
                 }
             }
             catch (UnauthorizedAccessException)
@@ -371,6 +472,26 @@ namespace Disposio.Views
                         : $"{gezeigt} von {gesamt} Störungen";
                     ZeigeStatus($"Karte mit Verkehrslage geladen · {text} im Umkreis (Stand {DateTime.Now:HH:mm} Uhr).");
                 }
+                return;
+            }
+
+            // Klick auf einen Fahrzeug-Marker: Details unten links zeigen.
+            if (TourIdAus(nachricht, TourGewaehltNachricht) is long gewaehlt)
+            {
+                if (_live.FirstOrDefault(position => position.TourId == gewaehlt) is LivePosition gewaehlteTour)
+                    DetailsZeigen(gewaehlteTour);
+                return;
+            }
+
+            // Knöpfe im Popup des Markers: direkt zu Tour oder Chat.
+            if (TourIdAus(nachricht, TourOeffnenNachricht) is long tourOeffnen)
+            {
+                _kontext.Oeffnen("D07", tourOeffnen);
+                return;
+            }
+            if (TourIdAus(nachricht, ChatOeffnenNachricht) is long chatOeffnen)
+            {
+                _kontext.Oeffnen("D09", chatOeffnen);
                 return;
             }
 
@@ -622,6 +743,16 @@ namespace Disposio.Views
                     .fahrzeug .stopp { margin-top: 2px; }
                     .fahrzeug .stopp.spaet { color: #B3261E; font-weight: 600; }
                     .fahrzeug .stopp.erledigt { color: #80868B; }
+
+                    /* Absprung aus dem Popup zu Tourdetails (D07) und Chat (D09) */
+                    .fahrzeug .aktionen { display: flex; gap: 6px; margin-top: 8px; }
+                    .fahrzeug .aktionen button {
+                        flex: 1; font: 600 12px "Segoe UI", sans-serif; padding: 6px 8px; cursor: pointer;
+                        border-radius: 8px; border: 1px solid #DADCE0; background: #fff; color: #202124;
+                    }
+                    .fahrzeug .aktionen button:hover { background: #F1F3F4; }
+                    .fahrzeug .aktionen button.primaer { background: #1A73E8; border-color: #1A73E8; color: #fff; }
+                    .fahrzeug .aktionen button.primaer:hover { background: #1765CC; }
 
                     /* Popup beim Anklicken */
                     .stoerung { font-size: 13px; line-height: 1.4; min-width: 200px; }
@@ -995,6 +1126,10 @@ namespace Disposio.Views
                                 <div class="ort">Stand ${escapeHtml(p.stand)} Uhr</div>
                                 ${p.veraltet ? `<div class="hinweis">Veraltet: letzte Position vor ${minuten} Min.</div>` : ""}
                                 ${stopps ? `<div class="stopps">${stopps}</div>` : ""}
+                                <div class="aktionen">
+                                    <button type="button" class="primaer" onclick="melden('tour-oeffnen:${Number(p.tourId)}')">Tour öffnen</button>
+                                    <button type="button" onclick="melden('chat-oeffnen:${Number(p.tourId)}')">Chat öffnen</button>
+                                </div>
                             </div>`;
                         };
 
@@ -1016,6 +1151,9 @@ namespace Disposio.Views
                                     marker.setLatLng([p.breite, p.laenge]);
                                 } else {
                                     marker = L.marker([p.breite, p.laenge], { keyboard: false }).bindPopup("");
+                                    // Klick auf den Marker: C# zeigt die Details unten links.
+                                    const tourId = p.tourId;
+                                    marker.on("click", () => melden(`tour-gewaehlt:${tourId}`));
                                     touren.set(p.tourId, marker);
                                 }
                                 marker.setIcon(tourSymbol(p));
