@@ -36,7 +36,11 @@ public sealed record TourPlanungsdaten(
     IReadOnlyList<FahrerAuswahl> Fahrer,
     IReadOnlyList<FahrzeugAuswahl> Fahrzeuge,
     IReadOnlyList<OffeneSendung> Sendungen,
-    string TournummerVorschlag);
+    string TournummerVorschlag)
+{
+    /// <summary>Adresse der eigenen Spedition („Straße, PLZ Ort“) als Vorschlag für Start- und Zielort. Null = keine hinterlegt.</summary>
+    public string? Firmenadresse { get; init; }
+}
 
 /// <summary>
 /// Ein Stopp im Formular. Von und Bis sind deutsche Ortszeit. Stopps aus einer Sendung haben

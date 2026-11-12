@@ -192,9 +192,10 @@ namespace Disposio.Views
                     text?.Contains(suche, StringComparison.CurrentCultureIgnoreCase) == true))
                 .ToList();
 
+            KennzahlenSetzen();
             _markierteZeile = null;
             TourListe.ItemsSource = treffer
-                .Select(tour => new TourZeile(tour, AnzeigeStatus(tour), MussZugewiesenWerden(tour))
+                .Select(tour => new TourZeile(tour, AnzeigeStatus(tour), MussZugewiesenWerden(tour), IstAbgeschlossen(tour.Status))
                 {
                     IstMarkiert = tour.Id == _markierteTourId
                 })
@@ -210,6 +211,18 @@ namespace Disposio.Views
                 ? "Für diesen Tag sind keine Touren geplant. Mit „+ Tour planen“ legen Sie eine an."
                 : "Keine Tour passt zum Filter.";
             LeerText.Visibility = treffer.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
+        }
+
+        // Kennzahlen über allen Touren des Tages (nicht nur den gefilterten), wie in den Entwürfen.
+        private void KennzahlenSetzen()
+        {
+            int verspaetet = _touren.Count(t => AnzeigeStatus(t) == StatusVerspaetung);
+            int abgeschlossen = _touren.Count(t => IstAbgeschlossen(t.Status));
+            int unterwegs = _touren.Count(t => AnzeigeStatus(t) != StatusVerspaetung && TourZeile.IstUnterwegs(t.Status));
+            KpiUnterwegs.Text = unterwegs.ToString(Deutsch);
+            KpiVerspaetet.Text = verspaetet.ToString(Deutsch);
+            KpiAbgeschlossen.Text = abgeschlossen.ToString(Deutsch);
+            KpiGeplant.Text = (_touren.Count - verspaetet - abgeschlossen - unterwegs).ToString(Deutsch);
         }
 
         // Die Status-Auswahl enthält „Alle“ und jeden Status, der an diesem Tag vorkommt.
@@ -260,40 +273,70 @@ namespace Disposio.Views
         };
     }
 
-    // Eine Tabellenzeile mit fertig formatierten Texten. Die XAML-Vorlage bindet mit {x:Bind Name} daran.
+    // Eine Tour-Karte mit fertig formatierten Texten. Die XAML-Vorlage bindet mit {x:Bind Name} daran.
+    // Aufbau wie „Meine Touren“ in der Fahrer-App: Nummer, Strecke, nächster Stopp mit ETA, Status-Etikett.
     public sealed class TourZeile
     {
-        public TourZeile(TourUebersicht tour, string status, bool mussZugewiesenWerden)
+        public TourZeile(TourUebersicht tour, string status, bool mussZugewiesenWerden, bool abgeschlossen)
         {
             Id = tour.Id;
-            TourUndBereich = tour.Bereich is null ? tour.Tournummer : $"{tour.Tournummer} · {tour.Bereich}";
+            Tournummer = tour.Tournummer;
+            Bereich = tour.Bereich ?? "";
+            Route = $"{tour.Startort} → {tour.Zielort}";
 
             FahrerUndFahrzeug = (tour.HatFahrer, tour.HatFahrzeug) switch
             {
-                (false, false) => "Noch nicht zugeordnet",
-                (true, false) => $"{tour.Fahrer} / Fahrzeug fehlt",
-                (false, true) => $"Fahrer fehlt / {tour.Kennzeichen}",
-                _ => $"{tour.Fahrer} / {tour.Kennzeichen}"
+                (false, false) => "Kein Fahrer · kein Fahrzeug",
+                (true, false) => $"{tour.Fahrer} · Fahrzeug fehlt",
+                (false, true) => $"Fahrer fehlt · {tour.Kennzeichen}",
+                _ => $"{tour.Fahrer} · {tour.Kennzeichen}"
             };
 
-            NaechsterStopp = tour.NaechsterStopp ?? "Alle Stopps erledigt";
-            string fenster = tour.FensterVon is null ? "—" : $"{tour.FensterVon}–{tour.FensterBis}";
-            FensterUndEta = tour.NaechsterStopp is null ? "—" : $"{fenster} / {tour.Eta ?? "—"}";
-
-            Status = status;
             bool verspaetet = status == "Verspätung";
+            if (tour.NaechsterStopp is null)
+            {
+                NaechsterStopp = "Nächster Stopp";
+                EtaText = "Alle Stopps erledigt";
+            }
+            else
+            {
+                NaechsterStopp = tour.FensterVon is null
+                    ? $"Nächster Stopp: {tour.NaechsterStopp}"
+                    : $"Nächster Stopp: {tour.NaechsterStopp} · {tour.FensterVon}–{tour.FensterBis}";
+                EtaText = tour.Eta is null ? "ETA offen" : verspaetet ? $"ETA {tour.Eta} · verspätet" : $"ETA {tour.Eta}";
+            }
+            EtaVerspaetetSichtbar = verspaetet ? Visibility.Visible : Visibility.Collapsed;
+            EtaNormalSichtbar = verspaetet ? Visibility.Collapsed : Visibility.Visible;
+
+            // Etikett: verspätet rot umrandet, unterwegs gefüllt, abgeschlossen grau, sonst umrandet.
+            Status = status;
+            bool aktiv = !verspaetet && !abgeschlossen && IstUnterwegs(tour.Status);
             VerspaetetSichtbar = verspaetet ? Visibility.Visible : Visibility.Collapsed;
-            NormalSichtbar = verspaetet ? Visibility.Collapsed : Visibility.Visible;
+            AktivSichtbar = aktiv ? Visibility.Visible : Visibility.Collapsed;
+            ErledigtSichtbar = !verspaetet && abgeschlossen ? Visibility.Visible : Visibility.Collapsed;
+            OffenSichtbar = !verspaetet && !aktiv && !abgeschlossen ? Visibility.Visible : Visibility.Collapsed;
             AktionText = mussZugewiesenWerden ? "Zuweisen" : "Öffnen";
         }
 
+        // Wie in der Fahrer-App gelten „unterwegs“ und „pausiert“ als aktive Tour.
+        public static bool IstUnterwegs(string status) =>
+            status.Contains("unterwegs", StringComparison.OrdinalIgnoreCase) ||
+            status.Contains("pausiert", StringComparison.OrdinalIgnoreCase) ||
+            status.Contains("gestartet", StringComparison.OrdinalIgnoreCase);
+
         public long Id { get; }
-        public string TourUndBereich { get; }
+        public string Tournummer { get; }
+        public string Bereich { get; }
+        public string Route { get; }
         public string FahrerUndFahrzeug { get; }
         public string NaechsterStopp { get; }
-        public string FensterUndEta { get; }
+        public string EtaText { get; }
+        public Visibility EtaNormalSichtbar { get; }
+        public Visibility EtaVerspaetetSichtbar { get; }
         public string Status { get; }
-        public Visibility NormalSichtbar { get; }
+        public Visibility AktivSichtbar { get; }
+        public Visibility OffenSichtbar { get; }
+        public Visibility ErledigtSichtbar { get; }
         public Visibility VerspaetetSichtbar { get; }
         public string AktionText { get; }
         // Beim Neuaufbau der Liste bleibt die zuletzt angeklickte Tour markiert.

@@ -62,7 +62,7 @@
                         <DataTemplate x:DataType="local:WartungsterminZeile">
                             <!-- Der linke Rand trägt die Ampelfarbe, damit Dringendes beim Überfliegen auffällt. -->
                             <Border BorderBrush="{x:Bind AmpelFarbe}" BorderThickness="4,0,0,0" Margin="0,6,0,0"
-                                    Background="{x:Bind Hintergrund}" CornerRadius="6" Padding="10,10">
+                                    Background="{x:Bind Hintergrund}" CornerRadius="4" Padding="10,10">
                                 <Grid ColumnSpacing="16">
                                     <Grid.ColumnDefinitions>
                                         <ColumnDefinition Width="*" />
@@ -83,7 +83,7 @@
                                             <TextBlock Text="{x:Bind FaelligZusatz}" Style="{StaticResource HinweisText}" />
                                         </StackPanel>
                                         <Border Grid.Column="3" BorderBrush="{x:Bind AmpelFarbe}" BorderThickness="1"
-                                                CornerRadius="14" Padding="10,3" HorizontalAlignment="Left" VerticalAlignment="Center">
+                                                CornerRadius="4" Padding="10,3" HorizontalAlignment="Left" VerticalAlignment="Center">
                                             <StackPanel Orientation="Horizontal" Spacing="6">
                                                 <Ellipse Width="9" Height="9" Fill="{x:Bind AmpelFarbe}" VerticalAlignment="Center" />
                                                 <TextBlock Text="{x:Bind AmpelText}" FontSize="13" Foreground="{StaticResource TextBrush}" />

@@ -96,7 +96,7 @@
             <StackPanel Spacing="12">
                 <TextBlock Text="Heute priorisieren" Style="{StaticResource UeberschriftText}" />
 
-                <Border Background="{StaticResource InputBrush}" CornerRadius="8" Padding="14,10">
+                <Border Background="{StaticResource InputBrush}" CornerRadius="4" Padding="14,10">
                     <Grid ColumnSpacing="16">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="1.2*" />

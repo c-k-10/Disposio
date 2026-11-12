@@ -25,7 +25,7 @@ namespace Disposio.Views
     {
         private static readonly string[] AccentColors =
         {
-            "#FF004D", "#007BFF", "#00C853", "#FF9100", "#7B2CBF"
+            "#263749", "#FF004D", "#007BFF", "#00C853", "#FF9100", "#7B2CBF"
         };
 
         private readonly HashSet<Kunde> _observedCustomers = new();
@@ -38,8 +38,8 @@ namespace Disposio.Views
         private bool _isInitialized;
         private bool _dialogOpen;
         private bool _returningToLogin;
-        private bool _isLight;
-        private string _accentHex = "#7B2CBF";
+        private bool _isLight = DarstellungSpeicher.IstHell;
+        private string _accentHex = DarstellungSpeicher.Akzent;
 
         // ObservableCollection meldet der XAML-Liste automatisch, wenn ein Eintrag hinzukommt.
         // Sie ist nur die Anzeige-Kopie: Dauerhaft gespeichert wird ausschließlich in Neon.
@@ -49,6 +49,7 @@ namespace Disposio.Views
         {
             InitializeComponent();
             Kunden.CollectionChanged += Kunden_CollectionChanged;
+            RailAnwenden();
 
             SetAppearanceControls();
             _isInitialized = true;
@@ -244,6 +245,7 @@ namespace Disposio.Views
                 item.Tag is string hex && AccentColors.Contains(hex, StringComparer.OrdinalIgnoreCase))
             {
                 _accentHex = hex.ToUpperInvariant();
+                DarstellungSpeicher.Akzent = _accentHex;
                 ApplyAccent();
             }
         }
@@ -253,6 +255,7 @@ namespace Disposio.Views
             if (_isInitialized)
             {
                 _isLight = ModeSwitch.IsOn;
+                DarstellungSpeicher.IstHell = _isLight;
                 ApplyAppearance();
             }
         }
@@ -262,19 +265,28 @@ namespace Disposio.Views
             // XAML verwendet dieselben Brush-Objekte überall. Ändern wir deren Farbe,
             // passen sich Karten, Texte und bereits geöffnete Dialoge gemeinsam an.
             RequestedTheme = _isLight ? ElementTheme.Light : ElementTheme.Dark;
-            SetBrush("BackgroundBrush", _isLight ? "#FCFCFD" : "#101319");
-            SetBrush("SidebarBrush", _isLight ? "#F0F0F0" : "#262930");
-            SetBrush("SurfaceBrush", _isLight ? "#FFFFFF" : "#262930");
-            SetBrush("BorderBrush", _isLight ? "#E1E2E6" : "#3D4048");
-            SetBrush("TextBrush", _isLight ? "#101319" : "#ECEEF3");
-            SetBrush("MutedTextBrush", _isLight ? "#525B6A" : "#B8C1D2");
-            SetBrush("InputBrush", _isLight ? "#F0F0F0" : "#20232A");
+            MainWindow.TitelleisteFaerben(_isLight);
+            // Farben der Fahrer-App (DisposioFarben) und ihr Gegenstück im Dark Mode.
+            SetBrush("BackgroundBrush", _isLight ? "#F4F5F9" : "#12161C");
+            SetBrush("SidebarBrush", _isLight ? "#FFFFFF" : "#1B2129");
+            SetBrush("SurfaceBrush", _isLight ? "#FFFFFF" : "#1B2129");
+            SetBrush("BorderBrush", _isLight ? "#D5D9E0" : "#2E3641");
+            SetBrush("TextBrush", _isLight ? "#1F2933" : "#E6EAF0");
+            SetBrush("MutedTextBrush", _isLight ? "#6B7280" : "#9AA3B0");
+            SetBrush("InputBrush", _isLight ? "#FFFFFF" : "#12161C");
+            SetBrush("StatusBoxBrush", _isLight ? "#F0F1F3" : "#232A33");
+            SetBrush("LateBrush", _isLight ? "#C62828" : "#FF7B7B");
+            MenueMarkieren();
             ApplyAccent();
         }
 
         private void ApplyAccent()
         {
-            Color accent = ParseColor(_accentHex);
+            // Das Disposio-Blau der Fahrer-App wird im Dark Mode hell, sonst wäre es auf Dunkel kaum sichtbar.
+            string accentHex = !_isLight && string.Equals(_accentHex, "#263749", StringComparison.OrdinalIgnoreCase)
+                ? "#A9C4E4"
+                : _accentHex;
+            Color accent = ParseColor(accentHex);
             Color foreground = BestAccentForeground(accent);
             Color hover = Mix(accent, Microsoft.UI.Colors.White, 0.12);
             Color pressed = Mix(accent,
@@ -439,7 +451,7 @@ namespace Disposio.Views
                         "bleiben erhalten. Mit „Aktiv“ oder „Testphase“ ist die Firma wieder freigeschaltet.",
                     FontSize = 14,
                     TextWrapping = TextWrapping.Wrap,
-                    Foreground = new SolidColorBrush(ParseColor(_isLight ? "#B91C1C" : "#FF939B"))
+                    Foreground = new SolidColorBrush(ParseColor(_isLight ? "#C62828" : "#FF7B7B"))
                 };
                 void UpdateLockWarning() => lockWarning.Visibility =
                     (statusBox.SelectedItem as ComboBoxItem)?.Tag as string == UnternehmenStatus.Inaktiv
@@ -452,7 +464,7 @@ namespace Disposio.Views
                 {
                     FontSize = 14,
                     TextWrapping = TextWrapping.Wrap,
-                    Foreground = new SolidColorBrush(ParseColor(_isLight ? "#B91C1C" : "#FF939B")),
+                    Foreground = new SolidColorBrush(ParseColor(_isLight ? "#C62828" : "#FF7B7B")),
                     Visibility = Visibility.Collapsed
                 };
                 var form = new StackPanel
@@ -732,7 +744,7 @@ namespace Disposio.Views
                 {
                     FontSize = 14,
                     TextWrapping = TextWrapping.Wrap,
-                    Foreground = new SolidColorBrush(ParseColor(_isLight ? "#B91C1C" : "#FF939B")),
+                    Foreground = new SolidColorBrush(ParseColor(_isLight ? "#C62828" : "#FF7B7B")),
                     Visibility = Visibility.Collapsed,
                     Margin = new Thickness(0, 12, 0, 0)
                 };
@@ -928,7 +940,7 @@ namespace Disposio.Views
             Foreground = Brush("TextBrush"),
             BorderBrush = Brush("BorderBrush"),
             BorderThickness = new Thickness(1),
-            CornerRadius = new CornerRadius(10),
+            CornerRadius = new CornerRadius(4),
             MinHeight = 50,
             Padding = new Thickness(14, 10, 14, 10),
             FontSize = 16,
@@ -974,7 +986,7 @@ namespace Disposio.Views
                 Background = Brush("SurfaceBrush"),
                 Foreground = Brush("TextBrush"),
                 BorderBrush = Brush("BorderBrush"),
-                CornerRadius = new CornerRadius(20),
+                CornerRadius = new CornerRadius(8),
                 DefaultButton = ContentDialogButton.None,
                 PrimaryButtonStyle = (Style)Resources["PrimaryButton"],
                 CloseButtonStyle = (Style)Resources["DashboardButton"]
@@ -994,7 +1006,7 @@ namespace Disposio.Views
             dialog.Resources["ContentDialogTitleForeground"] = Brush("TextBrush");
             dialog.Resources["ContentDialogContentForeground"] = Brush("TextBrush");
             dialog.Resources["ContentDialogBorderBrush"] = Brush("BorderBrush");
-            dialog.Resources["ContentDialogCornerRadius"] = new CornerRadius(20);
+            dialog.Resources["ContentDialogCornerRadius"] = new CornerRadius(8);
             dialog.Resources["ContentDialogMaxWidth"] = 620d;
             return dialog;
         }
@@ -1081,6 +1093,54 @@ namespace Disposio.Views
 
         private void ProtokollMenu_Tapped(object sender, Microsoft.UI.Xaml.Input.TappedRoutedEventArgs e) => ZeigeBereich(protokoll: true);
 
+        private bool _protokollAktiv;
+        // Reißzwecke wie in der Firmenansicht, dieselbe gespeicherte Einstellung.
+        private bool _angeheftet = DarstellungSpeicher.MenueAngeheftet;
+
+        private void Pin_Click(object sender, RoutedEventArgs e)
+        {
+            _angeheftet = !_angeheftet;
+            DarstellungSpeicher.MenueAngeheftet = _angeheftet;
+            RailAnwenden();
+        }
+
+        private void RailAnwenden()
+        {
+            RailColumn.Width = new GridLength(_angeheftet ? 230 : 68);
+            Visibility namen = _angeheftet ? Visibility.Visible : Visibility.Collapsed;
+            KundenText.Visibility = ProtokollText.Visibility = namen;
+            KundenPille.Width = ProtokollPille.Width = _angeheftet ? 36 : 44;
+            // Angeheftet: Symbol links, Name daneben. Eingeklappt: nur das Symbol, mittig.
+            KundenInhalt.HorizontalAlignment = ProtokollInhalt.HorizontalAlignment =
+                _angeheftet ? HorizontalAlignment.Left : HorizontalAlignment.Center;
+            KundenMenu.Padding = ProtokollMenu.Padding = _angeheftet ? new Thickness(6, 4, 8, 4) : new Thickness(2, 6, 2, 6);
+            KundenMenu.CornerRadius = ProtokollMenu.CornerRadius = new CornerRadius(_angeheftet ? 19 : 4);
+            MenueMarkieren();
+            PinSymbol.Glyph = _angeheftet ? "\uE77A" : "\uE718";
+            string hinweis = _angeheftet ? "Menü einklappen (nur Symbole)" : "Menü anheften (mit Namen)";
+            ToolTipService.SetToolTip(PinButton, hinweis);
+            Microsoft.UI.Xaml.Automation.AutomationProperties.SetName(PinButton, hinweis);
+        }
+
+        // Navigationsleiste wie in der Firmenansicht: aktiver Punkt mit grauer Pille, blauem Symbol und fetter Schrift.
+        private void MenueMarkieren()
+        {
+            RailPunkt(KundenPille, KundenSymbol, KundenText, !_protokollAktiv);
+            RailPunkt(ProtokollPille, ProtokollSymbol, ProtokollText, _protokollAktiv);
+        }
+
+        private void RailPunkt(Border pille, FontIcon symbol, TextBlock text, bool aktiv)
+        {
+            var durchsichtig = new SolidColorBrush(Microsoft.UI.Colors.Transparent);
+            // Angeheftet: graue Pille über die ganze Zeile, eingeklappt: nur um das Symbol.
+            pille.Background = aktiv && !_angeheftet ? Brush("StatusBoxBrush") : durchsichtig;
+            if (pille.Parent is StackPanel { Parent: Border zeile })
+                zeile.Background = aktiv && _angeheftet ? Brush("StatusBoxBrush") : durchsichtig;
+            symbol.Foreground = Brush(aktiv ? "AccentBrush" : "MutedTextBrush");
+            text.Foreground = Brush(aktiv ? "TextBrush" : "MutedTextBrush");
+            text.FontWeight = aktiv ? Microsoft.UI.Text.FontWeights.SemiBold : Microsoft.UI.Text.FontWeights.Normal;
+        }
+
         // Wechselt zwischen der Kundenliste und dem Aktionsprotokoll aller Firmen.
         private void ZeigeBereich(bool protokoll)
         {
@@ -1095,12 +1155,8 @@ namespace Disposio.Views
                 ? "Nachvollziehen, wer wann was geändert hat, über alle Kunden."
                 : "Kunden anlegen, bearbeiten und in ihre Ansicht springen.";
 
-            // Der aktive Menüpunkt bekommt die Fläche, wie bisher „Kunden“.
-            var durchsichtig = new SolidColorBrush(Microsoft.UI.Colors.Transparent);
-            KundenMenu.Background = protokoll ? durchsichtig : Brush("SurfaceBrush");
-            KundenMenu.BorderBrush = protokoll ? durchsichtig : Brush("BorderBrush");
-            ProtokollMenu.Background = protokoll ? Brush("SurfaceBrush") : durchsichtig;
-            ProtokollMenu.BorderBrush = protokoll ? Brush("BorderBrush") : durchsichtig;
+            _protokollAktiv = protokoll;
+            MenueMarkieren();
 
             // Bei jedem Öffnen neu laden, damit neue Einträge sofort sichtbar sind.
             ProtokollHost.Child = protokoll
@@ -1114,7 +1170,7 @@ namespace Disposio.Views
     // Diese beiden Einstellungen werden beim Wechsel zwischen Login und Dashboard mitgegeben.
     public sealed class DashboardAppearance
     {
-        public string AccentHex { get; set; } = "#7B2CBF";
+        public string AccentHex { get; set; } = "#263749";
         public bool IsLight { get; set; }
     }
 

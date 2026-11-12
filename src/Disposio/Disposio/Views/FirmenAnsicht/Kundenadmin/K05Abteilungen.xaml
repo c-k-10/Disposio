@@ -10,14 +10,14 @@
     <StackPanel Spacing="18">
         <!-- Neue Abteilung: Leiste mit Akzentstreifen wie in K01 -->
         <Border Background="{StaticResource SurfaceBrush}" BorderBrush="{StaticResource BorderBrush}"
-                BorderThickness="1" CornerRadius="12">
+                BorderThickness="1" CornerRadius="4">
             <Grid ColumnSpacing="14" Padding="0,14,18,14">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="Auto" />
                     <ColumnDefinition Width="*" />
                     <ColumnDefinition Width="Auto" />
                 </Grid.ColumnDefinitions>
-                <Border Width="5" Margin="0,-14,8,-14" Background="{StaticResource AccentBrush}" CornerRadius="12,0,0,12" />
+                <Border Width="5" Margin="0,-14,8,-14" Background="{StaticResource AccentBrush}" CornerRadius="4,0,0,4" />
                 <TextBox x:Name="NeuBox" Grid.Column="1" Style="{StaticResource FormTextBox}" MaxLength="100"
                          PlaceholderText="Name der neuen Abteilung, z. B. Frische" KeyDown="NeuBox_KeyDown"
                          AutomationProperties.Name="Name der neuen Abteilung" />
@@ -77,7 +77,7 @@
                                     <TextBlock Grid.Column="2" Text="{x:Bind Fahrzeuge}" Style="{StaticResource NormalText}" VerticalAlignment="Center" />
                                     <TextBlock Grid.Column="3" Text="{x:Bind OffeneTouren}" Style="{StaticResource NormalText}" VerticalAlignment="Center" />
                                     <Border Grid.Column="4" BorderBrush="{StaticResource BorderBrush}" BorderThickness="1"
-                                            CornerRadius="14" Padding="10,3" HorizontalAlignment="Left" VerticalAlignment="Center">
+                                            CornerRadius="4" Padding="10,3" HorizontalAlignment="Left" VerticalAlignment="Center">
                                         <TextBlock Text="{x:Bind StatusText}" FontSize="13" Foreground="{StaticResource TextBrush}" />
                                     </Border>
                                     <StackPanel Grid.Column="5" Orientation="Horizontal" Spacing="8" Width="250" VerticalAlignment="Center">

@@ -49,7 +49,7 @@
             <StackPanel Grid.Column="4" Spacing="4" VerticalAlignment="Center">
                 <TextBlock Text="Störungsarten" FontSize="14" Foreground="{StaticResource TextBrush}" />
                 <DropDownButton x:Name="ArtenKnopf" Content="Alle Arten" IsEnabled="False" Width="190"
-                                MinHeight="36" CornerRadius="10" Background="{StaticResource InputBrush}"
+                                MinHeight="36" CornerRadius="4" Background="{StaticResource InputBrush}"
                                 BorderBrush="{StaticResource BorderBrush}" Foreground="{StaticResource TextBrush}"
                                 AutomationProperties.Name="Störungsarten auswählen">
                     <DropDownButton.Flyout>
@@ -134,7 +134,7 @@
                     <!-- Details zum ausgewählten Fahrzeug: erscheinen beim Klick in die Liste oder auf einen Marker,
                          wenn das Fahrzeug gerade eine aktive Tour hat. Werden mit den Positionen alle 30 s erneuert. -->
                     <Border x:Name="DetailsRahmen" Grid.Row="6" Visibility="Collapsed" Padding="14,12"
-                            CornerRadius="12" BorderThickness="1"
+                            CornerRadius="4" BorderThickness="1"
                             Background="{StaticResource InputBrush}" BorderBrush="{StaticResource BorderBrush}">
                         <StackPanel Spacing="6">
                             <Grid ColumnSpacing="8">

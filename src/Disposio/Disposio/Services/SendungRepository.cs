@@ -139,6 +139,44 @@ public sealed class SendungRepository
     }
 
     /// <summary>
+    /// Adressen eines Kunden für D03: seine Firmenadresse (aus public.kunde) und die zuletzt benutzten
+    /// Abhol- und Lieferadressen seiner Sendungen (ohne Doppelte, neueste zuerst, höchstens 8).
+    /// Nur Kunden der eigenen Firma; sonst kommt eine leere Liste.
+    /// </summary>
+    public async Task<KundenAdressen> AdressenLadenAsync(long kundeId, CancellationToken cancellationToken = default)
+    {
+        FirmenZugriff zugriff = await AuthService.FirmenZugriffPruefenAsync(Rolle, cancellationToken);
+        var rows = await _client.Value.QueryAsync("""
+            WITH k AS (
+                SELECT kunde_id, btrim(adresse) || ', ' || btrim(plz) || ' ' || btrim(ort) AS firmenadresse
+                FROM public.kunde WHERE kunde_id = $2::bigint AND unternehmen_id = $1::bigint
+            ), frueher AS (
+                SELECT DISTINCT ON (lower(btrim(x.adresse))) btrim(x.adresse) AS adresse, x.art, x.auftrag_id
+                FROM k
+                JOIN public.auftrag a ON a.kunde_id = k.kunde_id AND a.unternehmen_id = $1::bigint
+                CROSS JOIN LATERAL (VALUES (a.abholadresse, 'Abholung', a.auftrag_id),
+                                           (a.lieferadresse, 'Zustellung', a.auftrag_id)) AS x(adresse, art, auftrag_id)
+                WHERE btrim(x.adresse) <> '' AND lower(btrim(x.adresse)) <> lower(k.firmenadresse)
+                ORDER BY lower(btrim(x.adresse)), x.auftrag_id DESC
+            )
+            SELECT 'Firmenadresse', firmenadresse, 0 FROM k
+            UNION ALL
+            SELECT * FROM (SELECT art, adresse, auftrag_id FROM frueher ORDER BY auftrag_id DESC LIMIT 8) f
+            """, new string?[] { Text(zugriff.UnternehmenId), Text(kundeId) }, cancellationToken);
+
+        string? firmenadresse = null;
+        var fruehere = new List<FruehereAdresse>();
+        foreach (var row in rows)
+        {
+            if (Required(row, 0) == "Firmenadresse")
+                firmenadresse = Required(row, 1);
+            else
+                fruehere.Add(new FruehereAdresse(Required(row, 1), Required(row, 0)));
+        }
+        return new KundenAdressen(firmenadresse, fruehere);
+    }
+
+    /// <summary>
     /// Legt eine Sendung an (id null) oder ändert eine unverplante Sendung. Ein neuer Kunde, die Sendung und der
     /// Protokolleintrag entstehen in einem einzigen Befehl: entweder alles oder nichts.
     /// </summary>

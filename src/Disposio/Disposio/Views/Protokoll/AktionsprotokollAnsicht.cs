@@ -52,7 +52,7 @@ namespace Disposio.Views
                 Foreground = Brush("TextBrush"),
                 BorderBrush = Brush("BorderBrush"),
                 BorderThickness = new Thickness(1),
-                CornerRadius = new CornerRadius(10),
+                CornerRadius = new CornerRadius(4),
                 MinHeight = 44,
                 Padding = new Thickness(12, 9, 12, 9),
                 FontSize = 16,
@@ -107,7 +107,7 @@ namespace Disposio.Views
                 Background = Brush("SurfaceBrush"),
                 BorderBrush = Brush("BorderBrush"),
                 BorderThickness = new Thickness(1),
-                CornerRadius = new CornerRadius(18),
+                CornerRadius = new CornerRadius(4),
                 Padding = new Thickness(26, 24, 26, 24),
                 Child = karte
             });
@@ -206,7 +206,7 @@ namespace Disposio.Views
                 table.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(breite, GridUnitType.Star) });
 
             // Kopfzeile mit hinterlegter Fläche wie in K01.
-            var header = new Border { Background = Brush("InputBrush"), CornerRadius = new CornerRadius(8) };
+            var header = new Border { Background = Brush("InputBrush"), CornerRadius = new CornerRadius(4) };
             Grid.SetColumnSpan(header, spalten.Count);
             table.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
             table.Children.Add(header);
@@ -289,7 +289,7 @@ namespace Disposio.Views
                 HorizontalAlignment = HorizontalAlignment.Stretch,
                 MinHeight = 44,
                 FontSize = 16,
-                CornerRadius = new CornerRadius(10)
+                CornerRadius = new CornerRadius(4)
             };
             box.Items.Add(new ComboBoxItem { Content = "Alle", Tag = null });
             box.SelectedIndex = 0;

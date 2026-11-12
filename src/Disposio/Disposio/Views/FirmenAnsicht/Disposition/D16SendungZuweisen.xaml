@@ -129,7 +129,7 @@
                             <DataTemplate x:DataType="local:FahrerZeile">
                                 <!-- Jeder Eintrag als Karte mit Griff links: zeigt, dass man ihn ziehen oder anklicken kann. -->
                                 <Border Background="{StaticResource InputBrush}" BorderBrush="{StaticResource BorderBrush}"
-                                        BorderThickness="1" CornerRadius="12" Padding="10,10,14,10"
+                                        BorderThickness="1" CornerRadius="4" Padding="10,10,14,10"
                                         ToolTipService.ToolTip="Ins Feld „Fahrer“ ziehen oder anklicken">
                                     <Grid ColumnSpacing="12">
                                         <Grid.ColumnDefinitions>
@@ -176,7 +176,7 @@
                             <DataTemplate x:DataType="local:FahrzeugAuswahlZeile">
                                 <!-- Jeder Eintrag als Karte mit Griff links: zeigt, dass man ihn ziehen oder anklicken kann. -->
                                 <Border Background="{StaticResource InputBrush}" BorderBrush="{StaticResource BorderBrush}"
-                                        BorderThickness="1" CornerRadius="12" Padding="10,10,14,10"
+                                        BorderThickness="1" CornerRadius="4" Padding="10,10,14,10"
                                         ToolTipService.ToolTip="Ins Feld „Fahrzeug“ ziehen oder anklicken">
                                     <Grid ColumnSpacing="12">
                                         <Grid.ColumnDefinitions>
