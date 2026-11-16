@@ -10,7 +10,9 @@
     FontFamily="Segoe UI"
     FontSize="16">
 
-    <!-- Farben und Stile kommen aus Themes/FirmenStil.xaml (in App.xaml eingebunden). -->
+    <!-- Aufbau wie in den Entwürfen im Stil der Fahrer-App: oben eine Leiste mit Logo, Firma und Konto,
+         links eine schmale Navigationsleiste mit Symbolen (wie die NavigationBar der Fahrer-App, nur senkrecht),
+         rechts die gewählte Ansicht. Farben und Stile kommen aus Themes/FirmenStil.xaml. -->
 
     <Grid Background="{StaticResource BackgroundBrush}">
         <VisualStateManager.VisualStateGroups>
@@ -20,108 +22,144 @@
                         <AdaptiveTrigger MinWindowWidth="0" />
                     </VisualState.StateTriggers>
                     <VisualState.Setters>
-                        <!-- Das Menü bleibt auch in kleinen Fenstern sichtbar, nur schmaler. -->
-                        <Setter Target="SidebarColumn.Width" Value="220" />
-                        <Setter Target="Sidebar.Padding" Value="16,20" />
-                        <Setter Target="MainContent.Padding" Value="20,24" />
-                        <Setter Target="PageTitle.FontSize" Value="30" />
+                        <Setter Target="MainContent.Padding" Value="20,20" />
+                        <Setter Target="PageTitle.FontSize" Value="24" />
+                        <Setter Target="CompanyPanel.Visibility" Value="Collapsed" />
+                        <Setter Target="AccountPanel.Visibility" Value="Collapsed" />
                     </VisualState.Setters>
                 </VisualState>
                 <VisualState x:Name="Desktop">
                     <VisualState.StateTriggers>
                         <AdaptiveTrigger MinWindowWidth="1050" />
                     </VisualState.StateTriggers>
-                    <VisualState.Setters>
-                        <Setter Target="SidebarColumn.Width" Value="270" />
-                    </VisualState.Setters>
-                </VisualState>
-                <VisualState x:Name="WideDesktop">
-                    <VisualState.StateTriggers>
-                        <AdaptiveTrigger MinWindowWidth="1450" />
-                    </VisualState.StateTriggers>
-                    <VisualState.Setters>
-                        <Setter Target="SidebarColumn.Width" Value="320" />
-                    </VisualState.Setters>
                 </VisualState>
             </VisualStateGroup>
         </VisualStateManager.VisualStateGroups>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="60" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
         <Grid.ColumnDefinitions>
-            <ColumnDefinition x:Name="SidebarColumn" Width="270" />
+            <ColumnDefinition x:Name="RailColumn" Width="140" />
             <ColumnDefinition Width="*" />
         </Grid.ColumnDefinitions>
 
-        <Border x:Name="Sidebar" Background="{StaticResource SidebarBrush}" Padding="24,24">
-            <Grid RowSpacing="18">
-                <Grid.RowDefinitions>
-                    <RowDefinition Height="Auto" />
-                    <RowDefinition Height="Auto" />
-                    <RowDefinition Height="*" />
-                    <RowDefinition Height="Auto" />
-                </Grid.RowDefinitions>
-                <StackPanel Spacing="8">
-                    <TextBlock Text="DISPOSIO" FontSize="28" FontWeight="ExtraBold"
-                               CharacterSpacing="60" Foreground="{StaticResource AccentBrush}" />
-                    <TextBlock Text="FIRMENBEREICH" FontSize="12" CharacterSpacing="260"
+        <!-- Obere Leiste: Logo, Firma, rechts Konto mit Kürzel und Abmelden -->
+        <Border Grid.ColumnSpan="2" Background="{StaticResource SurfaceBrush}"
+                BorderBrush="{StaticResource BorderBrush}" BorderThickness="0,0,0,1" Padding="24,0">
+            <Grid ColumnSpacing="20">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <TextBlock Text="DISPOSIO" FontSize="18" FontWeight="Bold" CharacterSpacing="80"
+                           VerticalAlignment="Center" Foreground="{StaticResource AccentBrush}" />
+
+                <StackPanel x:Name="CompanyPanel" Grid.Column="1" VerticalAlignment="Center" Spacing="0"
+                            BorderBrush="{StaticResource BorderBrush}" BorderThickness="1,0,0,0" Padding="20,0,0,0">
+                    <TextBlock x:Name="CompanyNameText" FontSize="14" FontWeight="SemiBold"
+                               TextTrimming="CharacterEllipsis" Foreground="{StaticResource TextBrush}" />
+                    <TextBlock x:Name="CompanyDetailText" FontSize="12" TextTrimming="CharacterEllipsis"
                                Foreground="{StaticResource MutedTextBrush}" />
                 </StackPanel>
 
-                <Border Grid.Row="1" Background="{StaticResource BackgroundBrush}"
-                        BorderBrush="{StaticResource BorderBrush}" BorderThickness="1"
-                        CornerRadius="12" Padding="14,10">
-                    <StackPanel Spacing="2">
-                        <TextBlock x:Name="CompanyNameText" FontSize="17" FontWeight="SemiBold"
-                                   TextWrapping="Wrap" Foreground="{StaticResource TextBrush}" />
-                        <TextBlock x:Name="CompanyDetailText" FontSize="13" TextWrapping="Wrap"
+                <!-- Konto: Name und Rollen in einer grauen Statuszeile wie in der Fahrer-App -->
+                <Border x:Name="AccountPanel" Grid.Column="3" Style="{StaticResource StatusZeile}"
+                        Padding="12,6" VerticalAlignment="Center" MaxWidth="420">
+                    <StackPanel Spacing="0">
+                        <TextBlock x:Name="AccountNameText" FontSize="13" FontWeight="SemiBold"
+                                   TextTrimming="CharacterEllipsis" Foreground="{StaticResource TextBrush}" />
+                        <TextBlock x:Name="AccountRoleText" FontSize="12" TextTrimming="CharacterEllipsis"
                                    Foreground="{StaticResource MutedTextBrush}" />
                     </StackPanel>
                 </Border>
 
-                <!-- Das Menü wird je nach Rollen des Kontos im Code aufgebaut. -->
-                <ScrollViewer Grid.Row="2" VerticalScrollBarVisibility="Auto" Margin="-4,0">
-                    <StackPanel x:Name="MenuPanel" Spacing="2" Padding="4,0"
-                                AutomationProperties.Name="Hauptmenü" />
-                </ScrollViewer>
-
-                <StackPanel Grid.Row="3" Spacing="6">
-                    <TextBlock x:Name="AccountNameText" FontSize="14" TextWrapping="Wrap"
-                               Foreground="{StaticResource TextBrush}" />
-                    <TextBlock x:Name="AccountRoleText" FontSize="14" TextWrapping="Wrap"
-                               Foreground="{StaticResource MutedTextBrush}" />
+                <StackPanel Grid.Column="4" Orientation="Horizontal" Spacing="14" VerticalAlignment="Center">
                     <!-- Nur beim Admin-Zugang sichtbar: zurück in die Kundenverwaltung. -->
-                    <HyperlinkButton x:Name="BackToDashboardLink" Content="Zurück zum Admin-Dashboard"
-                                     Click="BackToDashboard_Click" Padding="0" HorizontalAlignment="Left"
+                    <HyperlinkButton x:Name="BackToDashboardLink" Content="Admin-Dashboard"
+                                     Click="BackToDashboard_Click" Padding="0" VerticalAlignment="Center"
                                      Visibility="Collapsed" Foreground="{StaticResource AccentBrush}" FontSize="14" />
-                    <HyperlinkButton Content="Abmelden" Click="Logout_Click" Padding="0" HorizontalAlignment="Left"
+                    <!-- Farbe der App: runder Punkt, Klick öffnet die Farbauswahl. Die Wahl wird gespeichert. -->
+                    <Button x:Name="FarbButton" Style="{StaticResource DashboardButton}" Width="40" Height="40"
+                            MinHeight="0" Padding="0" ToolTipService.ToolTip="Farbe der App wählen"
+                            AutomationProperties.Name="Farbe der App wählen">
+                        <Ellipse Width="16" Height="16" Fill="{StaticResource AccentBrush}" />
+                        <Button.Flyout>
+                            <Flyout x:Name="FarbFlyout" Placement="BottomEdgeAlignedRight">
+                                <StackPanel Spacing="10">
+                                    <TextBlock Text="Farbe der App" FontSize="13" FontWeight="SemiBold" />
+                                    <StackPanel x:Name="FarbAuswahl" Orientation="Horizontal" Spacing="6" />
+                                </StackPanel>
+                            </Flyout>
+                        </Button.Flyout>
+                    </Button>
+                    <!-- Hell / Dunkel jederzeit umschalten. Die Wahl wird gespeichert. -->
+                    <Button x:Name="ModusButton" Style="{StaticResource DashboardButton}" Width="40" Height="40"
+                            MinHeight="0" Padding="0" Click="Modus_Click">
+                        <FontIcon x:Name="ModusSymbol" Glyph="&#xE708;" FontSize="16" />
+                    </Button>
+                    <HyperlinkButton Content="Abmelden" Click="Logout_Click" Padding="0" VerticalAlignment="Center"
                                      Foreground="{StaticResource MutedTextBrush}" FontSize="14" />
+                    <Border Width="36" Height="36" CornerRadius="18" Background="{StaticResource AccentBrush}">
+                        <TextBlock x:Name="AvatarText" FontSize="13" FontWeight="SemiBold" HorizontalAlignment="Center"
+                                   VerticalAlignment="Center" Foreground="{StaticResource AccentTextBrush}" />
+                    </Border>
                 </StackPanel>
             </Grid>
         </Border>
 
-        <ScrollViewer x:Name="ContentScroll" Grid.Column="1" HorizontalScrollBarVisibility="Disabled"
+        <!-- Schmale Navigationsleiste. Die Menüpunkte (Symbol + Name) baut der Code je nach Rollen auf. -->
+        <Border Grid.Row="1" Background="{StaticResource SurfaceBrush}"
+                BorderBrush="{StaticResource BorderBrush}" BorderThickness="0,0,1,0">
+            <Grid Padding="6,10,6,0">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="*" />
+                </Grid.RowDefinitions>
+                <StackPanel>
+                    <!-- Reißzwecke: angeheftet = breit mit Namen, gelöst = schmal nur mit Symbolen. -->
+                    <Button x:Name="PinButton" Click="Pin_Click" HorizontalAlignment="Center" Width="40" Height="36"
+                            MinHeight="0" Padding="0" Background="Transparent" BorderThickness="0"
+                            Style="{StaticResource DashboardButton}">
+                        <FontIcon x:Name="PinSymbol" Glyph="&#xE718;" FontSize="16" Foreground="{StaticResource MutedTextBrush}" />
+                    </Button>
+                    <Border Height="1" Margin="0,8,0,8" Background="{StaticResource BorderBrush}" />
+                </StackPanel>
+                <!-- Scrollbalken ausgeblendet; Scrollen mit Mausrad oder Touchpad geht weiterhin. -->
+                <ScrollViewer x:Name="RailScroll" Grid.Row="1" VerticalScrollBarVisibility="Hidden">
+                    <StackPanel x:Name="MenuPanel" Spacing="4" Padding="0,0,0,14"
+                                AutomationProperties.Name="Hauptmenü" />
+                </ScrollViewer>
+            </Grid>
+        </Border>
+
+        <ScrollViewer x:Name="ContentScroll" Grid.Row="1" Grid.Column="1" HorizontalScrollBarVisibility="Disabled"
                       VerticalScrollBarVisibility="Auto">
-            <StackPanel x:Name="MainContent" Padding="36,24,36,30" Spacing="10">
+            <StackPanel x:Name="MainContent" Padding="28,22,28,28" Spacing="6">
                 <!-- Hinweis beim Admin-Zugang: Man sieht eine fremde Firma, nicht das eigene Konto.
                      Bei gesperrter Firma erklärt er stattdessen den Nur-Statistik-Modus (ohne Knopf). -->
                 <Border x:Name="AdminAccessBanner" Visibility="Collapsed" Margin="0,0,0,14"
-                        BorderBrush="{StaticResource AccentBrush}" BorderThickness="1"
-                        CornerRadius="12" Padding="16,10">
+                        Style="{StaticResource StatusZeile}" Padding="16,10">
                     <Grid ColumnSpacing="16">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="*" />
                             <ColumnDefinition Width="Auto" />
                         </Grid.ColumnDefinitions>
                         <TextBlock x:Name="AdminAccessText" TextWrapping="Wrap" VerticalAlignment="Center"
-                                   FontSize="15" Foreground="{StaticResource TextBrush}" />
+                                   FontSize="14" Foreground="{StaticResource TextBrush}" />
                         <Button x:Name="BannerDashboardButton" Grid.Column="1" Content="Zurück zum Admin-Dashboard"
                                 Style="{StaticResource DashboardButton}" Click="BackToDashboard_Click" />
                     </Grid>
                 </Border>
-                <TextBlock x:Name="CrumbText" FontSize="14" TextWrapping="Wrap"
+                <TextBlock x:Name="CrumbText" FontSize="13" TextWrapping="Wrap"
                            Foreground="{StaticResource MutedTextBrush}" />
-                <TextBlock x:Name="PageTitle" FontSize="38" FontWeight="SemiBold" TextWrapping="Wrap"
+                <TextBlock x:Name="PageTitle" FontSize="28" FontWeight="Bold" TextWrapping="Wrap"
                            Foreground="{StaticResource TextBrush}" />
-                <TextBlock x:Name="PurposeText" FontSize="18" TextWrapping="Wrap"
-                           Foreground="{StaticResource MutedTextBrush}" Margin="0,0,0,18" />
+                <TextBlock x:Name="PurposeText" FontSize="15" TextWrapping="Wrap"
+                           Foreground="{StaticResource MutedTextBrush}" Margin="0,0,0,14" />
                 <Border x:Name="ViewHost" />
             </StackPanel>
         </ScrollViewer>

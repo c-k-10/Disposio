@@ -67,6 +67,12 @@ public sealed record SendungFormularDaten(
     SendungEntwurf? Vorhanden,
     string? Tournummer);
 
+/// <summary>Adressen eines Kunden zur Auswahl in D03. Firmenadresse ist „Straße, PLZ Ort“ aus public.kunde.</summary>
+public sealed record KundenAdressen(string? Firmenadresse, IReadOnlyList<FruehereAdresse> Fruehere);
+
+/// <summary>Eine früher benutzte Adresse und wofür sie zuletzt diente („Abholung“ oder „Zustellung“).</summary>
+public sealed record FruehereAdresse(string Adresse, string Art);
+
 /// <summary>Startwert für D02 nach dem Speichern in D03: Tag der Abholung und eine Erfolgsmeldung.</summary>
 public sealed record SendungGespeichert(DateOnly Tag, string Meldung);
 

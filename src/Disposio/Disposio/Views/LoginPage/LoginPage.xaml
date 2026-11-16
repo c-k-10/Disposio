@@ -11,7 +11,7 @@
             <GradientStop Color="#0B0D12" Offset="0"/>
             <GradientStop Color="#13161A" Offset="1"/>
         </LinearGradientBrush>
-        <SolidColorBrush x:Key="PrimaryBrush" Color="#FF004D" />
+        <SolidColorBrush x:Key="PrimaryBrush" Color="#263749" />
         <SolidColorBrush x:Key="PanelBrush" Color="#26292D" />
         <SolidColorBrush x:Key="PanelDarkBrush" Color="#1B1E23" />
         <SolidColorBrush x:Key="TextMain" Color="#E6E9F0" />
@@ -118,15 +118,16 @@
                                 <ColumnDefinition Width="Auto" />
                             </Grid.ColumnDefinitions>
 
-                            <ComboBox x:Name="ColorCombo" Width="120" SelectionChanged="ColorCombo_SelectionChanged" Grid.Column="0" HorizontalAlignment="Left" Margin="18,0,0,0">
-                                <ComboBoxItem Tag="#FF004D" IsSelected="True">Pink‑Rot</ComboBoxItem>
+                            <ComboBox x:Name="ColorCombo" Width="150" SelectionChanged="ColorCombo_SelectionChanged" Grid.Column="0" HorizontalAlignment="Left" Margin="18,0,0,0">
+                                <ComboBoxItem Tag="#263749" IsSelected="True">Disposio-Blau</ComboBoxItem>
+                                <ComboBoxItem Tag="#FF004D">Pink‑Rot</ComboBoxItem>
                                 <ComboBoxItem Tag="#7B2CBF">Lila</ComboBoxItem>
                                 <ComboBoxItem Tag="#007BFF">Blau</ComboBoxItem>
                                 <ComboBoxItem Tag="#00C853">Grün</ComboBoxItem>
                                 <ComboBoxItem Tag="#FF9100">Orange</ComboBoxItem>
                             </ComboBox>
 
-                            <ToggleSwitch x:Name="ModeSwitch" Toggled="ModeSwitch_Toggled" OffContent="Dark Mode" OnContent="Light Mode" Grid.Column="1" HorizontalAlignment="Right" Margin="0,0,0,0"/>
+                            <ToggleSwitch x:Name="ModeSwitch" IsOn="True" Toggled="ModeSwitch_Toggled" OffContent="Dark Mode" OnContent="Light Mode" Grid.Column="1" HorizontalAlignment="Right" Margin="0,0,0,0"/>
                         </Grid>
 
                         <Grid HorizontalAlignment="Center" VerticalAlignment="Center">

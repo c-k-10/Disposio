@@ -152,7 +152,23 @@ public sealed class TourRepository
                 """, firma, cancellationToken);
         string vorschlag = "T-" + Required(nummer[0], 0);
 
-        return new TourPlanungsdaten(abteilungen, fahrer, fahrzeuge, sendungen, vorschlag);
+        // Adresse der eigenen Firma („Straße, PLZ Ort“) als Vorschlag für Start- und Zielort in D05.
+        string? firmenadresse = null;
+        try
+        {
+            var adresse = await _client.Value.QueryAsync("""
+                    SELECT NULLIF(concat_ws(', ', NULLIF(btrim(adresse), ''),
+                           NULLIF(btrim(concat_ws(' ', NULLIF(btrim(plz), ''), NULLIF(btrim(ort), ''))), '')), '')
+                    FROM public.unternehmen WHERE unternehmen_id = $1::bigint
+                    """, firma, cancellationToken);
+            firmenadresse = adresse.Count == 1 ? adresse[0][0] : null;
+        }
+        catch (NeonSqlException)
+        {
+            // Nur ein Vorschlag: Ohne Firmenadresse bleiben Start- und Zielort einfach leer.
+        }
+
+        return new TourPlanungsdaten(abteilungen, fahrer, fahrzeuge, sendungen, vorschlag) { Firmenadresse = firmenadresse };
     }
 
     /// <summary>

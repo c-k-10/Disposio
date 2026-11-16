@@ -31,13 +31,20 @@ namespace Disposio.Views
         // Felder, die beim letzten Speichern rot markiert wurden.
         private readonly HashSet<Control> _markiert = new();
 
-        // Die fünf Abschnitte links: Karte im Formular, Knopf in der Liste und die Felder, die dazugehören.
-        private sealed record Abschnitt(Border Karte, Button Knopf, Rectangle Balken, Ellipse Punkt, TextBlock Symbol,
-                                        string Nummer, Control[] Felder);
+        // Die vier Schritte des Assistenten: Karten im Formular, Knopf links und die Felder, die dazugehören.
+        private sealed record Schritt(string Titel, string Hinweis, Border[] Karten, Button Knopf, Rectangle Balken,
+                                      Ellipse Punkt, TextBlock Symbol, string Nummer, Control[] Felder);
 
         private readonly SolidColorBrush _gruen = new(Microsoft.UI.ColorHelper.FromArgb(255, 0x2E, 0xA6, 0x6A));
-        private Abschnitt[] _abschnitte = Array.Empty<Abschnitt>();
-        private ScrollViewer? _scroll;
+        private Schritt[] _schritte = Array.Empty<Schritt>();
+        private int _aktuell;
+
+        // Adressen des gewählten Kunden für „Frühere ▾“. Die automatisch eingetragene Firmenadresse wird gemerkt,
+        // damit ein Kundenwechsel sie ersetzen darf – eine selbst getippte Adresse aber nie überschrieben wird.
+        private KundenAdressen? _adressen;
+        private string? _autoAbholadresse;
+        private CancellationTokenSource? _adressenLaden;
+        private bool _gesperrt;
 
         public D03SendungFormular(FirmenAnsichtKontext kontext)
         {
@@ -63,20 +70,18 @@ namespace Disposio.Views
             BreiteBox.TextChanged += (_, _) => LademeterAnzeigen();
             LademeterAnzeigen();
             TemperaturHinweisAnzeigen();
-            AbschnitteAnlegen();
+            SchritteAnlegen();
             MarkierungZuruecksetzenBeiEingabe();
-            AbschnitteAktualisieren();
+            SchrittZeigen(0);
 
-            Loaded += async (_, _) =>
-            {
-                ScrollAnmelden();
-                await LadenAsync();
-            };
+            Loaded += async (_, _) => await LadenAsync();
             Unloaded += (_, _) =>
             {
                 _abbruch?.Cancel();
-                ScrollAbmelden();
+                _adressenLaden?.Cancel();
             };
+            AbholadresseBox.TextChanged += (_, _) => AdressHinweiseAktualisieren();
+            LieferadresseBox.TextChanged += (_, _) => AdressHinweiseAktualisieren();
         }
 
         // ---- Laden ----
@@ -112,6 +117,7 @@ namespace Disposio.Views
                     if (daten.Tournummer is { } tour)
                     {
                         // Verplante Sendungen nur anzeigen: Ihre Stopps hängen schon an der Tour.
+                        _gesperrt = true;
                         Sperren(FormularBereich);
                         LadeFertig($"Diese Sendung ist in Tour {tour} verplant und kann hier nicht mehr geändert werden.");
                         return;
@@ -123,7 +129,7 @@ namespace Disposio.Views
                 }
 
                 SpeichernButton.IsEnabled = true;
-                AbschnitteAktualisieren();
+                SchritteAktualisieren();
                 LadeFertig("");
             }
             catch (OperationCanceledException) when (abbruch.IsCancellationRequested)
@@ -212,6 +218,118 @@ namespace Disposio.Views
         {
             bool neu = (KundeBox.SelectedItem as ComboBoxItem)?.Tag as string == NeuerKundeTag;
             NeuerKundeBereich.Visibility = neu ? Visibility.Visible : Visibility.Collapsed;
+            _ = AdressenLadenAsync((KundeBox.SelectedItem as ComboBoxItem)?.Tag as long?);
+        }
+
+        // ---- Adressen des Kunden (Schritt 2) ----
+
+        // Lädt Firmenadresse und frühere Adressen des Kunden. Die Abholadresse wird mit der Firmenadresse
+        // vorbelegt, wenn sie leer ist oder noch die automatisch eingetragene eines anderen Kunden enthält.
+        private async Task AdressenLadenAsync(long? kundeId)
+        {
+            _adressenLaden?.Cancel();
+            _adressen = null;
+            AdressKnoepfeAktualisieren();
+
+            if (kundeId is not long id || _kontext.IstVorschau)
+            {
+                // Neuer Kunde oder keine Auswahl: eine automatisch eingetragene Adresse wieder entfernen.
+                if (_autoAbholadresse is not null && AbholadresseBox.Text == _autoAbholadresse)
+                    AbholadresseBox.Text = "";
+                _autoAbholadresse = null;
+                AdressHinweiseAktualisieren();
+                return;
+            }
+
+            var abbruch = new CancellationTokenSource();
+            _adressenLaden = abbruch;
+            try
+            {
+                KundenAdressen adressen = await _repository.AdressenLadenAsync(id, abbruch.Token);
+                if (abbruch.IsCancellationRequested)
+                    return;
+                _adressen = adressen;
+                AdressKnoepfeAktualisieren();
+
+                if (!_gesperrt && adressen.Firmenadresse is { } firma &&
+                    (string.IsNullOrWhiteSpace(AbholadresseBox.Text) || AbholadresseBox.Text == _autoAbholadresse))
+                {
+                    _autoAbholadresse = firma;
+                    AbholadresseBox.Text = firma;
+                }
+                AdressHinweiseAktualisieren();
+            }
+            catch (OperationCanceledException)
+            {
+            }
+            catch (UnauthorizedAccessException)
+            {
+                _kontext.ZugriffBeenden();
+            }
+            catch (Exception)
+            {
+                // Die Vorschläge sind nur eine Hilfe. Ohne sie tippt man die Adresse wie bisher.
+            }
+            finally
+            {
+                if (ReferenceEquals(_adressenLaden, abbruch))
+                    _adressenLaden = null;
+                abbruch.Dispose();
+            }
+        }
+
+        private void AdressKnoepfeAktualisieren()
+        {
+            bool vorhanden = !_gesperrt && _adressen is { } a && (a.Firmenadresse is not null || a.Fruehere.Count > 0);
+            AbholAdressenButton.IsEnabled = LieferAdressenButton.IsEnabled = vorhanden;
+        }
+
+        private void AdressHinweiseAktualisieren()
+        {
+            if (AbholAdresseHinweis is null || LieferAdresseHinweis is null)
+                return;
+            bool auto = _autoAbholadresse is not null && AbholadresseBox.Text == _autoAbholadresse;
+            AbholAdresseHinweis.Text = "Firmenadresse des Kunden eingetragen – bei Bedarf einfach ändern.";
+            AbholAdresseHinweis.Visibility = auto ? Visibility.Visible : Visibility.Collapsed;
+
+            bool tipp = !_gesperrt && string.IsNullOrWhiteSpace(LieferadresseBox.Text) && _adressen is { } a &&
+                        (a.Fruehere.Count > 0 || a.Firmenadresse is not null);
+            LieferAdresseHinweis.Text = "Bekannte Adressen dieses Kunden finden Sie unter „Frühere ▾“.";
+            LieferAdresseHinweis.Visibility = tipp ? Visibility.Visible : Visibility.Collapsed;
+        }
+
+        // Menü mit Firmenadresse und früheren Adressen. Ein Klick trägt die Adresse ins Feld ein (danach frei änderbar).
+        private void Adressauswahl_Click(object sender, RoutedEventArgs e)
+        {
+            if (sender is not Button knopf || _adressen is not { } adressen)
+                return;
+            TextBox ziel = ReferenceEquals(knopf, AbholAdressenButton) ? AbholadresseBox : LieferadresseBox;
+
+            var menue = new MenuFlyout();
+            void Eintrag(string text, string adresse)
+            {
+                var item = new MenuFlyoutItem { Text = text };
+                item.Click += (_, _) =>
+                {
+                    // Bewusst gewählt: gilt nicht mehr als automatisch eingetragen.
+                    if (ReferenceEquals(ziel, AbholadresseBox))
+                        _autoAbholadresse = null;
+                    ziel.Text = adresse;
+                    ziel.SelectionStart = ziel.Text.Length;
+                };
+                menue.Items.Add(item);
+            }
+
+            if (adressen.Firmenadresse is { } firma)
+                Eintrag($"Firmenadresse: {firma}", firma);
+            if (adressen.Fruehere.Count > 0)
+            {
+                if (menue.Items.Count > 0)
+                    menue.Items.Add(new MenuFlyoutSeparator());
+                foreach (FruehereAdresse f in adressen.Fruehere)
+                    Eintrag($"{f.Adresse}   ·   zuletzt {f.Art}", f.Adresse);
+            }
+            menue.ShowAt(knopf);
         }
 
         private void GutartBox_SelectionChanged(object sender, SelectionChangedEventArgs e) => TemperaturHinweisAnzeigen();
@@ -517,14 +635,21 @@ namespace Disposio.Views
                 _markiert.Add(feld);
             }
 
-            AbschnitteAktualisieren();
+            // Liegt das erste fehlerhafte Feld in einem anderen Schritt, dorthin wechseln.
+            int schritt = SchrittVon(fehler[0].Feld);
+            if (schritt >= 0 && schritt != _aktuell)
+                SchrittZeigen(schritt);
+            SchritteAktualisieren();
             FehlerAnzeigen(fehler.Count == 1
                 ? fehler[0].Meldung
                 : $"Bitte die {fehler.Count} rot markierten Felder prüfen:\n" +
                   string.Join("\n", fehler.Select(f => "• " + f.Meldung).Distinct()));
 
             // Nur hinscrollen, nicht fokussieren: Ein fokussiertes Feld zeigt sonst den Fokusrahmen statt Rot.
-            fehler[0].Feld.StartBringIntoView(new BringIntoViewOptions { VerticalAlignmentRatio = 0.3 });
+            // Erst nach dem Neuaufbau, falls gerade der Schritt gewechselt wurde.
+            Control erstes = fehler[0].Feld;
+            DispatcherQueue.TryEnqueue(() =>
+                erstes.StartBringIntoView(new BringIntoViewOptions { VerticalAlignmentRatio = 0.3 }));
         }
 
         private void MarkierungEntfernen(Control feld)
@@ -555,168 +680,288 @@ namespace Disposio.Views
                          AbholVonBox, AbholBisBox, LieferVonBox, LieferBisBox, AnsprechpartnerBox, AnzahlBox, GewichtBox,
                          LaengeBox, BreiteBox, HoeheBox, WarenwertBox, TempMinBox, TempMaxBox
                      })
-                box.TextChanged += (_, _) => { MarkierungEntfernen(box); AbschnitteAktualisieren(); };
+                box.TextChanged += (_, _) => { MarkierungEntfernen(box); SchritteAktualisieren(); };
 
             foreach (ComboBox box in new[] { PrioritaetBox, KundeBox, EquipmentBox, GutartBox, VerpackungBox })
-                box.SelectionChanged += (_, _) => { MarkierungEntfernen(box); AbschnitteAktualisieren(); };
+                box.SelectionChanged += (_, _) => { MarkierungEntfernen(box); SchritteAktualisieren(); };
 
             AbholdatumBox.DateChanged += (_, _) =>
             {
                 MarkierungEntfernen(AbholdatumBox);
                 MarkierungEntfernen(LieferdatumBox);
-                AbschnitteAktualisieren();
+                SchritteAktualisieren();
             };
-            LieferdatumBox.DateChanged += (_, _) => { MarkierungEntfernen(LieferdatumBox); AbschnitteAktualisieren(); };
+            LieferdatumBox.DateChanged += (_, _) => { MarkierungEntfernen(LieferdatumBox); SchritteAktualisieren(); };
             // Mit der Gutart ändert sich, ob die Temperaturen Pflicht sind.
             GutartBox.SelectionChanged += (_, _) => { MarkierungEntfernen(TempMinBox); MarkierungEntfernen(TempMaxBox); };
         }
 
-        // ---- Abschnitte links (Navigation und Fortschritt) ----
+        // ---- Assistent: Schritte ----
 
-        private void AbschnitteAnlegen()
+        private void SchritteAnlegen()
         {
-            _abschnitte = new[]
+            _schritte = new[]
             {
-                new Abschnitt(AuftragKarte, NavAuftrag, NavAuftragBalken, NavAuftragPunkt, NavAuftragSymbol, "1",
-                    new Control[] { AuftragsnummerBox, KundenreferenzBox, PrioritaetBox }),
-                new Abschnitt(KundeKarte, NavKunde, NavKundeBalken, NavKundePunkt, NavKundeSymbol, "2",
+                new Schritt("Auftrag & Kunde", "Auftragsnummer, Priorität und für welchen Kunden transportiert wird.",
+                    new[] { AuftragKarte, KundeKarte }, NavSchritt1, NavSchritt1Balken, NavSchritt1Punkt, NavSchritt1Symbol, "1",
                     new Control[]
                     {
-                        KundeBox, KundennummerBox, FirmennameBox, KundeAnsprechpartnerBox, KundeAdresseBox,
-                        KundePlzBox, KundeOrtBox, KundeTelefonBox, KundeEmailBox
+                        AuftragsnummerBox, KundenreferenzBox, PrioritaetBox, KundeBox, KundennummerBox, FirmennameBox,
+                        KundeAnsprechpartnerBox, KundeAdresseBox, KundePlzBox, KundeOrtBox, KundeTelefonBox, KundeEmailBox
                     }),
-                new Abschnitt(OrteKarte, NavOrte, NavOrteBalken, NavOrtePunkt, NavOrteSymbol, "3",
+                new Schritt("Orte & Zeiten", "Wo und wann abgeholt und zugestellt wird – und wer vor Ort Bescheid weiß.",
+                    new[] { OrteKarte, VorOrtKarte }, NavSchritt2, NavSchritt2Balken, NavSchritt2Punkt, NavSchritt2Symbol, "2",
                     new Control[]
                     {
-                        AbholadresseBox, LieferadresseBox, AbholdatumBox, LieferdatumBox,
-                        AbholVonBox, AbholBisBox, LieferVonBox, LieferBisBox
+                        AbholadresseBox, LieferadresseBox, AbholdatumBox, LieferdatumBox, AbholVonBox, AbholBisBox,
+                        LieferVonBox, LieferBisBox, AnsprechpartnerBox, EquipmentBox
                     }),
-                new Abschnitt(VorOrtKarte, NavVorOrt, NavVorOrtBalken, NavVorOrtPunkt, NavVorOrtSymbol, "4",
-                    new Control[] { AnsprechpartnerBox, EquipmentBox }),
-                new Abschnitt(LadegutKarte, NavLadegut, NavLadegutBalken, NavLadegutPunkt, NavLadegutSymbol, "5",
+                new Schritt("Ladegut", "Was transportiert wird: Art, Menge, Maße und besondere Anforderungen.",
+                    new[] { LadegutKarte }, NavSchritt3, NavSchritt3Balken, NavSchritt3Punkt, NavSchritt3Symbol, "3",
                     new Control[]
                     {
                         GutartBox, VerpackungBox, AnzahlBox, GewichtBox, LaengeBox, BreiteBox, HoeheBox,
                         WarenwertBox, TempMinBox, TempMaxBox
-                    })
+                    }),
+                new Schritt("Prüfen & speichern", "Bitte alles noch einmal prüfen. Mit „Ändern“ springen Sie zum passenden Schritt.",
+                    new[] { ZusammenfassungKarte }, NavSchritt4, NavSchritt4Balken, NavSchritt4Punkt, NavSchritt4Symbol, "4",
+                    Array.Empty<Control>())
             };
-            AktivenAbschnittSetzen(_abschnitte[0]);
         }
 
-        // Rot „!“ = ein Feld ist nach dem Speichern rot markiert. Grün „✓“ = alle Pflichtangaben stimmen.
-        // Sonst die Nummer des Abschnitts: Es fehlt noch etwas (wird erst beim Speichern rot).
-        private void AbschnitteAktualisieren()
+        private int SchrittVon(Control feld) => Array.FindIndex(_schritte, s => s.Felder.Contains(feld));
+
+        // Zeigt nur die Karten des Schritts und passt Kopf und Knöpfe an.
+        private void SchrittZeigen(int index)
         {
-            if (_abschnitte.Length == 0)
-                return;
-            var offeneFelder = FelderPruefen().Select(f => f.Feld).ToHashSet();
-            int vollstaendig = 0;
-            foreach (Abschnitt a in _abschnitte)
+            _aktuell = index;
+            Schritt aktuell = _schritte[index];
+            foreach (Schritt schritt in _schritte)
+                foreach (Border karte in schritt.Karten)
+                    karte.Visibility = ReferenceEquals(schritt, aktuell) ? Visibility.Visible : Visibility.Collapsed;
+
+            SchrittZaehler.Text = $"Schritt {index + 1} von {_schritte.Length}";
+            SchrittTitel.Text = aktuell.Titel;
+            SchrittHinweis.Text = aktuell.Hinweis;
+
+            bool letzter = index == _schritte.Length - 1;
+            ZurueckButton.Visibility = index > 0 ? Visibility.Visible : Visibility.Collapsed;
+            WeiterButton.Visibility = letzter ? Visibility.Collapsed : Visibility.Visible;
+            SpeichernButton.Visibility = letzter ? Visibility.Visible : Visibility.Collapsed;
+            if (letzter)
+                ZusammenfassungAufbauen();
+
+            SchritteAktualisieren();
+            DispatcherQueue?.TryEnqueue(() => SchrittKopf.StartBringIntoView(new BringIntoViewOptions { VerticalAlignmentRatio = 0 }));
+        }
+
+        // Fehler eines Schritts (nur dessen Felder). Leer = Schritt vollständig.
+        private List<(Control Feld, string Meldung)> FehlerIm(int index, List<(Control Feld, string Meldung)> alle) =>
+            alle.Where(f => _schritte[index].Felder.Contains(f.Feld)).ToList();
+
+        // Wechselt zu einem späteren Schritt nur, wenn alle Schritte davor vollständig sind.
+        // Sonst geht es zum ersten Schritt mit Fehlern, und dessen Felder werden rot markiert.
+        private void VorwaertsGehen(int ziel)
+        {
+            var alle = FelderPruefen();
+            for (int i = _aktuell; i < ziel; i++)
             {
-                if (a.Felder.Any(_markiert.Contains))
-                    PunktSetzen(a, "!", Ressource("ErrorBrush"), Ressource("ErrorBrush"), Ressource("SurfaceBrush"));
-                else if (!a.Felder.Any(offeneFelder.Contains))
+                var fehler = FehlerIm(i, alle);
+                if (fehler.Count > 0)
                 {
-                    PunktSetzen(a, "✓", _gruen, _gruen, new SolidColorBrush(Microsoft.UI.Colors.White));
-                    vollstaendig++;
+                    AlleMarkierungenEntfernen();
+                    FehlerMarkieren(fehler);
+                    return;
                 }
-                else
-                    PunktSetzen(a, a.Nummer, new SolidColorBrush(Microsoft.UI.Colors.Transparent),
-                        Ressource("BorderBrush"), Ressource("MutedTextBrush"));
             }
-            FortschrittText.Text = vollstaendig == _abschnitte.Length
-                ? "Alle Abschnitte vollständig."
-                : $"{vollstaendig} von {_abschnitte.Length} Abschnitten vollständig";
+            AlleMarkierungenEntfernen();
+            FehlerText.Visibility = Visibility.Collapsed;
+            SchrittZeigen(ziel);
         }
 
-        private static void PunktSetzen(Abschnitt a, string symbol, Brush fuellung, Brush rand, Brush schrift)
+        private void Weiter_Click(object sender, RoutedEventArgs e)
         {
-            a.Symbol.Text = symbol;
-            a.Symbol.Foreground = schrift;
-            a.Punkt.Fill = fuellung;
-            a.Punkt.Stroke = rand;
+            if (_aktuell < _schritte.Length - 1)
+                VorwaertsGehen(_aktuell + 1);
+        }
+
+        private void Zurueck_Click(object sender, RoutedEventArgs e)
+        {
+            if (_aktuell > 0)
+                SchrittZeigen(_aktuell - 1);
+        }
+
+        private void Schritt_Click(object sender, RoutedEventArgs e)
+        {
+            int ziel = Array.FindIndex(_schritte, s => ReferenceEquals(s.Knopf, sender));
+            if (ziel < 0 || ziel == _aktuell)
+                return;
+            if (ziel < _aktuell)
+                SchrittZeigen(ziel);
+            else
+                VorwaertsGehen(ziel);
+        }
+
+        // Punkte links: Akzent = aktueller Schritt, rotes „!“ = rot markiertes Feld, grünes ✓ = vollständig,
+        // sonst die Nummer. „Prüfen“ wird grün, wenn alle drei Eingabeschritte vollständig sind.
+        private void SchritteAktualisieren()
+        {
+            if (_schritte.Length == 0)
+                return;
+            var alle = FelderPruefen();
+            int vollstaendig = 0;
+            for (int i = 0; i < _schritte.Length; i++)
+            {
+                Schritt s = _schritte[i];
+                bool istLetzter = i == _schritte.Length - 1;
+                bool fertig = istLetzter ? vollstaendig == _schritte.Length - 1 : FehlerIm(i, alle).Count == 0;
+                bool aktiv = i == _aktuell;
+
+                s.Balken.Opacity = aktiv ? 1 : 0;
+                s.Knopf.Background = aktiv ? Ressource("InputBrush") : new SolidColorBrush(Microsoft.UI.Colors.Transparent);
+
+                if (s.Felder.Any(_markiert.Contains))
+                    PunktSetzen(s, "!", Ressource("ErrorBrush"), Ressource("ErrorBrush"), Ressource("SurfaceBrush"));
+                else if (fertig && !aktiv)
+                    PunktSetzen(s, "✓", _gruen, _gruen, new SolidColorBrush(Microsoft.UI.Colors.White));
+                else if (aktiv)
+                    PunktSetzen(s, s.Nummer, Ressource("AccentBrush"), Ressource("AccentBrush"), Ressource("AccentTextBrush"));
+                else
+                    PunktSetzen(s, s.Nummer, new SolidColorBrush(Microsoft.UI.Colors.Transparent),
+                        Ressource("BorderBrush"), Ressource("MutedTextBrush"));
+
+                if (fertig && !istLetzter)
+                    vollstaendig++;
+            }
+            FortschrittText.Text = vollstaendig == _schritte.Length - 1
+                ? "Alle Angaben vollständig."
+                : $"{vollstaendig} von {_schritte.Length - 1} Schritten vollständig";
+        }
+
+        private static void PunktSetzen(Schritt s, string symbol, Brush fuellung, Brush rand, Brush schrift)
+        {
+            s.Symbol.Text = symbol;
+            s.Symbol.Foreground = schrift;
+            s.Punkt.Fill = fuellung;
+            s.Punkt.Stroke = rand;
         }
 
         private static Brush Ressource(string schluessel) => (Brush)Application.Current.Resources[schluessel];
 
-        private void Abschnitt_Click(object sender, RoutedEventArgs e)
+        // ---- Schritt 4: Zusammenfassung ----
+
+        private void ZusammenfassungAufbauen()
         {
-            Abschnitt? a = _abschnitte.FirstOrDefault(x => ReferenceEquals(x.Knopf, sender));
-            if (a is null)
-                return;
-            AktivenAbschnittSetzen(a);
-            a.Karte.StartBringIntoView(new BringIntoViewOptions
+            ZusammenfassungListe.Children.Clear();
+
+            object? kundeTag = (KundeBox.SelectedItem as ComboBoxItem)?.Tag;
+            bool neuerKunde = kundeTag as string == NeuerKundeTag;
+            string kunde = neuerKunde
+                ? $"Neuer Kunde: {Wert(FirmennameBox.Text)} ({Wert(KundennummerBox.Text)})"
+                : (KundeBox.SelectedItem as ComboBoxItem)?.Content as string ?? "—";
+
+            var auftrag = new List<(string, string)>
             {
-                VerticalAlignmentRatio = 0,
-                VerticalOffset = -16,
-                AnimationDesired = true
+                ("Auftragsnummer", Wert(AuftragsnummerBox.Text)),
+                ("Kundenreferenz", Wert(KundenreferenzBox.Text)),
+                ("Priorität", PrioritaetBox.SelectedItem as string ?? "—"),
+                ("Kunde", kunde)
+            };
+            if (neuerKunde)
+            {
+                auftrag.Add(("Anschrift", $"{Wert(KundeAdresseBox.Text)}, {KundePlzBox.Text.Trim()} {KundeOrtBox.Text.Trim()}".Trim()));
+                auftrag.Add(("Kontakt", $"{Wert(KundeAnsprechpartnerBox.Text)} · {Wert(KundeTelefonBox.Text)} · {Wert(KundeEmailBox.Text)}"));
+            }
+            Bereich("Auftrag & Kunde", 0, auftrag);
+
+            Bereich("Orte & Zeiten", 1, new List<(string, string)>
+            {
+                ("Abholung", Wert(AbholadresseBox.Text)),
+                ("", $"{DatumText(AbholdatumBox)} · {Wert(AbholVonBox.Text)}–{Wert(AbholBisBox.Text)} Uhr"),
+                ("Zustellung", Wert(LieferadresseBox.Text)),
+                ("", $"{DatumText(LieferdatumBox)} · {Wert(LieferVonBox.Text)}–{Wert(LieferBisBox.Text)} Uhr"),
+                ("Vor Ort", Wert(AnsprechpartnerBox.Text)),
+                ("Equipment", EquipmentBox.SelectedItem as string ?? "—")
+            });
+
+            string gutart = GutartBox.SelectedItem as string ?? "—";
+            var ladegut = new List<(string, string)>
+            {
+                ("Gut", $"{gutart} · {VerpackungBox.SelectedItem as string ?? "—"}"),
+                ("Menge", $"{Wert(AnzahlBox.Text)} × {Wert(LaengeBox.Text)} × {Wert(BreiteBox.Text)} × {Wert(HoeheBox.Text)} m (L × B × H)"),
+                ("Gewicht", $"{Wert(GewichtBox.Text)} kg"),
+                ("Lademeter", LademeterText.Text),
+                ("Warenwert", $"{Wert(WarenwertBox.Text)} €")
+            };
+            if (gutart == SendungWerte.GutartFrische)
+                ladegut.Add(("Temperatur", $"{Wert(TempMinBox.Text)} bis {Wert(TempMaxBox.Text)} °C"));
+            var optionen = new (CheckBox Box, string Name)[]
+            {
+                (StapelbarBox, "Stapelbar"), (DrehbarBox, "Drehbar"), (GefahrgutBox, "Gefahrgut"),
+                (VersicherungBox, "Versicherung"), (LadehilfsmittelBox, "Ladehilfsmitteltausch"),
+                (ZollBox, "Zollrelevant"), (AvisierungBox, "Avisierung erforderlich")
+            }.Where(o => o.Box.IsChecked == true).Select(o => o.Name).ToList();
+            ladegut.Add(("Besonderheiten", optionen.Count == 0 ? "keine" : string.Join(", ", optionen)));
+            Bereich("Ladegut", 2, ladegut);
+        }
+
+        // Ein Bereich der Zusammenfassung: Überschrift mit „Ändern“ und darunter Beschriftung / Wert.
+        private void Bereich(string titel, int schritt, List<(string Label, string Wert)> zeilen)
+        {
+            var inhalt = new StackPanel { Spacing = 6 };
+
+            var kopf = new Grid();
+            kopf.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+            kopf.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+            kopf.Children.Add(new TextBlock
+            {
+                Text = titel,
+                Style = (Style)Application.Current.Resources["NormalText"],
+                FontWeight = Microsoft.UI.Text.FontWeights.SemiBold,
+                VerticalAlignment = VerticalAlignment.Center
+            });
+            var aendern = new Button
+            {
+                Content = "Ändern",
+                Style = (Style)Application.Current.Resources["DashboardButton"],
+                MinHeight = 32,
+                Padding = new Thickness(12, 2, 12, 2)
+            };
+            aendern.Click += (_, _) => SchrittZeigen(schritt);
+            Grid.SetColumn(aendern, 1);
+            kopf.Children.Add(aendern);
+            inhalt.Children.Add(kopf);
+
+            foreach (var (label, wert) in zeilen)
+            {
+                var zeile = new Grid { ColumnSpacing = 16 };
+                zeile.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(150) });
+                zeile.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+                zeile.Children.Add(new TextBlock { Text = label, Style = (Style)Application.Current.Resources["HinweisText"] });
+                var wertText = new TextBlock
+                {
+                    Text = wert,
+                    Style = (Style)Application.Current.Resources["NormalText"],
+                    TextWrapping = TextWrapping.Wrap
+                };
+                Grid.SetColumn(wertText, 1);
+                zeile.Children.Add(wertText);
+                inhalt.Children.Add(zeile);
+            }
+
+            ZusammenfassungListe.Children.Add(new Border
+            {
+                Background = Ressource("InputBrush"),
+                CornerRadius = new CornerRadius(10),
+                Padding = new Thickness(16, 12, 16, 14),
+                Child = inhalt
             });
         }
 
-        private void AktivenAbschnittSetzen(Abschnitt aktiv)
-        {
-            foreach (Abschnitt a in _abschnitte)
-            {
-                bool istAktiv = ReferenceEquals(a, aktiv);
-                a.Balken.Opacity = istAktiv ? 1 : 0;
-                a.Knopf.Background = istAktiv ? Ressource("InputBrush") : new SolidColorBrush(Microsoft.UI.Colors.Transparent);
-            }
-        }
+        private static string Wert(string? text) => string.IsNullOrWhiteSpace(text) ? "—" : text.Trim();
 
-        // Die Seite scrollt im ScrollViewer der FirmenAnsicht. Damit die Abschnittsliste sichtbar bleibt,
-        // wird sie beim Scrollen nach unten mitgeschoben (höchstens bis zum Ende des Formulars).
-        private void ScrollAnmelden()
-        {
-            DependencyObject? element = this;
-            while (element is not null and not ScrollViewer)
-                element = VisualTreeHelper.GetParent(element);
-            _scroll = element as ScrollViewer;
-            if (_scroll is null)
-                return;
-            _scroll.ViewChanged += Scroll_ViewChanged;
-            SizeChanged += Groesse_Changed;
-            NavigationNachziehen();
-        }
-
-        private void ScrollAbmelden()
-        {
-            if (_scroll is not null)
-                _scroll.ViewChanged -= Scroll_ViewChanged;
-            SizeChanged -= Groesse_Changed;
-            _scroll = null;
-        }
-
-        private void Scroll_ViewChanged(object? sender, ScrollViewerViewChangedEventArgs e) => NavigationNachziehen();
-
-        private void Groesse_Changed(object sender, SizeChangedEventArgs e) => NavigationNachziehen();
-
-        private void NavigationNachziehen()
-        {
-            if (_scroll is null || _abschnitte.Length == 0)
-                return;
-            try
-            {
-                // Oberkante des Formulars im sichtbaren Bereich (negativ, wenn schon darüber gescrollt).
-                double oben = FormularRaster.TransformToVisual(_scroll).TransformPoint(new Point(0, 0)).Y;
-                double spielraum = Math.Max(0, FormularRaster.ActualHeight - AbschnittNavigation.ActualHeight);
-                NavVerschiebung.Y = Math.Clamp(16 - oben, 0, spielraum);
-
-                // Aktiv ist der letzte Abschnitt, dessen Karte das obere Drittel erreicht hat.
-                double grenze = _scroll.ViewportHeight * 0.3;
-                Abschnitt aktiv = _abschnitte[0];
-                foreach (Abschnitt a in _abschnitte)
-                    if (a.Karte.TransformToVisual(_scroll).TransformPoint(new Point(0, 0)).Y <= grenze)
-                        aktiv = a;
-                // Ganz unten angekommen: Der letzte Abschnitt erreicht das obere Drittel evtl. nie.
-                if (_scroll.ScrollableHeight > 0 && _scroll.VerticalOffset >= _scroll.ScrollableHeight - 1)
-                    aktiv = _abschnitte[^1];
-                AktivenAbschnittSetzen(aktiv);
-            }
-            catch (ArgumentException)
-            {
-                // Die Ansicht wird gerade aus dem Baum entfernt.
-            }
-        }
+        private static string DatumText(CalendarDatePicker feld) =>
+            feld.Date is DateTimeOffset datum ? datum.ToString("ddd dd.MM.yyyy", Deutsch) : "—";
 
         // ---- Eingaben umwandeln ----
 
