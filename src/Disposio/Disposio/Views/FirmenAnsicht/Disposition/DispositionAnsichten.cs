@@ -21,6 +21,7 @@ namespace Disposio.Views
             "D09" => new D09Nachrichten(kontext),
             "D10" => new D10Kundenkommunikation(kontext),
             "D11" => new D11Frachtdokumente(kontext),
+            "D15" => new D15Meldungen(kontext),
             "D16" => new D16SendungZuweisen(kontext),
             _ => null
         };

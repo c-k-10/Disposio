@@ -42,29 +42,8 @@ namespace Disposio.Views
                 if (punkte.Count == 0)
                     continue;
 
-                MenuPanel.Children.Add(new TextBlock
-                {
-                    Text = rolle.Rolle.ToUpper(CultureInfo.CurrentCulture),
-                    FontSize = 12,
-                    CharacterSpacing = 100,
-                    TextWrapping = TextWrapping.Wrap,
-                    Foreground = Brush("MutedTextBrush"),
-                    Margin = new Thickness(4, MenuPanel.Children.Count == 0 ? 0 : 18, 0, 6)
-                });
-
-                foreach (AnsichtInfo item in punkte)
-                {
-                    var button = new Button { Content = item.Menuename, Style = Stil("MenuButton") };
-                    if (item.Id == activeId)
-                    {
-                        button.Background = Brush("AccentBrush");
-                        button.Foreground = Brush("AccentTextBrush");
-                        button.FontWeight = FontWeights.SemiBold;
-                        button.Loaded += (_, _) => button.StartBringIntoView();
-                    }
-                    button.Click += (_, _) => Open(item.Id);
-                    MenuPanel.Children.Add(button);
-                }
+                // Gleiche Darstellung wie die Standardrollen (schmale Navigationsleiste, FirmenAnsicht.xaml.cs).
+                MenueAbschnitt(rolle.Rolle, punkte, activeId);
             }
         }
 

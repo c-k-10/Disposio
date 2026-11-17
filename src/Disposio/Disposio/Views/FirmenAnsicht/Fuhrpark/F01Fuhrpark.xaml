@@ -96,13 +96,13 @@
                                         <TextBlock Grid.Column="3" Text="{x:Bind Kilometerstand}" Style="{StaticResource NormalText}" VerticalAlignment="Center" />
                                         <TextBlock Grid.Column="4" Text="{x:Bind Kapazitaet}" Style="{StaticResource NormalText}" VerticalAlignment="Center" />
                                         <Border Grid.Column="5" BorderBrush="{StaticResource BorderBrush}" BorderThickness="1"
-                                                CornerRadius="14" Padding="10,3" HorizontalAlignment="Left" VerticalAlignment="Center">
+                                                CornerRadius="4" Padding="10,3" HorizontalAlignment="Left" VerticalAlignment="Center">
                                             <TextBlock Text="{x:Bind Status}" FontSize="13" Foreground="{StaticResource TextBrush}" />
                                         </Border>
                                         <!-- #92 Wartungsstatus: Ampel mit Text, darunter der dringendste offene Termin. -->
                                         <StackPanel Grid.Column="6" Spacing="3" VerticalAlignment="Center">
                                             <Border BorderBrush="{x:Bind WartungFarbe}" BorderThickness="1"
-                                                    CornerRadius="14" Padding="10,3" HorizontalAlignment="Left">
+                                                    CornerRadius="4" Padding="10,3" HorizontalAlignment="Left">
                                                 <StackPanel Orientation="Horizontal" Spacing="6">
                                                     <Ellipse Width="9" Height="9" Fill="{x:Bind WartungFarbe}" VerticalAlignment="Center" />
                                                     <TextBlock Text="{x:Bind WartungStatus}" FontSize="13" Foreground="{StaticResource TextBrush}" />

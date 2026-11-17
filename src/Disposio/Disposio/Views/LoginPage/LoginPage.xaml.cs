@@ -25,11 +25,31 @@ namespace Disposio.Views
     public sealed partial class LoginPage : Page
     {
         private bool _isSigningIn;
+        // Erst nach dem Aufbau speichern: beim Laden der XAML-Datei meldet die Farbliste schon eine Auswahl.
+        private bool _farbeBereit;
 
         public LoginPage()
         {
             this.InitializeComponent();
             UpdateAccountType();
+            // Zuletzt gewählte Darstellung (Standard wie in der Fahrer-App: hell und Disposio-Blau).
+            ModeSwitch.IsOn = DarstellungSpeicher.IstHell;
+            RequestedTheme = ModeSwitch.IsOn ? ElementTheme.Light : ElementTheme.Dark;
+            ApplyTheme(ModeSwitch.IsOn);
+            FarbeAuswaehlen(DarstellungSpeicher.Akzent);
+            _farbeBereit = true;
+        }
+
+        private void FarbeAuswaehlen(string hex)
+        {
+            foreach (ComboBoxItem item in ColorCombo.Items.OfType<ComboBoxItem>())
+            {
+                if (string.Equals(item.Tag as string, hex, StringComparison.OrdinalIgnoreCase))
+                {
+                    ColorCombo.SelectedItem = item;
+                    break;
+                }
+            }
         }
 
         protected override void OnNavigatedTo(NavigationEventArgs e)
@@ -94,6 +114,9 @@ namespace Disposio.Views
                     {
                         sb.Color = color;
                     }
+
+                    if (_farbeBereit)
+                        DarstellungSpeicher.Akzent = hex.ToUpperInvariant();
                 }
                 catch { }
             }
@@ -104,6 +127,7 @@ namespace Disposio.Views
             if (sender is ToggleSwitch ts)
             {
                 bool isLight = ts.IsOn;
+                DarstellungSpeicher.IstHell = isLight;
                 // set control theme
                 this.RequestedTheme = isLight ? ElementTheme.Light : ElementTheme.Dark;
                 // update page resources to match theme (backgrounds, text colors)
@@ -113,6 +137,7 @@ namespace Disposio.Views
 
         private void ApplyTheme(bool isLight)
         {
+            MainWindow.TitelleisteFaerben(isLight);
             try
             {
                 if (this.Resources["PanelDarkBrush"] is SolidColorBrush panelDark)
@@ -231,14 +256,20 @@ namespace Disposio.Views
                     return;
                 }
 
+                // Darstellung wie beim letzten Mal mit diesem Konto (hell/dunkel und Farbe).
+                // Was das Konto noch nicht gespeichert hat, kommt von der Anmeldeseite und wird übernommen.
+                var (kontoHell, kontoAkzent) = await DarstellungSpeicher.KontoLadenAsync(user.Id);
+                bool isLight = kontoHell ?? ModeSwitch.IsOn;
+                string accentHex = kontoAkzent ?? (ColorCombo.SelectedItem as ComboBoxItem)?.Tag as string ?? "#263749";
+
                 try
                 {
                     // Plattformadministratoren öffnen die globale Kundenverwaltung, Firmenkonten
                     // ihre Firmenansicht. Beide Seiten prüfen den Zugriff beim Öffnen erneut.
                     BenutzerSitzung.Starten(user);
-                    var accent = ColorCombo.SelectedItem as ComboBoxItem;
-                    var accentHex = accent?.Tag as string ?? "#FF004D";
-                    var appearance = new DashboardAppearance { AccentHex = accentHex, IsLight = ModeSwitch.IsOn };
+                    DarstellungSpeicher.KontoUebernehmen(isLight, accentHex.ToUpperInvariant(),
+                        hellNeu: kontoHell is null, akzentNeu: kontoAkzent is null);
+                    var appearance = new DashboardAppearance { AccentHex = accentHex.ToUpperInvariant(), IsLight = isLight };
                     Type target = user.IstMegakrasserAdmin ? typeof(DashboardAnsicht) : typeof(FirmenAnsicht);
 
                     if (Frame is not Frame frame || !frame.Navigate(target, appearance))
@@ -269,7 +300,7 @@ namespace Disposio.Views
         private void PasswortVergessen_Click(object sender, RoutedEventArgs e)
             {
                 // Farbe und Light/Dark Mode an die Passwort-vergessen-Seite weitergeben.
-                var accentHex = (ColorCombo.SelectedItem as ComboBoxItem)?.Tag as string ?? "#FF004D";
+                var accentHex = (ColorCombo.SelectedItem as ComboBoxItem)?.Tag as string ?? "#263749";
                 var appearance = new DashboardAppearance { AccentHex = accentHex, IsLight = ModeSwitch.IsOn };
                 Frame.Navigate(typeof(passwortVergessen), appearance);
             }
