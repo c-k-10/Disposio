@@ -78,7 +78,7 @@
                                     <TextBlock Grid.Column="3" Text="{x:Bind OffeneTouren}" Style="{StaticResource NormalText}" VerticalAlignment="Center" />
                                     <Border Grid.Column="4" BorderBrush="{StaticResource BorderBrush}" BorderThickness="1"
                                             CornerRadius="4" Padding="10,3" HorizontalAlignment="Left" VerticalAlignment="Center">
-                                        <TextBlock Text="{x:Bind StatusText}" FontSize="13" Foreground="{StaticResource TextBrush}" />
+                                        <TextBlock Text="{x:Bind AktivText}" FontSize="13" Foreground="{StaticResource TextBrush}" />
                                     </Border>
                                     <StackPanel Grid.Column="5" Orientation="Horizontal" Spacing="8" Width="250" VerticalAlignment="Center">
                                         <Button Content="Umbenennen" Tag="{x:Bind Id}" Click="Umbenennen_Click"
