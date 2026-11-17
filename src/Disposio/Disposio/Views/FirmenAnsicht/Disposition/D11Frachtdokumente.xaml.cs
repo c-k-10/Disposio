@@ -408,6 +408,13 @@ namespace Disposio.Views
             string art = zufall ? (d.Art == "Unterschrift" ? "Unterschrift vorhanden" : d.Art) : d.Art;
             Untertitel = $"{D11Frachtdokumente.Wann(d.HochgeladenAm)} · {art} · {herkunft} · {D11Frachtdokumente.Groesse(d.Bytes)}"
                          + (string.IsNullOrWhiteSpace(d.Bemerkung) ? "" : $"\n„{d.Bemerkung}“");
+            // Ersetzte Version (Verlauf, Migration 018): bleibt sichtbar, ist aber als alt gekennzeichnet.
+            if (d.ErsetztAm is DateTime ersetztAm)
+            {
+                Titel = $"Alte Version: {Titel}";
+                Untertitel += $"\nErsetzt am {D11Frachtdokumente.Wann(ersetztAm)}"
+                              + (string.IsNullOrWhiteSpace(d.ErsetztVon) ? "" : $" von {d.ErsetztVon}");
+            }
             Details = "";
         }
 

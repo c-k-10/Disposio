@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Dokumente einer Sendung anzeigen, hochladen und (eigene) entfernen. Wird in D03 (Schritt „Dokumente“) und in der
+     aufgeklappten Sendung in D02 benutzt. Mit AuftragId wird sofort hochgeladen; ohne (neue Sendung in D03) werden
+     die Dateien nur vorgemerkt und nach dem Speichern der Sendung hochgeladen (VorgemerkteHochladenAsync). -->
+<UserControl
+    x:Class="Disposio.Views.DokumentBereich"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+    <StackPanel x:Name="Wurzel" Spacing="8">
+        <TextBlock x:Name="LadeText" Style="{StaticResource HinweisText}" FontSize="13" TextWrapping="Wrap"
+                   Text="Dokumente werden geladen …" Visibility="Collapsed" />
+
+        <!-- Eine Zeile je Dokument (im Code aufgebaut), getrennt durch feine Linien -->
+        <StackPanel x:Name="Liste" />
+
+        <TextBlock x:Name="LeerText" Style="{StaticResource HinweisText}" FontSize="13" Visibility="Collapsed"
+                   Text="Noch keine Dokumente." />
+
+        <Grid x:Name="HochladenZeile" ColumnSpacing="8">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="*" />
+            </Grid.ColumnDefinitions>
+            <ComboBox x:Name="ArtAuswahl" MinWidth="170" VerticalAlignment="Center"
+                      AutomationProperties.Name="Dokumentart" />
+            <Button x:Name="HochladenKnopf" Grid.Column="1" Style="{StaticResource DashboardButton}"
+                    VerticalAlignment="Center" Click="Hochladen_Click">
+                <StackPanel Orientation="Horizontal" Spacing="8">
+                    <FontIcon Glyph="&#xE898;" FontSize="14" />
+                    <TextBlock x:Name="HochladenText" Text="Datei hochladen …" />
+                </StackPanel>
+            </Button>
+            <TextBlock x:Name="StatusText" Grid.Column="2" Style="{StaticResource HinweisText}" FontSize="13"
+                       TextWrapping="Wrap" VerticalAlignment="Center" />
+        </Grid>
+
+        <TextBlock x:Name="SpeicherText" Style="{StaticResource HinweisText}" FontSize="12" TextWrapping="Wrap" />
+    </StackPanel>
+</UserControl>
