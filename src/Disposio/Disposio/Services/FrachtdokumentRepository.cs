@@ -27,8 +27,9 @@ public sealed class FrachtdokumentRepository
         SELECT a.auftrag_id, a.auftragsnummer, a.kundenreferenz, COALESCE(k.firmenname, ''), a.anzahl, a.verpackungstyp,
                a.gewicht_kg, to_char(a.lieferdatum, 'YYYY-MM-DD'), a.lieferadresse,
                (SELECT count(*) FROM public.dokument d
-                WHERE d.auftrag_id = a.auftrag_id
-                   OR d.nachweis_id IN (SELECT n.nachweis_id FROM public.abliefernachweis n WHERE n.auftrag_id = a.auftrag_id)),
+                WHERE (d.auftrag_id = a.auftrag_id
+                       OR d.nachweis_id IN (SELECT n.nachweis_id FROM public.abliefernachweis n WHERE n.auftrag_id = a.auftrag_id))
+                  AND to_jsonb(d) ->> 'ersetzt_durch_id' IS NULL),
                EXISTS (SELECT 1 FROM public.abliefernachweis n WHERE n.auftrag_id = a.auftrag_id),
                EXISTS (SELECT 1 FROM public.abliefernachweis n WHERE n.auftrag_id = a.auftrag_id
                          AND (NULLIF(btrim(n.ausnahmegrund), '') IS NOT NULL OR n.tatsaechlich_abgelieferte_anzahl < a.anzahl))
@@ -44,20 +45,35 @@ public sealed class FrachtdokumentRepository
         LIMIT 100
         """;
 
-    // Dokumente einer Sendung: direkt zugeordnet (D11) oder über einen Abliefernachweis (Fahrer-App).
-    // Bemerkung über to_jsonb, damit die Abfrage auch vor Migration 014 funktioniert.
+    // Dokumente einer Sendung: direkt zugeordnet (D11/D03/D16) oder über einen Abliefernachweis (Fahrer-App),
+    // inklusive ersetzter Versionen (Verlauf). Bemerkung und Verlaufsspalten über to_jsonb, damit die Abfrage auch
+    // vor den Migrationen 014 und 018 funktioniert.
+    // Spalten: 10 entfernbar (Büro, kein Verlauf), 11 ersetzbar, 12 ersetzt durch, 13 ersetzt am, 14 ersetzt von.
     private const string DokumenteQuery = """
         SELECT d.dokument_id, d.dokumentart, d.dateiname, d.dateireferenz, d.mime_typ, d.dateigroesse_bytes,
                to_char(d.hochgeladen_am AT TIME ZONE 'Europe/Berlin', 'YYYY-MM-DD HH24:MI'),
                COALESCE(b.vorname || ' ' || b.nachname, ''),
                EXISTS (SELECT 1 FROM public.fahrer f WHERE f.benutzer_id = d.benutzer_id),
                to_jsonb(d) ->> 'bemerkung',
-               (d.auftrag_id = a.auftrag_id AND d.nachweis_id IS NULL
-                AND NOT EXISTS (SELECT 1 FROM public.fahrer f WHERE f.benutzer_id = d.benutzer_id))
+               (d.auftrag_id = a.auftrag_id AND d.nachweis_id IS NULL AND v.ersetzt_durch IS NULL
+                AND NOT EXISTS (SELECT 1 FROM public.fahrer f WHERE f.benutzer_id = d.benutzer_id)
+                AND NOT EXISTS (SELECT 1 FROM public.dokument alt
+                                WHERE alt.auftrag_id = a.auftrag_id
+                                  AND (to_jsonb(alt) ->> 'ersetzt_durch_id')::bigint = d.dokument_id)),
+               (d.auftrag_id = a.auftrag_id AND d.nachweis_id IS NULL AND v.ersetzt_durch IS NULL),
+               v.ersetzt_durch,
+               to_char(v.ersetzt_am AT TIME ZONE 'Europe/Berlin', 'YYYY-MM-DD HH24:MI'),
+               COALESCE(e.vorname || ' ' || e.nachname, '')
         FROM public.auftrag a
         JOIN public.dokument d ON d.auftrag_id = a.auftrag_id
              OR d.nachweis_id IN (SELECT n.nachweis_id FROM public.abliefernachweis n WHERE n.auftrag_id = a.auftrag_id)
+        CROSS JOIN LATERAL (
+            SELECT (to_jsonb(d) ->> 'ersetzt_durch_id')::bigint AS ersetzt_durch,
+                   (to_jsonb(d) ->> 'ersetzt_am')::timestamptz AS ersetzt_am,
+                   (to_jsonb(d) ->> 'ersetzt_von_benutzer_id')::bigint AS ersetzt_von
+        ) v
         LEFT JOIN public.benutzer b ON b.benutzer_id = d.benutzer_id
+        LEFT JOIN public.benutzer e ON e.benutzer_id = v.ersetzt_von
         WHERE a.auftrag_id = $2::bigint AND a.unternehmen_id = $1::bigint
         ORDER BY d.hochgeladen_am, d.dokument_id
         """;
@@ -102,7 +118,8 @@ public sealed class FrachtdokumentRepository
         SELECT dokument_id FROM d
         """;
 
-    // Nur im Büro direkt zur Sendung hochgeladene Dokumente (nicht Fahrer-App, nicht Abliefernachweis) dieser Firma.
+    // Nur im Büro direkt zur Sendung hochgeladene Dokumente (nicht Fahrer-App, nicht Abliefernachweis) dieser Firma,
+    // die keinen Verlauf haben: weder selbst ersetzt noch Nachfolger einer ersetzten Version (Migration 018).
     // $1 Firma, $2 Dokument, $3 Konto. Liefert die Adresse, damit die Datei danach bei Cloudinary gelöscht wird.
     private const string EntfernenQuery = """
         WITH d AS (
@@ -111,6 +128,10 @@ public sealed class FrachtdokumentRepository
             WHERE d.dokument_id = $2::bigint AND d.auftrag_id = a.auftrag_id AND a.unternehmen_id = $1::bigint
               AND d.nachweis_id IS NULL
               AND NOT EXISTS (SELECT 1 FROM public.fahrer f WHERE f.benutzer_id = d.benutzer_id)
+              AND to_jsonb(d) ->> 'ersetzt_durch_id' IS NULL
+              AND NOT EXISTS (SELECT 1 FROM public.dokument alt
+                              WHERE alt.auftrag_id = d.auftrag_id
+                                AND (to_jsonb(alt) ->> 'ersetzt_durch_id')::bigint = d.dokument_id)
             RETURNING d.dateireferenz, d.dokumentart, d.dateiname, a.auftragsnummer
         ), protokoll AS (
             INSERT INTO public.aktionsprotokoll (akteur_art, aktion, ergebnis, detail, unternehmen_id, benutzer_id)
@@ -119,6 +140,38 @@ public sealed class FrachtdokumentRepository
             FROM d
         )
         SELECT dateireferenz FROM d
+        """;
+
+    // Neue Version eines Dokuments (braucht Migration 018). Die alte bleibt stehen und zeigt auf die neue.
+    // FOR UPDATE: Ersetzen zwei Personen gleichzeitig, gewinnt die erste; die zweite bekommt keine Zeile.
+    // $1 Firma, $2 altes Dokument, $3 Konto, $4 Dateiname, $5 Adresse, $6 MIME-Typ, $7 Bytes, $8 Bemerkung.
+    private const string ErsetzenQuery = """
+        WITH alt AS (
+            SELECT d.dokument_id, d.dokumentart, d.dateiname, d.auftrag_id, a.auftragsnummer
+            FROM public.dokument d
+            JOIN public.auftrag a ON a.auftrag_id = d.auftrag_id
+            WHERE d.dokument_id = $2::bigint AND a.unternehmen_id = $1::bigint
+              AND d.nachweis_id IS NULL AND d.ersetzt_durch_id IS NULL
+            FOR UPDATE OF d
+        ), neu AS (
+            INSERT INTO public.dokument (dokumentart, dateiname, dateireferenz, mime_typ, dateigroesse_bytes,
+                                        benutzer_id, auftrag_id, bemerkung)
+            SELECT alt.dokumentart, $4, $5, $6, $7::bigint, $3::bigint, alt.auftrag_id, NULLIF($8, '') FROM alt
+            RETURNING dokument_id
+        ), markiert AS (
+            UPDATE public.dokument d
+            SET ersetzt_durch_id = neu.dokument_id, ersetzt_am = now(), ersetzt_von_benutzer_id = $3::bigint
+            FROM alt, neu
+            WHERE d.dokument_id = alt.dokument_id
+            RETURNING d.dokument_id
+        ), protokoll AS (
+            INSERT INTO public.aktionsprotokoll (akteur_art, aktion, ergebnis, detail, unternehmen_id, benutzer_id)
+            SELECT 'Benutzer', 'Dokument ersetzt', 'Gespeichert',
+                   alt.dokumentart || ' „' || alt.dateiname || '“ ersetzt durch „' || $4 || '“ bei Sendung ' || alt.auftragsnummer,
+                   $1::bigint, $3::bigint
+            FROM alt, neu
+        )
+        SELECT neu.dokument_id FROM neu, markiert
         """;
 
     /// <param name="suche">Leer = alle Sendungen des Tages; sonst Suche über alle Tage.</param>
@@ -151,7 +204,10 @@ public sealed class FrachtdokumentRepository
 
         var dokumente = (await dokTask).Select(r => new Frachtdokument(
             Id(r, 0), Req(r, 1), Req(r, 2), Req(r, 3), Req(r, 4), long.Parse(Req(r, 5), CultureInfo.InvariantCulture),
-            Zeit(Req(r, 6)), Req(r, 7), r[8] == "t", r[9], r[10] == "t")).ToList();
+            Zeit(Req(r, 6)), Req(r, 7), r[8] == "t", r[9], r[10] == "t", r[11] == "t",
+            r[12] is { } durch ? long.Parse(durch, CultureInfo.InvariantCulture) : null,
+            r[13] is { } am ? Zeit(am) : null,
+            string.IsNullOrWhiteSpace(r[14]) ? null : r[14])).ToList();
         var nachweise = (await nwTask).Select(r => new Abliefernachweis(
             Id(r, 0), Zeit(Req(r, 1)), Req(r, 2), r[3], Req(r, 4), Zahl(r, 5), Zahl(r, 6), r[7], r[8])).ToList();
         return new SendungDokumente(dokumente, nachweise);
@@ -212,6 +268,53 @@ public sealed class FrachtdokumentRepository
             throw new ArgumentException("Das Dokument gibt es nicht mehr oder es stammt aus der Fahrer-App und kann nicht entfernt werden.");
         if (rows[0][0] is { } adresse)
             await CloudinarySpeicher.LoeschenAsync(adresse, CancellationToken.None);
+    }
+
+    /// <summary>
+    /// Ersetzt ein Dokument durch eine neue Datei (gleiche Dokumentart). Die alte Version bleibt im Verlauf.
+    /// </summary>
+    /// <exception cref="ArgumentException">Datei ungültig oder Dokument schon ersetzt / nicht ersetzbar.</exception>
+    /// <exception cref="InvalidOperationException">Dokumentenspeicher nicht eingerichtet oder Upload fehlgeschlagen.</exception>
+    public async Task ErsetzenAsync(Frachtdokument alt, string dateiname, byte[] inhalt, string? bemerkung = null,
+        CancellationToken cancellationToken = default)
+    {
+        DateiPruefen(alt.Art, inhalt, bemerkung);
+        FirmenZugriff zugriff = await AuthService.FirmenZugriffPruefenAsync(Rolle, cancellationToken);
+        var benutzer = BenutzerSitzung.AktuellerBenutzer
+            ?? throw new UnauthorizedAccessException("Bitte melden Sie sich erneut an.");
+        string mime = MimeTyp(inhalt);
+
+        string ordner = $"disposio/{zugriff.UnternehmenId.ToString(CultureInfo.InvariantCulture)}/{Ordnername(alt.Art)}";
+        string adresse = await CloudinarySpeicher.HochladenAsync(inhalt, mime, ordner, Guid.NewGuid().ToString(), cancellationToken);
+
+        string name = System.IO.Path.GetFileName(dateiname);
+        if (name.Length > 200)
+            name = name[..200];
+        IReadOnlyList<string?[]> rows;
+        try
+        {
+            rows = await _client.Value.QueryAsync(ErsetzenQuery, new string?[]
+            {
+                Text(zugriff.UnternehmenId), Text(alt.Id), Text(benutzer.Id), name, adresse, mime,
+                inhalt.LongLength.ToString(CultureInfo.InvariantCulture), (bemerkung ?? "").Trim()
+            }, cancellationToken);
+        }
+        catch (NeonSqlException fehler) when (fehler.Code == "42703")
+        {
+            // Spalte ersetzt_durch_id fehlt: Migration 018 wurde noch nicht ausgeführt.
+            await CloudinarySpeicher.LoeschenAsync(adresse, CancellationToken.None);
+            throw new ArgumentException("Ersetzen ist noch nicht eingerichtet: Bitte einmal die Datenbank-Migration 018_dokument_verlauf.sql ausführen.");
+        }
+        catch
+        {
+            await CloudinarySpeicher.LoeschenAsync(adresse, CancellationToken.None);
+            throw;
+        }
+        if (rows.Count != 1)
+        {
+            await CloudinarySpeicher.LoeschenAsync(adresse, CancellationToken.None);
+            throw new ArgumentException("Das Dokument wurde inzwischen schon ersetzt oder entfernt. Bitte die Liste neu laden.");
+        }
     }
 
     /// <summary>Prüfungen ohne Datenbank – auch für D03, bevor eine Datei vorgemerkt wird.</summary>
