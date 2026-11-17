@@ -51,7 +51,9 @@ public sealed class FrachtdokumentRepository
                to_char(d.hochgeladen_am AT TIME ZONE 'Europe/Berlin', 'YYYY-MM-DD HH24:MI'),
                COALESCE(b.vorname || ' ' || b.nachname, ''),
                EXISTS (SELECT 1 FROM public.fahrer f WHERE f.benutzer_id = d.benutzer_id),
-               to_jsonb(d) ->> 'bemerkung'
+               to_jsonb(d) ->> 'bemerkung',
+               (d.auftrag_id = a.auftrag_id AND d.nachweis_id IS NULL
+                AND NOT EXISTS (SELECT 1 FROM public.fahrer f WHERE f.benutzer_id = d.benutzer_id))
         FROM public.auftrag a
         JOIN public.dokument d ON d.auftrag_id = a.auftrag_id
              OR d.nachweis_id IN (SELECT n.nachweis_id FROM public.abliefernachweis n WHERE n.auftrag_id = a.auftrag_id)
@@ -100,6 +102,25 @@ public sealed class FrachtdokumentRepository
         SELECT dokument_id FROM d
         """;
 
+    // Nur im Büro direkt zur Sendung hochgeladene Dokumente (nicht Fahrer-App, nicht Abliefernachweis) dieser Firma.
+    // $1 Firma, $2 Dokument, $3 Konto. Liefert die Adresse, damit die Datei danach bei Cloudinary gelöscht wird.
+    private const string EntfernenQuery = """
+        WITH d AS (
+            DELETE FROM public.dokument d
+            USING public.auftrag a
+            WHERE d.dokument_id = $2::bigint AND d.auftrag_id = a.auftrag_id AND a.unternehmen_id = $1::bigint
+              AND d.nachweis_id IS NULL
+              AND NOT EXISTS (SELECT 1 FROM public.fahrer f WHERE f.benutzer_id = d.benutzer_id)
+            RETURNING d.dateireferenz, d.dokumentart, d.dateiname, a.auftragsnummer
+        ), protokoll AS (
+            INSERT INTO public.aktionsprotokoll (akteur_art, aktion, ergebnis, detail, unternehmen_id, benutzer_id)
+            SELECT 'Benutzer', 'Dokument entfernt', 'Gespeichert',
+                   d.dokumentart || ' „' || d.dateiname || '“ von Sendung ' || d.auftragsnummer, $1::bigint, $3::bigint
+            FROM d
+        )
+        SELECT dateireferenz FROM d
+        """;
+
     /// <param name="suche">Leer = alle Sendungen des Tages; sonst Suche über alle Tage.</param>
     /// <param name="tourId">Gesetzt = alle Sendungen dieser Tour (Tag und Suche zählen dann nicht).</param>
     public async Task<IReadOnlyList<DokumentSendung>> SendungenLadenAsync(DateOnly tag, string suche, long? tourId = null,
@@ -130,13 +151,13 @@ public sealed class FrachtdokumentRepository
 
         var dokumente = (await dokTask).Select(r => new Frachtdokument(
             Id(r, 0), Req(r, 1), Req(r, 2), Req(r, 3), Req(r, 4), long.Parse(Req(r, 5), CultureInfo.InvariantCulture),
-            Zeit(Req(r, 6)), Req(r, 7), r[8] == "t", r[9])).ToList();
+            Zeit(Req(r, 6)), Req(r, 7), r[8] == "t", r[9], r[10] == "t")).ToList();
         var nachweise = (await nwTask).Select(r => new Abliefernachweis(
             Id(r, 0), Zeit(Req(r, 1)), Req(r, 2), r[3], Req(r, 4), Zahl(r, 5), Zahl(r, 6), r[7], r[8])).ToList();
         return new SendungDokumente(dokumente, nachweise);
     }
 
-    /// <summary>Prüft, lädt die Datei zu Cloudinary hoch und ordnet sie der Sendung zu.</summary>
+    /// <summary>D11: Sendung über ihre Referenz suchen, Datei hochladen und zuordnen.</summary>
     /// <returns>Die Id der Sendung (für die Anzeige danach).</returns>
     /// <exception cref="ArgumentException">Eingaben ungültig oder Sendung nicht eindeutig.</exception>
     /// <exception cref="InvalidOperationException">Dokumentenspeicher nicht eingerichtet oder Upload fehlgeschlagen.</exception>
@@ -146,36 +167,83 @@ public sealed class FrachtdokumentRepository
         string refText = (referenz ?? "").Trim();
         if (refText.Length == 0)
             throw new ArgumentException("Bitte die Sendungsreferenz eingeben.");
-        if (!DokumentStatus.Arten.Contains(art))
-            throw new ArgumentException("Bitte eine Dokumentart wählen.");
-        if (inhalt.Length == 0)
-            throw new ArgumentException("Bitte eine Datei auswählen.");
-        if (inhalt.Length > MaxBytes)
-            throw new ArgumentException("Die Datei ist größer als 10 MB.");
-        string bem = (bemerkung ?? "").Trim();
-        if (bem.Length > 500)
-            throw new ArgumentException("Die Bemerkung darf höchstens 500 Zeichen haben.");
-
-        // Nur echte PDF-, JPEG- oder PNG-Dateien, egal welche Endung sie haben.
-        string mime = inhalt switch
-        {
-            [0x25, 0x50, 0x44, 0x46, ..] => "application/pdf",
-            [0xFF, 0xD8, 0xFF, ..] => "image/jpeg",
-            [0x89, 0x50, 0x4E, 0x47, ..] => "image/png",
-            _ => throw new ArgumentException("Nur PDF-, JPG- oder PNG-Dateien sind erlaubt.")
-        };
+        DateiPruefen(art, inhalt, bemerkung);
 
         FirmenZugriff zugriff = await AuthService.FirmenZugriffPruefenAsync(Rolle, cancellationToken);
-        var benutzer = BenutzerSitzung.AktuellerBenutzer
-            ?? throw new UnauthorizedAccessException("Bitte melden Sie sich erneut an.");
-        string firma = Text(zugriff.UnternehmenId);
-
-        var treffer = await _client.Value.QueryAsync(ReferenzQuery, new string?[] { firma, refText }, cancellationToken);
+        var treffer = await _client.Value.QueryAsync(ReferenzQuery, new string?[] { Text(zugriff.UnternehmenId), refText },
+            cancellationToken);
         if (treffer.Count == 0)
             throw new ArgumentException($"Keine Sendung mit der Referenz „{refText}“ gefunden.");
         if (treffer.Count > 1)
             throw new ArgumentException($"Die Referenz „{refText}“ passt zu mehreren Sendungen. Bitte die Auftragsnummer (A-…) verwenden.");
         long auftragId = Id(treffer[0], 0);
+
+        await SpeichernAsync(zugriff, auftragId, art, dateiname, inhalt, bemerkung, cancellationToken);
+        return auftragId;
+    }
+
+    /// <summary>D02/D03: Datei hochladen und direkt der Sendung zuordnen (auch wenn sie schon verplant ist).</summary>
+    /// <exception cref="ArgumentException">Eingaben ungültig oder Sendung nicht (mehr) vorhanden.</exception>
+    /// <exception cref="InvalidOperationException">Dokumentenspeicher nicht eingerichtet oder Upload fehlgeschlagen.</exception>
+    public async Task HochladenAsync(long auftragId, string art, string dateiname, byte[] inhalt, string? bemerkung = null,
+        CancellationToken cancellationToken = default)
+    {
+        DateiPruefen(art, inhalt, bemerkung);
+        FirmenZugriff zugriff = await AuthService.FirmenZugriffPruefenAsync(Rolle, cancellationToken);
+        await SpeichernAsync(zugriff, auftragId, art, dateiname, inhalt, bemerkung, cancellationToken);
+    }
+
+    /// <summary>Nur die Dokumente einer Sendung (ohne Abliefernachweise) – für D02 und D03.</summary>
+    public async Task<IReadOnlyList<Frachtdokument>> AuftragDokumenteLadenAsync(long auftragId,
+        CancellationToken cancellationToken = default) => (await DokumenteLadenAsync(auftragId, cancellationToken)).Dokumente;
+
+    /// <summary>Entfernt ein im Büro hochgeladenes Dokument (mit Protokoll) und löscht die Datei bei Cloudinary.</summary>
+    /// <exception cref="ArgumentException">Dokument gibt es nicht mehr oder es darf nicht entfernt werden.</exception>
+    public async Task EntfernenAsync(long dokumentId, CancellationToken cancellationToken = default)
+    {
+        FirmenZugriff zugriff = await AuthService.FirmenZugriffPruefenAsync(Rolle, cancellationToken);
+        var benutzer = BenutzerSitzung.AktuellerBenutzer
+            ?? throw new UnauthorizedAccessException("Bitte melden Sie sich erneut an.");
+        var rows = await _client.Value.QueryAsync(EntfernenQuery, new string?[]
+        {
+            Text(zugriff.UnternehmenId), Text(dokumentId), Text(benutzer.Id)
+        }, cancellationToken);
+        if (rows.Count != 1)
+            throw new ArgumentException("Das Dokument gibt es nicht mehr oder es stammt aus der Fahrer-App und kann nicht entfernt werden.");
+        if (rows[0][0] is { } adresse)
+            await CloudinarySpeicher.LoeschenAsync(adresse, CancellationToken.None);
+    }
+
+    /// <summary>Prüfungen ohne Datenbank – auch für D03, bevor eine Datei vorgemerkt wird.</summary>
+    /// <exception cref="ArgumentException">Mit einem Text für die Anzeige.</exception>
+    public static void DateiPruefen(string art, byte[] inhalt, string? bemerkung = null)
+    {
+        if (!DokumentStatus.Arten.Contains(art))
+            throw new ArgumentException("Bitte eine Dokumentart wählen.");
+        if (inhalt.Length == 0)
+            throw new ArgumentException("Die Datei ist leer.");
+        if (inhalt.Length > MaxBytes)
+            throw new ArgumentException("Die Datei ist größer als 10 MB.");
+        if ((bemerkung ?? "").Trim().Length > 500)
+            throw new ArgumentException("Die Bemerkung darf höchstens 500 Zeichen haben.");
+        _ = MimeTyp(inhalt);
+    }
+
+    // Nur echte PDF-, JPEG- oder PNG-Dateien, egal welche Endung sie haben.
+    private static string MimeTyp(byte[] inhalt) => inhalt switch
+    {
+        [0x25, 0x50, 0x44, 0x46, ..] => "application/pdf",
+        [0xFF, 0xD8, 0xFF, ..] => "image/jpeg",
+        [0x89, 0x50, 0x4E, 0x47, ..] => "image/png",
+        _ => throw new ArgumentException("Nur PDF-, JPG- oder PNG-Dateien sind erlaubt.")
+    };
+
+    private async Task SpeichernAsync(FirmenZugriff zugriff, long auftragId, string art, string dateiname, byte[] inhalt,
+        string? bemerkung, CancellationToken cancellationToken)
+    {
+        var benutzer = BenutzerSitzung.AktuellerBenutzer
+            ?? throw new UnauthorizedAccessException("Bitte melden Sie sich erneut an.");
+        string mime = MimeTyp(inhalt);
 
         // Erst hochladen, dann speichern. Scheitert das Speichern, bleibt höchstens eine unbenutzte Datei bei Cloudinary.
         string ordner = $"disposio/{zugriff.UnternehmenId.ToString(CultureInfo.InvariantCulture)}/{Ordnername(art)}";
@@ -186,12 +254,14 @@ public sealed class FrachtdokumentRepository
             name = name[..200];
         var rows = await _client.Value.QueryAsync(ZuordnenQuery, new string?[]
         {
-            firma, Text(auftragId), Text(benutzer.Id), art, name, adresse, mime,
-            inhalt.LongLength.ToString(CultureInfo.InvariantCulture), bem
+            Text(zugriff.UnternehmenId), Text(auftragId), Text(benutzer.Id), art, name, adresse, mime,
+            inhalt.LongLength.ToString(CultureInfo.InvariantCulture), (bemerkung ?? "").Trim()
         }, cancellationToken);
         if (rows.Count != 1)
+        {
+            await CloudinarySpeicher.LoeschenAsync(adresse, CancellationToken.None);
             throw new ArgumentException("Die Sendung gibt es nicht mehr.");
-        return auftragId;
+        }
     }
 
     // „Frachtbrief (CMR)“ -> „frachtbrief-cmr“ (Ordner bei Cloudinary, wie „lieferschein“ in der Fahrer-App)

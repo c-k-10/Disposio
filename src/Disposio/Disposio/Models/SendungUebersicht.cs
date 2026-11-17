@@ -26,6 +26,17 @@ public sealed record SendungUebersicht(
 {
     public bool IstVerplant => Tournummer is not null;
 
+    /// <summary>Fahrer und Kennzeichen der Tour, in der die Sendung verplant ist (sonst null).</summary>
+    public string? Fahrer { get; init; }
+    public string? Kennzeichen { get; init; }
+
+    /// <summary>Tour der Sendung mit Fahrer-/Fahrzeug-Id. Bearbeitbar = „Geplant“/„Zugewiesen“ und noch nicht losgefahren.</summary>
+    public long? TourId { get; init; }
+    public long? FahrerId { get; init; }
+    public long? FahrzeugId { get; init; }
+    public bool TourBearbeitbar { get; init; }
+    public string? TourStatus { get; init; }
+
     /// <summary>Die Referenz, die der Kunde kennt. Ohne Kundenreferenz die eigene Auftragsnummer.</summary>
     public string Referenz => string.IsNullOrWhiteSpace(Kundenreferenz) ? Auftragsnummer : Kundenreferenz!;
 }

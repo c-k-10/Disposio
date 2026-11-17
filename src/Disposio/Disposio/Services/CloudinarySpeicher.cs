@@ -1,5 +1,6 @@
 using System;
 using System.Globalization;
+using System.Linq;
 using System.Net.Http;
 using System.Net.Http.Headers;
 using System.Security.Cryptography;
@@ -63,6 +64,64 @@ internal static class CloudinarySpeicher
         using var json = JsonDocument.Parse(text);
         return json.RootElement.GetProperty("secure_url").GetString()
                ?? throw new InvalidOperationException("Der Dokumentenspeicher hat keine Adresse geliefert.");
+    }
+
+    /// <summary>
+    /// Löscht eine hochgeladene Datei wieder (beim Entfernen eines Dokuments). Nur Adressen aus diesem Speicher;
+    /// alles andere wird ignoriert. Wirft bei Fehlern nicht – die Zuordnung in der Datenbank ist dann schon weg,
+    /// eine übrig gebliebene Datei bei Cloudinary schadet nicht.
+    /// </summary>
+    public static async Task LoeschenAsync(string url, CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            var zugang = Lesen();
+            if (zugang is null)
+                return;
+            var (schluessel, geheimnis, cloud) = zugang.Value;
+            string? publicId = PublicIdVon(url, cloud);
+            if (publicId is null)
+                return;
+            string zeit = DateTimeOffset.UtcNow.ToUnixTimeSeconds().ToString(CultureInfo.InvariantCulture);
+            string zuSignieren = $"public_id={publicId}&timestamp={zeit}{geheimnis}";
+            string signatur = Convert.ToHexString(SHA1.HashData(Encoding.UTF8.GetBytes(zuSignieren))).ToLowerInvariant();
+
+            using var formular = new MultipartFormDataContent
+            {
+                { new StringContent(publicId), "public_id" },
+                { new StringContent(schluessel), "api_key" },
+                { new StringContent(zeit), "timestamp" },
+                { new StringContent(signatur), "signature" }
+            };
+            using var antwort = await Http.PostAsync(
+                $"https://api.cloudinary.com/v1_1/{Uri.EscapeDataString(cloud)}/image/destroy", formular, cancellationToken);
+        }
+        catch (Exception)
+        {
+            // Absichtlich still: siehe Beschreibung.
+        }
+    }
+
+    // https://res.cloudinary.com/<cloud>/image/upload/v1712345678/disposio/6/lieferschein/<guid>.pdf
+    //   -> disposio/6/lieferschein/<guid>   (nur Dateien aus unserem Ordner „disposio/“)
+    private static string? PublicIdVon(string url, string cloud)
+    {
+        string marke = $"res.cloudinary.com/{cloud}/image/upload/";
+        int stelle = url.IndexOf(marke, StringComparison.OrdinalIgnoreCase);
+        if (stelle < 0)
+            return null;
+        string rest = url[(stelle + marke.Length)..];
+        int frage = rest.IndexOfAny(new[] { '?', '#' });
+        if (frage >= 0)
+            rest = rest[..frage];
+        // Versionsangabe „v123/“ überspringen
+        int strich = rest.IndexOf('/');
+        if (strich > 1 && rest[0] == 'v' && rest[1..strich].All(char.IsDigit))
+            rest = rest[(strich + 1)..];
+        int punkt = rest.LastIndexOf('.');
+        if (punkt > rest.LastIndexOf('/'))
+            rest = rest[..punkt];
+        return rest.StartsWith("disposio/", StringComparison.Ordinal) ? Uri.UnescapeDataString(rest) : null;
     }
 
     /// <summary>

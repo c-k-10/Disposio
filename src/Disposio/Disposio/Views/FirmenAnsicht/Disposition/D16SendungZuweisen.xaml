@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- D16 „Sendung zuweisen“ (aus D02 „Zuweisen“): zeigt die Sendung und alle Fahrer und Fahrzeuge, die im Zeitraum
-     der Sendung frei sind. Nach der Auswahl wird daraus eine neue Tour mit Abhol- und Zustellstopp (Status „Zugewiesen“). -->
+     der Sendung frei sind. Nach der Auswahl wird daraus eine neue Tour mit Abhol- und Zustellstopp (Status „Zugewiesen“).
+     Unter der Sendung: ihre Dokumente (DokumentBereich – anzeigen, hochladen, eigene entfernen; sofort gespeichert). -->
 <UserControl
     x:Class="Disposio.Views.D16SendungZuweisen"
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
@@ -35,6 +36,13 @@
                     </StackPanel>
                 </Grid>
                 <TextBlock x:Name="LadegutText" Style="{StaticResource NormalText}" />
+
+                <!-- Dokumente der Sendung -->
+                <StackPanel x:Name="DokumenteAbschnitt" Spacing="8">
+                    <Rectangle Height="1" Fill="{StaticResource BorderBrush}" Margin="0,2,0,4" />
+                    <TextBlock Text="Dokumente" Style="{StaticResource HinweisText}" FontWeight="SemiBold" />
+                    <local:DokumentBereich x:Name="DokumenteBereich" />
+                </StackPanel>
             </StackPanel>
         </Border>
 

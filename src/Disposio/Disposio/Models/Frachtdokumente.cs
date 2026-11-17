@@ -28,7 +28,9 @@ public sealed record DokumentSendung(
         : DokumentStatus.Offen;
 }
 
-/// <summary>Ein Dokument (public.dokument) – aus der Fahrer-App oder in D11 zugeordnet.</summary>
+/// <summary>Ein Dokument (public.dokument) – aus der Fahrer-App, in D11, D03 oder D02 zugeordnet.</summary>
+/// <param name="Entfernbar">Im Büro direkt zur Sendung hochgeladen (nicht Fahrer-App, nicht Abliefernachweis)
+/// – nur solche Dokumente darf der Disponent wieder entfernen.</param>
 public sealed record Frachtdokument(
     long Id,
     string Art,
@@ -39,7 +41,11 @@ public sealed record Frachtdokument(
     DateTime HochgeladenAm,
     string HochgeladenVon,
     bool AusFahrerApp,
-    string? Bemerkung);
+    string? Bemerkung,
+    bool Entfernbar = false);
+
+/// <summary>Beim Erfassen einer neuen Sendung (D03) ausgewählte Datei. Wird erst nach dem Speichern hochgeladen.</summary>
+public sealed record VorgemerktesDokument(string Art, string Dateiname, byte[] Inhalt);
 
 /// <summary>Ein Abliefernachweis der Fahrer-App (public.abliefernachweis), ggf. mit Problemmeldung.</summary>
 public sealed record Abliefernachweis(
