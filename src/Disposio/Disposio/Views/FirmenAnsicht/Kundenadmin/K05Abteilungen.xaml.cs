@@ -239,7 +239,7 @@ namespace Disposio.Views
             Benutzer = abteilung.Benutzer.ToString(CultureInfo.InvariantCulture);
             Fahrzeuge = abteilung.Fahrzeuge.ToString(CultureInfo.InvariantCulture);
             OffeneTouren = abteilung.OffeneTouren.ToString(CultureInfo.InvariantCulture);
-            StatusText = abteilung.Aktiv ? "Aktiv" : "Deaktiviert";
+            AktivText = abteilung.Aktiv ? "Aktiv" : "Deaktiviert";
             UmschaltText = abteilung.Aktiv ? "Deaktivieren" : "Aktivieren";
             // Deaktivierte Abteilungen etwas blasser, damit die aktiven ins Auge fallen.
             Deckkraft = abteilung.Aktiv ? 1.0 : 0.6;
@@ -250,7 +250,7 @@ namespace Disposio.Views
         public string Benutzer { get; }
         public string Fahrzeuge { get; }
         public string OffeneTouren { get; }
-        public string StatusText { get; }
+        public string AktivText { get; }
         public string UmschaltText { get; }
         public double Deckkraft { get; }
     }

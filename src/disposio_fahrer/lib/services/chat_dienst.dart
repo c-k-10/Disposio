@@ -80,6 +80,9 @@ class ChatDienst {
     });
   }
 
+  /// Gerade geoeffneter Chat-Verlauf (null = keiner). Push zeigt fuer diesen Chat keine Benachrichtigung.
+  static int? get offenerChat => _offenerChat;
+
   /// Verlauf eines Chats (null = noch nicht geladen).
   static List<ChatNachricht>? verlauf(int chatId) => _verlaeufe[chatId];
 

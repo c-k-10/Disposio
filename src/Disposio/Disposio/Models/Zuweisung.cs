@@ -87,3 +87,18 @@ public sealed record TourZuweisungDaten(
     IReadOnlyList<TourStoppKurz> Stopps,
     IReadOnlyList<FreierFahrer> Fahrer,
     IReadOnlyList<FreiesFahrzeug> Fahrzeuge);
+
+/// <summary>
+/// Startwert für D16 aus D02, wenn ein Fahrer oder Fahrzeug per Drag &amp; Drop auf eine Sendung gezogen wurde.
+/// D16 wählt die beiden dann schon aus, sofern sie im Zeitraum der Sendung frei sind und passen.
+/// </summary>
+public sealed record SendungZuweisenStart(long AuftragId, long? FahrerId, long? FahrzeugId);
+
+/// <summary>Ein Fahrer in der Spalte „Verfügbar am …“ (D02) mit seinen Touren an diesem Tag. Touren null = ganz frei.</summary>
+public sealed record TagesFahrer(FreierFahrer Fahrer, string? Touren);
+
+/// <summary>Ein Fahrzeug in der Spalte „Verfügbar am …“ (D02) mit seinen Touren an diesem Tag. Touren null = ganz frei.</summary>
+public sealed record TagesFahrzeug(FreiesFahrzeug Fahrzeug, string? Touren);
+
+/// <summary>Fahrer und Fahrzeuge, die an einem Tag einsetzbar sind (nicht krank/Urlaub, nicht Wartung/gesperrt).</summary>
+public sealed record TagesVerfuegbarkeit(IReadOnlyList<TagesFahrer> Fahrer, IReadOnlyList<TagesFahrzeug> Fahrzeuge);

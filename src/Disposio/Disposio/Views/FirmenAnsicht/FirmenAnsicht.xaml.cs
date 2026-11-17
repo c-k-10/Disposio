@@ -6,8 +6,10 @@ using Disposio.Models;
 using Disposio.Services;
 using Microsoft.UI.Text;
 using Microsoft.UI.Xaml;
+using Microsoft.UI.Xaml.Automation;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Media;
+using Microsoft.UI.Xaml.Shapes;
 using Microsoft.UI.Xaml.Navigation;
 using Windows.UI;
 
@@ -20,8 +22,13 @@ namespace Disposio.Views
     {
         private static readonly string[] AccentColors =
         {
-            "#FF004D", "#007BFF", "#00C853", "#FF9100", "#7B2CBF"
+            "#263749", "#FF004D", "#007BFF", "#00C853", "#FF9100", "#7B2CBF"
         };
+
+        // Hauptfarbe der Fahrer-App. Im Dark Mode wäre das dunkle Blau kaum sichtbar,
+        // deshalb wird es dort (wie bei Material Design) zu einem hellen Blau.
+        private const string DisposioBlau = "#263749";
+        private const string DisposioBlauDunkel = "#A9C4E4";
 
         // Die Monatsstatistik. Bei gesperrter Firma ist sie die einzige erreichbare Ansicht.
         private const string StatistikId = "G02";
@@ -31,13 +38,30 @@ namespace Disposio.Views
         // Firma im Admin-Dashboard auf „Inaktiv“ gesetzt: Geschäftsführung und Kundenadmin sehen nur noch G02.
         private bool _nurStatistik;
         private bool _returningToLogin;
-        private bool _isLight;
-        private string _accentHex = "#7B2CBF";
+        // Standard wie in der Fahrer-App: hell.
+        private bool _isLight = DarstellungSpeicher.IstHell;
+        // Zuletzt markierter Menüpunkt, damit das Menü nach dem Umschalten von Hell/Dunkel neu gezeichnet werden kann.
+        private string _menueAktiv = "";
+        // Reißzwecke links oben: angeheftet = breite Leiste mit Namen, sonst schmal nur mit Symbolen.
+        private bool _angeheftet = DarstellungSpeicher.MenueAngeheftet;
+        private string _accentHex = DarstellungSpeicher.Akzent;
+
+        // Auswahl im Farb-Menü oben rechts.
+        private static readonly (string Name, string Hex)[] Farben =
+        {
+            ("Disposio-Blau", "#263749"), ("Blau", "#007BFF"), ("Grün", "#00C853"),
+            ("Orange", "#FF9100"), ("Pink-Rot", "#FF004D"), ("Lila", "#7B2CBF")
+        };
 
         public FirmenAnsicht()
         {
             InitializeComponent();
+            // Kürzel im runden Feld oben rechts, z. B. „Christina Kiesl“ → „CK“.
+            AccountNameText.RegisterPropertyChangedCallback(TextBlock.TextProperty,
+                (_, _) => AvatarText.Text = Initialen(AccountNameText.Text));
+            RailAnwenden();
             ApplyAppearance();
+            FarbenAufbauen();
         }
 
         protected override void OnNavigatedTo(NavigationEventArgs e)
@@ -50,6 +74,7 @@ namespace Disposio.Views
 
                 _isLight = appearance.IsLight;
                 ApplyAppearance();
+                FarbenAufbauen();
             }
 
             if (!EnsureAccess())
@@ -241,6 +266,7 @@ namespace Disposio.Views
 
         private void BuildMenu(string activeId)
         {
+            _menueAktiv = activeId;
             MenuPanel.Children.Clear();
             if (_nurStatistik)
             {
@@ -256,33 +282,153 @@ namespace Disposio.Views
             EigeneRollenMenue(activeId);
         }
 
-        // Überschrift und Menüpunkte eines Abschnitts. Der aktive Menüpunkt bekommt die Akzentfarbe.
+        // Abschnitt der Navigationsleiste: kleine Überschrift (Rolle), darunter die Menüpunkte mit Symbol.
         private void MenueAbschnitt(string titel, IEnumerable<AnsichtInfo> menuepunkte, string activeId)
         {
-            MenuPanel.Children.Add(new TextBlock
-            {
-                Text = titel.ToUpper(CultureInfo.CurrentCulture),
-                FontSize = 12,
-                CharacterSpacing = 100,
-                TextWrapping = TextWrapping.Wrap,
-                Foreground = Brush("MutedTextBrush"),
-                Margin = new Thickness(4, MenuPanel.Children.Count == 0 ? 0 : 18, 0, 6)
-            });
-
+            // Zwischen den Abschnitten ein Strich über die ganze Breite.
+            if (MenuPanel.Children.Count > 0)
+                MenuPanel.Children.Add(Trennstrich(breit: true));
+            MenuPanel.Children.Add(RailUeberschrift(titel));
+            bool erster = true;
             foreach (AnsichtInfo item in menuepunkte)
             {
-                var button = new Button { Content = item.Menuename, Style = Stil("MenuButton") };
-                if (item.Id == activeId)
-                {
-                    button.Background = Brush("AccentBrush");
-                    button.Foreground = Brush("AccentTextBrush");
-                    button.FontWeight = FontWeights.SemiBold;
-                    // In kleinen Fenstern scrollt das Menü, bis der aktive Punkt sichtbar ist.
-                    button.Loaded += (_, _) => button.StartBringIntoView();
-                }
-                button.Click += (_, _) => Open(item.Id);
-                MenuPanel.Children.Add(button);
+                // Zwischen den Menüpunkten ein kurzer, feiner Strich zur Abgrenzung.
+                if (!erster)
+                    MenuPanel.Children.Add(Trennstrich(breit: false));
+                MenuPanel.Children.Add(RailButton(item, item.Id == activeId));
+                erster = false;
             }
+        }
+
+        private static Border Trennstrich(bool breit) => new()
+        {
+            Height = 1,
+            Margin = breit ? new Thickness(0, 8, 0, 0) : new Thickness(18, 0, 18, 0),
+            Background = Brush("BorderBrush")
+        };
+
+        private void Pin_Click(object sender, RoutedEventArgs e)
+        {
+            _angeheftet = !_angeheftet;
+            DarstellungSpeicher.MenueAngeheftet = _angeheftet;
+            RailAnwenden();
+            BuildMenu(_menueAktiv);
+        }
+
+        private void RailAnwenden()
+        {
+            RailColumn.Width = new GridLength(_angeheftet ? 230 : 68);
+            // Angeheftet: Symbol „Lösen“, eingeklappt: Symbol „Anheften“.
+            PinSymbol.Glyph = _angeheftet ? "\uE77A" : "\uE718";
+            string hinweis = _angeheftet ? "Menü einklappen (nur Symbole)" : "Menü anheften (mit Namen)";
+            ToolTipService.SetToolTip(PinButton, hinweis);
+            AutomationProperties.SetName(PinButton, hinweis);
+        }
+
+        private TextBlock RailUeberschrift(string titel) => new()
+        {
+            Visibility = _angeheftet ? Visibility.Visible : Visibility.Collapsed,
+            Text = titel.ToUpper(CultureInfo.CurrentCulture),
+            // Gut sichtbare Abschnittsüberschrift: größer, fett und in der Hauptfarbe.
+            FontSize = 12,
+            FontWeight = FontWeights.Bold,
+            CharacterSpacing = 80,
+            TextWrapping = TextWrapping.Wrap,
+            HorizontalAlignment = HorizontalAlignment.Left,
+            Foreground = Brush("AccentBrush"),
+            Margin = new Thickness(12, MenuPanel.Children.Count == 0 ? 2 : 12, 4, 6)
+        };
+
+        // Menüpunkt wie in der NavigationBar der Fahrer-App: Symbol in einer runden „Pille“, darunter der Name.
+        // Der aktive Punkt hat eine graue Pille, ein Symbol in der Hauptfarbe und fette Schrift.
+        private Button RailButton(AnsichtInfo item, bool aktiv)
+        {
+            var symbol = new FontIcon
+            {
+                Glyph = MenueSymbol(item.Id),
+                FontSize = 18,
+                Foreground = Brush(aktiv ? "AccentBrush" : "MutedTextBrush")
+            };
+            // Eingeklappt: nur das Symbol in einer runden Pille. Angeheftet: Symbol links, Name daneben,
+            // der aktive Punkt bekommt die graue Pille über die ganze Zeile (wie ein Navigationsmenü bei Material Design).
+            var pille = new Border
+            {
+                Width = _angeheftet ? 36 : 44,
+                Height = 30,
+                CornerRadius = new CornerRadius(15),
+                HorizontalAlignment = HorizontalAlignment.Center,
+                Background = aktiv && !_angeheftet ? Brush("StatusBoxBrush") : new SolidColorBrush(Microsoft.UI.Colors.Transparent),
+                Child = symbol
+            };
+            var name = new TextBlock
+            {
+                Text = item.Menuename,
+                FontSize = 14,
+                Visibility = _angeheftet ? Visibility.Visible : Visibility.Collapsed,
+                TextWrapping = TextWrapping.Wrap,
+                VerticalAlignment = VerticalAlignment.Center,
+                FontWeight = aktiv ? FontWeights.SemiBold : FontWeights.Normal,
+                Foreground = Brush(aktiv ? "TextBrush" : "MutedTextBrush")
+            };
+            var inhalt = new StackPanel
+            {
+                Orientation = Orientation.Horizontal,
+                Spacing = 10,
+                HorizontalAlignment = _angeheftet ? HorizontalAlignment.Left : HorizontalAlignment.Center
+            };
+            inhalt.Children.Add(pille);
+            inhalt.Children.Add(name);
+
+            var button = new Button { Content = inhalt, Style = Stil("RailButton") };
+            if (_angeheftet)
+            {
+                button.HorizontalContentAlignment = HorizontalAlignment.Left;
+                button.Padding = new Thickness(6, 4, 8, 4);
+                button.CornerRadius = new CornerRadius(19);
+                if (aktiv)
+                    button.Background = Brush("StatusBoxBrush");
+            }
+            ToolTipService.SetToolTip(button, item.Titel);
+            AutomationProperties.SetName(button, item.Menuename ?? item.Titel);
+            if (aktiv)
+                // In kleinen Fenstern scrollt das Menü, bis der aktive Punkt sichtbar ist.
+                button.Loaded += (_, _) => button.StartBringIntoView();
+            button.Click += (_, _) => Open(item.Id);
+            return button;
+        }
+
+        // Symbole aus „Segoe Fluent Icons“ je Ansicht.
+        private static string MenueSymbol(string id) => id switch
+        {
+            "D01" or "G01" or "L01" => "\uE80F",          // Startseite
+            "D02" => "\uE7B8",                            // Paket
+            "D04" => "\uE8F0",                            // Route
+            "D08" => "\uE707",                            // Karte / Pin
+            "D09" => "\uE8BD",                            // Nachricht
+            "D10" => "\uE715",                            // Mail
+            "D11" => "\uE8A5",                            // Dokument
+            "D15" or "L03" => "\uE7BA",                   // Meldung
+            "F01" or "L02" => "\uE804",                   // Fahrzeug
+            "F03" => "\uE77B",                            // Fahrer
+            "F04" => "\uE90F",                            // Wartung
+            "G02" or "L05" => "\uE9D2",                   // Kennzahlen
+            "K01" => "\uE716",                            // Benutzer
+            "K06" => "\uE902",                            // Abteilungen
+            "K03" => "\uE8D7",                            // Rollen
+            "K04" => "\uE72E",                            // Passwort
+            "K05" or "L06" => "\uE81C",                   // Protokoll
+            _ => "\uE8A9"
+        };
+
+        private static string Initialen(string name)
+        {
+            string[] teile = name.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+            return teile.Length switch
+            {
+                0 => "",
+                1 => teile[0][..1].ToUpper(CultureInfo.CurrentCulture),
+                _ => (teile[0][..1] + teile[^1][..1]).ToUpper(CultureInfo.CurrentCulture)
+            };
         }
 
         // S03: nachvollziehbarer Hinweis statt einer leeren Seite.
@@ -380,26 +526,100 @@ namespace Disposio.Views
             Background = Brush("SurfaceBrush"),
             BorderBrush = Brush("BorderBrush"),
             BorderThickness = new Thickness(1),
-            CornerRadius = new CornerRadius(18),
-            Padding = new Thickness(26, 24, 26, 24),
+            CornerRadius = new CornerRadius(4),
+            Padding = new Thickness(20, 18, 20, 18),
             Child = child
         };
 
         // ── Darstellung (wie im Admin-Dashboard) ─────────────────────────────────────────
 
+        // Knopf oben rechts: zwischen Hell und Dunkel wechseln. Alle Farben hängen an denselben Brush-Objekten,
+        // deshalb passt sich die geöffnete Ansicht sofort an. Nur das Menü wird neu gezeichnet.
+        private void Modus_Click(object sender, RoutedEventArgs e)
+        {
+            _isLight = !_isLight;
+            DarstellungSpeicher.IstHell = _isLight;
+            ApplyAppearance();
+            BuildMenu(_menueAktiv);
+            FarbenAufbauen();
+        }
+
+        // Runde Farbpunkte im Flyout. Der gewählte bekommt einen Ring.
+        private void FarbenAufbauen()
+        {
+            FarbAuswahl.Children.Clear();
+            foreach (var (name, hex) in Farben)
+            {
+                bool gewaehlt = string.Equals(hex, _accentHex, StringComparison.OrdinalIgnoreCase);
+                string anzeige = !_isLight && hex == DisposioBlau ? DisposioBlauDunkel : hex;
+                var punkt = new Border
+                {
+                    Width = 30,
+                    Height = 30,
+                    CornerRadius = new CornerRadius(15),
+                    BorderThickness = new Thickness(2),
+                    BorderBrush = gewaehlt ? Brush("TextBrush") : new SolidColorBrush(Microsoft.UI.Colors.Transparent),
+                    Child = new Ellipse
+                    {
+                        Width = 20,
+                        Height = 20,
+                        HorizontalAlignment = HorizontalAlignment.Center,
+                        VerticalAlignment = VerticalAlignment.Center,
+                        Fill = new SolidColorBrush(ParseColor(anzeige))
+                    }
+                };
+                var knopf = new Button
+                {
+                    Content = punkt,
+                    Padding = new Thickness(0),
+                    MinWidth = 0,
+                    MinHeight = 0,
+                    BorderThickness = new Thickness(0),
+                    Background = new SolidColorBrush(Microsoft.UI.Colors.Transparent),
+                    CornerRadius = new CornerRadius(15)
+                };
+                ToolTipService.SetToolTip(knopf, name);
+                AutomationProperties.SetName(knopf, name);
+                knopf.Click += (_, _) => FarbeWaehlen(hex);
+                FarbAuswahl.Children.Add(knopf);
+            }
+        }
+
+        private void FarbeWaehlen(string hex)
+        {
+            _accentHex = hex;
+            DarstellungSpeicher.Akzent = hex;
+            ApplyAppearance();
+            BuildMenu(_menueAktiv);
+            FarbenAufbauen();
+            FarbFlyout.Hide();
+        }
+
         private void ApplyAppearance()
         {
-            RequestedTheme = _isLight ? ElementTheme.Light : ElementTheme.Dark;
-            SetBrush("BackgroundBrush", _isLight ? "#FCFCFD" : "#101319");
-            SetBrush("SidebarBrush", _isLight ? "#F0F0F0" : "#262930");
-            SetBrush("SurfaceBrush", _isLight ? "#FFFFFF" : "#262930");
-            SetBrush("BorderBrush", _isLight ? "#E1E2E6" : "#3D4048");
-            SetBrush("TextBrush", _isLight ? "#101319" : "#ECEEF3");
-            SetBrush("MutedTextBrush", _isLight ? "#525B6A" : "#B8C1D2");
-            SetBrush("InputBrush", _isLight ? "#F0F0F0" : "#20232A");
-            SetBrush("ErrorBrush", _isLight ? "#B91C1C" : "#FF939B");
+            // Mond = zu Dunkel wechseln, Sonne = zu Hell wechseln.
+            ModusSymbol.Glyph = _isLight ? "\uE708" : "\uE706";
+            ToolTipService.SetToolTip(ModusButton, _isLight ? "Zu Dark Mode wechseln" : "Zu Light Mode wechseln");
+            AutomationProperties.SetName(ModusButton, _isLight ? "Dark Mode einschalten" : "Light Mode einschalten");
 
-            Color accent = ParseColor(_accentHex);
+            RequestedTheme = _isLight ? ElementTheme.Light : ElementTheme.Dark;
+            MainWindow.TitelleisteFaerben(_isLight);
+            // Farben der Fahrer-App (DisposioFarben) und ihr Gegenstück im Dark Mode.
+            SetBrush("BackgroundBrush", _isLight ? "#F4F5F9" : "#12161C");
+            SetBrush("SidebarBrush", _isLight ? "#FFFFFF" : "#1B2129");
+            SetBrush("SurfaceBrush", _isLight ? "#FFFFFF" : "#1B2129");
+            SetBrush("BorderBrush", _isLight ? "#D5D9E0" : "#2E3641");
+            SetBrush("TextBrush", _isLight ? "#1F2933" : "#E6EAF0");
+            SetBrush("MutedTextBrush", _isLight ? "#6B7280" : "#9AA3B0");
+            SetBrush("InputBrush", _isLight ? "#FFFFFF" : "#12161C");
+            SetBrush("ErrorBrush", _isLight ? "#C62828" : "#FF7B7B");
+            SetBrush("StatusBoxBrush", _isLight ? "#F0F1F3" : "#232A33");
+            SetBrush("LateBrush", _isLight ? "#C62828" : "#FF7B7B");
+
+            string accentHex = !_isLight && string.Equals(_accentHex, DisposioBlau, StringComparison.OrdinalIgnoreCase)
+                ? DisposioBlauDunkel
+                : _accentHex;
+            Color accent = ParseColor(accentHex);
             Color foreground = BestAccentForeground(accent);
             SetBrush("AccentBrush", accent);
             SetBrush("AccentHoverBrush", Mix(accent, Microsoft.UI.Colors.White, 0.12));

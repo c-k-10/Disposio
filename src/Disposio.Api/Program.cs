@@ -8,6 +8,8 @@ using Npgsql;
 // Phase 0: Health-Check. Phase 1: Anmeldung (M01) und Profil (M09). Phase 2: Touren (M02 bis M05).
 // Phase 3: GPS-Positionen, ETA mit TomTom, Abschluss (M10, M12). Phase 4: Chat mit Uebersetzung (M08).
 // Phase 5: Ablieferung (M06/M07), Dokumente ueber Cloudinary, Tanken (M14), Schaden (M15).
+// v0.7: Push-Benachrichtigungen (neue Nachricht, neue Tour) ueber Firebase Cloud Messaging.
+// v0.7.1: Push mit eigenem Ton (Android-Kanal disposio_ton, res/raw/ton.wav in der App).
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -68,6 +70,11 @@ builder.Services.AddHttpClient(BildSpeicher.HttpName, client => client.Timeout =
 builder.Services.AddSingleton<BildSpeicher>();
 builder.Services.AddSingleton<Wiederholschutz>();
 
+// Firebase Cloud Messaging. Dienstkonto-Pfad: lokal User-Secret Firebase:CredentialsPfad, auf Render
+// Secret File /etc/secrets/firebase.json + Firebase__CredentialsPfad. Ohne Pfad laeuft alles, nur ohne Push.
+builder.Services.AddSingleton<PushDienst>();
+builder.Services.AddHostedService<BenachrichtigungsWaechter>();
+
 // Render gibt den Port ueber die Umgebungsvariable PORT vor
 var port = Environment.GetEnvironmentVariable("PORT");
 if (!string.IsNullOrEmpty(port))
@@ -80,20 +87,20 @@ var app = builder.Build();
 app.UseAuthentication();
 app.UseAuthorization();
 
-app.MapGet("/", () => Results.Ok(new { name = "Disposio.Api", version = "0.6" }));
+app.MapGet("/", () => Results.Ok(new { name = "Disposio.Api", version = "0.7.1" }));
 
-app.MapGet("/health", async (NpgsqlDataSource db) =>
+app.MapGet("/health", async (NpgsqlDataSource db, PushDienst push) =>
 {
     try
     {
         await using var befehl = db.CreateCommand("SELECT 1");
         await befehl.ExecuteScalarAsync();
-        return Results.Ok(new { api = "ok", datenbank = "ok", zeit = DateTime.UtcNow });
+        return Results.Ok(new { api = "ok", datenbank = "ok", push = push.Aktiv ? "aktiv" : "aus", zeit = DateTime.UtcNow });
     }
     catch (Exception ex)
     {
         app.Logger.LogError(ex, "Datenbank nicht erreichbar");
-        return Results.Json(new { api = "ok", datenbank = "fehler" }, statusCode: 503);
+        return Results.Json(new { api = "ok", datenbank = "fehler", push = push.Aktiv ? "aktiv" : "aus" }, statusCode: 503);
     }
 });
 

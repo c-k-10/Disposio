@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:permission_handler/permission_handler.dart';
 
 import '../services/api_client.dart';
+import '../services/push_dienst.dart';
 import '../services/sitzung.dart';
 import '../services/vorlese_dienst.dart';
 import '../texte.dart';
@@ -184,6 +185,21 @@ class _ProfilSeiteState extends State<ProfilSeite> {
                 value: an,
                 activeTrackColor: DisposioFarben.dunkelblau,
                 onChanged: VorleseDienst.setzen,
+              ),
+            ),
+          ),
+          // Push-Benachrichtigungen (neue Nachricht, neue Tour); aus = Thema kuendigen
+          Card(
+            child: ValueListenableBuilder<bool>(
+              valueListenable: PushDienst.an,
+              builder: (context, an, _) => SwitchListTile(
+                title: Text(Texte.t('benachrichtigungen')),
+                subtitle: Text(Texte.t(PushDienst.verfuegbar
+                    ? 'benachrichtigungen_hinweis'
+                    : 'benachrichtigungen_nicht_verfuegbar')),
+                value: an && PushDienst.verfuegbar,
+                activeTrackColor: DisposioFarben.dunkelblau,
+                onChanged: PushDienst.verfuegbar ? PushDienst.setzen : null,
               ),
             ),
           ),

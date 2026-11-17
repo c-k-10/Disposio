@@ -113,7 +113,7 @@
             <Border Grid.Column="1" Style="{StaticResource KarteStyle}" VerticalAlignment="Top">
                 <StackPanel Spacing="12">
                     <TextBlock x:Name="VorschauTitel" Text="Vorschau" Style="{StaticResource UeberschriftText}" />
-                    <Border BorderBrush="{StaticResource BorderBrush}" BorderThickness="1" CornerRadius="10"
+                    <Border BorderBrush="{StaticResource BorderBrush}" BorderThickness="1" CornerRadius="4"
                             Background="{StaticResource InputBrush}" MinHeight="180" Padding="16">
                         <Grid>
                             <Image x:Name="VorschauBild" MaxHeight="460" Stretch="Uniform" Visibility="Collapsed"
@@ -157,7 +157,7 @@
                     </StackPanel>
                     <StackPanel Grid.Row="1">
                         <TextBlock Text="Datei *" Style="{StaticResource FeldLabel}" />
-                        <Border BorderBrush="{StaticResource BorderBrush}" BorderThickness="1" CornerRadius="8"
+                        <Border BorderBrush="{StaticResource BorderBrush}" BorderThickness="1" CornerRadius="4"
                                 Background="{StaticResource InputBrush}" Padding="8,6">
                             <StackPanel Orientation="Horizontal" Spacing="12">
                                 <Button x:Name="DateiKnopf" Content="Datei auswählen" Style="{StaticResource DashboardButton}"

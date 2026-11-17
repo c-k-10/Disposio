@@ -27,6 +27,8 @@ namespace Disposio.Views
         private readonly FirmenAnsichtKontext _kontext;
         private readonly TourRepository _repository = new();
         private readonly long? _auftragId;
+        // Aus D02 per Drag & Drop: Fahrer bzw. Fahrzeug schon auswählen.
+        private readonly SendungZuweisenStart? _start;
         private ZuweisungSendung? _sendung;
         private CancellationTokenSource? _abbruch;
         private bool _speichert;
@@ -37,7 +39,20 @@ namespace Disposio.Views
         {
             InitializeComponent();
             _kontext = kontext;
-            _auftragId = kontext.Parameter as long?;
+            _start = kontext.Parameter as SendungZuweisenStart;
+            _auftragId = kontext.Parameter switch
+            {
+                long id => id,
+                SendungZuweisenStart start => start.AuftragId,
+                _ => null
+            };
+
+            // Dokumente der Sendung: hochladen wird sofort gespeichert (auch wenn die Sendung schon verplant ist).
+            DokumenteBereich.NurAnsicht = kontext.IstVorschau;
+            DokumenteBereich.AuftragId = _auftragId;
+            if (_auftragId is null)
+                DokumenteAbschnitt.Visibility = Visibility.Collapsed;
+
             Loaded += async (_, _) => await LadenAsync();
             Unloaded += (_, _) => _abbruch?.Cancel();
         }
@@ -56,6 +71,8 @@ namespace Disposio.Views
                 LadeFertig("Keine Sendung gewählt. Bitte in „Sendungen“ bei einer offenen Sendung auf „Zuweisen“ klicken.");
                 return;
             }
+
+            _ = DokumenteBereich.LadenAsync();   // fängt Fehler selbst ab und zeigt sie an
 
             var abbruch = new CancellationTokenSource();
             _abbruch = abbruch;
@@ -158,7 +175,37 @@ namespace Disposio.Views
                                $"mit zwei Stopps angelegt: Abholung in {Adressen.Ort(s.Abholadresse)} und Zustellung in {Adressen.Ort(s.Lieferadresse)}. " +
                                "Mit Fahrer und Fahrzeug hat sie den Status „Zugewiesen“.";
             LadeFertig("");
+            Vorbelegen();
             AuswahlPruefen();
+        }
+
+        // Aus D02 gezogener Fahrer bzw. gezogenes Fahrzeug: in der Liste auswählen (füllt das Feld „Zuweisung“).
+        // Steht er nicht in der Liste, ist er im Zeitraum der Sendung nicht frei oder passt nicht zur Ladung.
+        private void Vorbelegen()
+        {
+            if (_start is null)
+                return;
+            var hinweise = new List<string>();
+            if (_start.FahrerId is long fahrerId)
+            {
+                FahrerZeile? zeile = (FahrerListe.ItemsSource as IEnumerable<FahrerZeile>)?
+                    .FirstOrDefault(f => f.Fahrer.FahrerId == fahrerId);
+                if (zeile is not null)
+                    FahrerListe.SelectedItem = zeile;
+                else
+                    hinweise.Add("Der gezogene Fahrer ist im Zeitraum dieser Sendung nicht frei. Bitte einen anderen wählen.");
+            }
+            if (_start.FahrzeugId is long fahrzeugId)
+            {
+                FahrzeugAuswahlZeile? zeile = (FahrzeugListe.ItemsSource as IEnumerable<FahrzeugAuswahlZeile>)?
+                    .FirstOrDefault(f => f.Fahrzeug.Id == fahrzeugId);
+                if (zeile is not null)
+                    FahrzeugListe.SelectedItem = zeile;
+                else
+                    hinweise.Add("Das gezogene Fahrzeug ist im Zeitraum dieser Sendung nicht frei oder passt nicht zur Ladung. Bitte ein anderes wählen.");
+            }
+            if (hinweise.Count > 0)
+                LadeFertig(string.Join(" ", hinweise));
         }
 
         private void LadeFertig(string text)

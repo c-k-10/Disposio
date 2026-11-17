@@ -152,7 +152,23 @@ public sealed class TourRepository
                 """, firma, cancellationToken);
         string vorschlag = "T-" + Required(nummer[0], 0);
 
-        return new TourPlanungsdaten(abteilungen, fahrer, fahrzeuge, sendungen, vorschlag);
+        // Adresse der eigenen Firma („Straße, PLZ Ort“) als Vorschlag für Start- und Zielort in D05.
+        string? firmenadresse = null;
+        try
+        {
+            var adresse = await _client.Value.QueryAsync("""
+                    SELECT NULLIF(concat_ws(', ', NULLIF(btrim(adresse), ''),
+                           NULLIF(btrim(concat_ws(' ', NULLIF(btrim(plz), ''), NULLIF(btrim(ort), ''))), '')), '')
+                    FROM public.unternehmen WHERE unternehmen_id = $1::bigint
+                    """, firma, cancellationToken);
+            firmenadresse = adresse.Count == 1 ? adresse[0][0] : null;
+        }
+        catch (NeonSqlException)
+        {
+            // Nur ein Vorschlag: Ohne Firmenadresse bleiben Start- und Zielort einfach leer.
+        }
+
+        return new TourPlanungsdaten(abteilungen, fahrer, fahrzeuge, sendungen, vorschlag) { Firmenadresse = firmenadresse };
     }
 
     /// <summary>
@@ -363,6 +379,330 @@ public sealed class TourRepository
 
         TourPlanungsdaten planung = await PlanungsdatenLadenAsync(cancellationToken);
         return new ZuweisungDaten(sendung, fahrer, fahrzeuge, planung.Abteilungen, planung.TournummerVorschlag);
+    }
+
+    // ── D02: Verfügbar am Tag ────────────────────────────────────────────────────────
+
+    /// <summary>
+    /// Für die Spalte „Verfügbar am …“ in D02: alle einsetzbaren Fahrer und Fahrzeuge (Fahrer nicht im Urlaub/krank,
+    /// Fahrzeug aktiv und nicht in Wartung/gesperrt) mit ihren offenen Touren an diesem Tag. Ganz freie stehen oben.
+    /// Ob sie zu einer bestimmten Sendung passen, prüft danach D16 genau (Zeitfenster, Kühlung, Kapazität).
+    /// </summary>
+    public async Task<TagesVerfuegbarkeit> TagesVerfuegbarkeitLadenAsync(DateOnly tag, CancellationToken cancellationToken = default)
+    {
+        FirmenZugriff zugriff = await AuthService.FirmenZugriffPruefenAsync(Rolle, cancellationToken);
+        var parameter = new string?[] { Text(zugriff.UnternehmenId), tag.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) };
+
+        // Offene Touren, die sich mit dem Tag (deutsche Zeit) überschneiden, als Text „06:30–15:00 T-2401“.
+        const string touren = """
+            WITH tag AS (
+                SELECT ($2::date + time '00:00') AT TIME ZONE 'Europe/Berlin' AS von,
+                       ($2::date + 1 + time '00:00') AT TIME ZONE 'Europe/Berlin' AS bis
+            ), touren AS (
+                SELECT t.fahrer_id, t.fahrzeug_id, t.startzeit,
+                       to_char(t.startzeit AT TIME ZONE 'Europe/Berlin', 'HH24:MI') || '–' ||
+                       to_char(t.endzeit AT TIME ZONE 'Europe/Berlin', 'HH24:MI') || ' ' || t.tournummer AS text
+                FROM public.tour t, tag
+                WHERE t.unternehmen_id = $1::bigint AND t.startzeit < tag.bis AND t.endzeit > tag.von
+                  AND lower(t.status) NOT SIMILAR TO '%(abgeschlossen|beendet|storniert)%'
+            )
+            """;
+
+        var fahrerTask = _client.Value.QueryAsync(touren + "\n" + """
+            SELECT fa.fahrer_id, trim(concat_ws(' ', b.vorname, b.nachname)), fa.fuehrerscheinklasse, fa.verfuegbarkeit, ab.bezeichnung,
+                   (SELECT string_agg(x.text, ', ' ORDER BY x.startzeit) FROM touren x WHERE x.fahrer_id = fa.fahrer_id)
+            FROM public.fahrer fa
+            JOIN public.benutzer b ON b.benutzer_id = fa.benutzer_id
+            LEFT JOIN public.abteilung ab ON ab.abteilung_id = b.abteilung_id AND ab.unternehmen_id = b.unternehmen_id
+            WHERE b.unternehmen_id = $1::bigint AND b.aktiv = true
+              AND lower(fa.verfuegbarkeit) NOT SIMILAR TO '%(urlaub|krank|abwesend|gesperrt|nicht verfügbar)%'
+            ORDER BY (SELECT count(*) FROM touren x WHERE x.fahrer_id = fa.fahrer_id), lower(b.nachname), lower(b.vorname), fa.fahrer_id
+            """, parameter, cancellationToken);
+
+        var fahrzeugTask = _client.Value.QueryAsync(touren + "\n" + """
+            SELECT f.fahrzeug_id, f.kennzeichen, f.fahrzeugtyp, f.aufbau, f.nutzlast_kg, f.nutzbare_lademeter, f.ep_stellplaetze,
+                   f.status, ab.bezeichnung,
+                   (SELECT string_agg(x.text, ', ' ORDER BY x.startzeit) FROM touren x WHERE x.fahrzeug_id = f.fahrzeug_id)
+            FROM public.fahrzeug f
+            LEFT JOIN public.abteilung ab ON ab.abteilung_id = f.abteilung_id AND ab.unternehmen_id = f.unternehmen_id
+            WHERE f.unternehmen_id = $1::bigint AND f.aktiv
+              AND lower(f.status) NOT SIMILAR TO '%(wartung|gesperrt|ausgemustert)%'
+            ORDER BY (SELECT count(*) FROM touren x WHERE x.fahrzeug_id = f.fahrzeug_id), f.kennzeichen, f.fahrzeug_id
+            """, parameter, cancellationToken);
+
+        await Task.WhenAll(fahrerTask, fahrzeugTask);
+
+        static decimal ZahlOderNull(string? text) =>
+            text is null ? 0 : decimal.Parse(text, CultureInfo.InvariantCulture);
+
+        var fahrer = (await fahrerTask)
+            .Select(row => new TagesFahrer(
+                new FreierFahrer(Id(row, 0), Required(row, 1), row[2] ?? "", row[3] ?? "", row[4]), row[5]))
+            .ToArray();
+        var fahrzeuge = (await fahrzeugTask)
+            .Select(row => new TagesFahrzeug(
+                new FreiesFahrzeug(Id(row, 0), Required(row, 1), row[2] ?? "", row[3] ?? "",
+                    ZahlOderNull(row[4]), ZahlOderNull(row[5]),
+                    row[6] is string plaetze ? int.Parse(plaetze, CultureInfo.InvariantCulture) : 0,
+                    row[7] ?? "", row[8]),
+                row[9]))
+            .ToArray();
+        return new TagesVerfuegbarkeit(fahrer, fahrzeuge);
+    }
+
+    /// <summary>
+    /// D02 Drag &amp; Drop: Sendung direkt einem Fahrer und Fahrzeug zuweisen, ohne D16 zu öffnen. Prüft dieselben Regeln
+    /// wie D16 (frei im Zeitraum der Sendung, Kühlung, Kapazität, Führerscheinklasse) und legt wie D16 eine neue Tour mit
+    /// Abholung und Zustellung an. Bereich wie die Gutart (z. B. „Frische“), sonst die erste aktive Abteilung.
+    /// </summary>
+    /// <returns>Die Tournummer der neuen Tour.</returns>
+    /// <exception cref="ArgumentException">Eine Regel ist verletzt. Die Meldung ist für die Oberfläche gedacht.</exception>
+    public async Task<string> SendungDirektZuweisenAsync(long auftragId, long fahrerId, long fahrzeugId,
+        CancellationToken cancellationToken = default)
+    {
+        ZuweisungDaten daten = await ZuweisungLadenAsync(auftragId, cancellationToken);
+        ZuweisungSendung s = daten.Sendung;
+        if (s.Tournummer is { } tour)
+            throw new ArgumentException($"Die Sendung ist inzwischen in Tour {tour} verplant.");
+
+        FreierFahrer fahrer = daten.Fahrer.FirstOrDefault(f => f.FahrerId == fahrerId)
+            ?? throw new ArgumentException("Der Fahrer ist im Zeitraum dieser Sendung nicht frei.");
+        FreiesFahrzeug fahrzeug = daten.Fahrzeuge.FirstOrDefault(f => f.Id == fahrzeugId)
+            ?? throw new ArgumentException("Das Fahrzeug ist im Zeitraum dieser Sendung nicht frei.");
+        if (ZuweisungsRegeln.FahrzeugPasstNicht(fahrzeug, s.Gutart == SendungWerte.GutartFrische, s.GewichtKg, s.Lademeter,
+                s.Verpackungstyp == SendungWerte.Europalette ? s.Anzahl : 0) is { } grund)
+            throw new ArgumentException($"{fahrzeug.Kennzeichen} passt nicht: {grund}.");
+        if (ZuweisungsRegeln.KlassePasstNicht(fahrer, fahrzeug) is { } klasse)
+            throw new ArgumentException(klasse);
+
+        AbteilungAuswahl abteilung = daten.Abteilungen
+            .FirstOrDefault(a => string.Equals(a.Bezeichnung, s.Gutart, StringComparison.OrdinalIgnoreCase))
+            ?? daten.Abteilungen.FirstOrDefault()
+            ?? throw new ArgumentException("Ihre Firma hat noch keine aktive Abteilung. Eine Tour braucht einen Bereich.");
+
+        // Wie in D16: zwei Stopps mit den Zeitfenstern der Sendung. Tourende muss nach dem Start liegen.
+        var stopps = new List<TourStoppEntwurf>
+        {
+            new(TourWerte.ArtAbholung, Adressen.Ort(s.Abholadresse), s.Abholadresse,
+                s.Abholdatum.ToDateTime(s.AbholfensterVon), s.Abholdatum.ToDateTime(s.AbholfensterBis), s.Id, TourWerte.ArtAbholung),
+            new(TourWerte.ArtZustellung, Adressen.Ort(s.Lieferadresse), s.Lieferadresse,
+                s.Lieferdatum.ToDateTime(s.LieferfensterVon), s.Lieferdatum.ToDateTime(s.LieferfensterBis), s.Id, TourWerte.ArtZustellung)
+        };
+        DateTime ende = s.Bis > s.Von ? s.Bis : s.Von.AddMinutes(1);
+
+        // Hat gerade jemand anderes dieselbe Tournummer vergeben, einmal mit einem neuen Vorschlag wiederholen.
+        string nummer = daten.TournummerVorschlag;
+        for (int versuch = 0; ; versuch++)
+        {
+            try
+            {
+                await AnlegenAsync(new TourEntwurf(nummer, abteilung.Id, s.Von, ende,
+                    Adressen.Ort(s.Abholadresse), Adressen.Ort(s.Lieferadresse), fahrer.FahrerId, fahrzeug.Id, stopps),
+                    cancellationToken);
+                return nummer;
+            }
+            catch (TournummerVergebenException) when (versuch == 0)
+            {
+                nummer = (await PlanungsdatenLadenAsync(cancellationToken)).TournummerVorschlag;
+            }
+        }
+    }
+
+    // ── D02: Zuweisung ändern oder auflösen ──────────────────────────────────────────
+
+    /// <summary>
+    /// D02: Fahrer oder Fahrzeug einer Tour setzen (id) oder entfernen (null). Nur bei „Geplant“/„Zugewiesen“ und noch
+    /// nicht losgefahren. Beim Setzen dieselben Regeln wie D06 (frei im Tourzeitraum, Kühlung, Kapazität, Klasse).
+    /// Der Status folgt der Zuordnung: beide gesetzt = „Zugewiesen“, sonst „Geplant“.
+    /// </summary>
+    /// <returns>Die Tournummer.</returns>
+    /// <exception cref="ArgumentException">Eine Regel ist verletzt oder die Tour lässt sich nicht mehr ändern.</exception>
+    public async Task<string> RessourceAendernAsync(long tourId, bool fahrer, long? id, CancellationToken cancellationToken = default)
+    {
+        if (id is long neu)
+        {
+            TourZuweisungDaten d = await TourZuweisungLadenAsync(tourId, cancellationToken);
+            TourZuweisungKopf tour = d.Tour;
+            if (fahrer)
+            {
+                FreierFahrer f = d.Fahrer.FirstOrDefault(x => x.FahrerId == neu)
+                    ?? throw new ArgumentException($"Der Fahrer ist im Zeitraum von Tour {tour.Tournummer} nicht frei.");
+                FreiesFahrzeug? fz = tour.FahrzeugId is long fzId ? d.Fahrzeuge.FirstOrDefault(x => x.Id == fzId) : null;
+                if (fz is not null && ZuweisungsRegeln.KlassePasstNicht(f, fz) is { } klasse)
+                    throw new ArgumentException(klasse);
+            }
+            else
+            {
+                FreiesFahrzeug fz = d.Fahrzeuge.FirstOrDefault(x => x.Id == neu)
+                    ?? throw new ArgumentException($"Das Fahrzeug ist im Zeitraum von Tour {tour.Tournummer} nicht frei.");
+                if (ZuweisungsRegeln.FahrzeugPasstNicht(fz, tour.Gekuehlt, tour.GewichtKg, tour.Lademeter, tour.Europaletten) is { } grund)
+                    throw new ArgumentException($"{fz.Kennzeichen} passt nicht: {grund}.");
+                FreierFahrer? f = tour.FahrerId is long fId ? d.Fahrer.FirstOrDefault(x => x.FahrerId == fId) : null;
+                if (f is not null && ZuweisungsRegeln.KlassePasstNicht(f, fz) is { } klasse)
+                    throw new ArgumentException(klasse);
+            }
+        }
+
+        FirmenZugriff zugriff = await AuthService.FirmenZugriffPruefenAsync(Rolle, cancellationToken);
+        // $1 Firma, $2 Tour, $3 'Fahrer'/'Fahrzeug', $4 Fahrer-Id, $5 Fahrzeug-Id, $6 Geplant, $7 Zugewiesen, $8 Konto.
+        // Überschneidung mit anderen offenen Touren wird hier noch einmal geprüft (gleichzeitige Änderungen).
+        const string query = """
+            WITH ziel AS (
+                SELECT t.tour_id FROM public.tour t
+                WHERE t.tour_id = $2::bigint AND t.unternehmen_id = $1::bigint AND t.status IN ($6, $7)
+                  AND NOT EXISTS (SELECT 1 FROM public.tourstopp s
+                                  WHERE s.tour_id = t.tour_id AND (s.ist_ankunft IS NOT NULL OR s.ist_abfahrt IS NOT NULL))
+                  AND ($4::bigint IS NULL OR (
+                        EXISTS (SELECT 1 FROM public.fahrer fa JOIN public.benutzer b ON b.benutzer_id = fa.benutzer_id
+                                WHERE fa.fahrer_id = $4::bigint AND b.unternehmen_id = $1::bigint AND b.aktiv = true)
+                        AND NOT EXISTS (SELECT 1 FROM public.tour x
+                                        WHERE x.unternehmen_id = $1::bigint AND x.tour_id <> t.tour_id AND x.fahrer_id = $4::bigint
+                                          AND x.startzeit < t.endzeit AND x.endzeit > t.startzeit
+                                          AND lower(x.status) NOT SIMILAR TO '%(abgeschlossen|beendet|storniert)%')))
+                  AND ($5::bigint IS NULL OR (
+                        EXISTS (SELECT 1 FROM public.fahrzeug f WHERE f.fahrzeug_id = $5::bigint AND f.unternehmen_id = $1::bigint)
+                        AND NOT EXISTS (SELECT 1 FROM public.tour x
+                                        WHERE x.unternehmen_id = $1::bigint AND x.tour_id <> t.tour_id AND x.fahrzeug_id = $5::bigint
+                                          AND x.startzeit < t.endzeit AND x.endzeit > t.startzeit
+                                          AND lower(x.status) NOT SIMILAR TO '%(abgeschlossen|beendet|storniert)%')))
+            ), geaendert AS (
+                UPDATE public.tour t
+                SET fahrer_id = CASE WHEN $3 = 'Fahrer' THEN $4::bigint ELSE t.fahrer_id END,
+                    fahrzeug_id = CASE WHEN $3 = 'Fahrzeug' THEN $5::bigint ELSE t.fahrzeug_id END,
+                    status = CASE WHEN (CASE WHEN $3 = 'Fahrer' THEN $4::bigint ELSE t.fahrer_id END) IS NOT NULL
+                                   AND (CASE WHEN $3 = 'Fahrzeug' THEN $5::bigint ELSE t.fahrzeug_id END) IS NOT NULL
+                                  THEN $7 ELSE $6 END
+                FROM ziel z WHERE t.tour_id = z.tour_id
+                RETURNING t.tour_id, t.tournummer, t.unternehmen_id, t.abteilung_id
+            ), protokoll AS (
+                INSERT INTO public.aktionsprotokoll (akteur_art, aktion, ergebnis, detail, unternehmen_id, abteilung_id, benutzer_id)
+                SELECT CASE WHEN $8::bigint IS NULL THEN 'Entwicklungsansicht' ELSE 'Benutzer' END,
+                       'Tour zugewiesen', 'Gespeichert',
+                       'Tour ' || g.tournummer || ': ' || $3 || CASE WHEN COALESCE($4, $5) IS NULL THEN ' entfernt' ELSE ' gesetzt' END,
+                       g.unternehmen_id, g.abteilung_id, $8::bigint
+                FROM geaendert g
+            )
+            SELECT tournummer FROM geaendert
+            """;
+        var rows = await _client.Value.QueryAsync(query, new string?[]
+        {
+            Text(zugriff.UnternehmenId), Text(tourId), fahrer ? "Fahrer" : "Fahrzeug",
+            fahrer && id is long f1 ? Text(f1) : null,
+            !fahrer && id is long f2 ? Text(f2) : null,
+            TourWerte.StatusGeplant, TourWerte.StatusZugewiesen,
+            BenutzerSitzung.AktuellerBenutzer is { } benutzer ? Text(benutzer.Id) : null
+        }, cancellationToken);
+        if (rows.Count != 1)
+            throw new ArgumentException("Die Tour lässt sich nicht mehr ändern: Sie ist schon unterwegs oder abgeschlossen, " +
+                                        "oder Fahrer bzw. Fahrzeug haben inzwischen eine andere Tour. Bitte laden Sie die Liste neu.");
+        return Required(rows[0], 0);
+    }
+
+    /// <summary>
+    /// D02 „Lösen“: Sendung aus ihrer Tour nehmen. Ihre Stopps werden entfernt (kombinierte Stopps anderer Sendungen
+    /// bleiben), die übrigen Stopps neu durchnummeriert. Bleibt die Tour leer, wird sie gelöscht – oder, falls andere
+    /// Daten auf sie verweisen, auf „Storniert“ gesetzt. Nur bei „Geplant“/„Zugewiesen“ und noch nicht losgefahren.
+    /// </summary>
+    /// <returns>Tournummer und ob die Tour danach aufgelöst ist.</returns>
+    public async Task<(string Tournummer, bool TourAufgeloest)> SendungAusTourNehmenAsync(long auftragId,
+        CancellationToken cancellationToken = default)
+    {
+        FirmenZugriff zugriff = await AuthService.FirmenZugriffPruefenAsync(Rolle, cancellationToken);
+        string firma = Text(zugriff.UnternehmenId);
+
+        // $1 Firma, $2 Sendung, $3 Konto, $4 Geplant, $5 Zugewiesen. Eine Zeile: Tour, Nummer, andere Sendungen, übrige Stopps.
+        const string loesen = """
+            WITH a AS (
+                SELECT x.auftrag_id, x.auftragsnummer, t.tour_id, t.tournummer, t.abteilung_id
+                FROM public.auftrag x
+                JOIN public.tour t ON t.tour_id = x.tour_id AND t.unternehmen_id = x.unternehmen_id
+                WHERE x.auftrag_id = $2::bigint AND x.unternehmen_id = $1::bigint
+                  AND t.status IN ($4, $5)
+                  AND NOT EXISTS (SELECT 1 FROM public.tourstopp s
+                                  WHERE s.tour_id = t.tour_id AND (s.ist_ankunft IS NOT NULL OR s.ist_abfahrt IS NOT NULL))
+                  AND NOT EXISTS (SELECT 1 FROM public.statusmeldung m WHERE m.tour_id = t.tour_id)
+            ), eigene AS (
+                SELECT sa.stopp_id FROM public.stopp_auftrag sa
+                JOIN public.tourstopp s ON s.stopp_id = sa.stopp_id
+                JOIN a ON a.auftrag_id = sa.auftrag_id AND s.tour_id = a.tour_id
+            ), links AS (
+                DELETE FROM public.stopp_auftrag sa USING a
+                WHERE sa.auftrag_id = a.auftrag_id AND sa.stopp_id IN (SELECT stopp_id FROM eigene)
+                RETURNING sa.stopp_id
+            ), stopps AS (
+                DELETE FROM public.tourstopp s USING a
+                WHERE s.tour_id = a.tour_id AND s.stopp_id IN (SELECT stopp_id FROM eigene)
+                  AND NOT EXISTS (SELECT 1 FROM public.stopp_auftrag x WHERE x.stopp_id = s.stopp_id AND x.auftrag_id <> a.auftrag_id)
+                RETURNING s.stopp_id
+            ), sendung AS (
+                UPDATE public.auftrag x SET tour_id = NULL FROM a WHERE x.auftrag_id = a.auftrag_id
+                RETURNING x.auftrag_id
+            ), protokoll AS (
+                INSERT INTO public.aktionsprotokoll (akteur_art, aktion, ergebnis, detail, unternehmen_id, abteilung_id, benutzer_id)
+                SELECT CASE WHEN $3::bigint IS NULL THEN 'Entwicklungsansicht' ELSE 'Benutzer' END,
+                       'Sendung aus Tour genommen', 'Gespeichert', 'Sendung ' || a.auftragsnummer || ' aus Tour ' || a.tournummer,
+                       $1::bigint, a.abteilung_id, $3::bigint
+                FROM a
+            )
+            SELECT a.tour_id, a.tournummer,
+                   (SELECT count(*) FROM public.auftrag y WHERE y.tour_id = a.tour_id AND y.auftrag_id <> a.auftrag_id),
+                   (SELECT count(*) FROM public.tourstopp s WHERE s.tour_id = a.tour_id) - (SELECT count(*) FROM stopps)
+            FROM a
+            """;
+        var rows = await _client.Value.QueryAsync(loesen, new string?[]
+        {
+            firma, Text(auftragId),
+            BenutzerSitzung.AktuellerBenutzer is { } benutzer ? Text(benutzer.Id) : null,
+            TourWerte.StatusGeplant, TourWerte.StatusZugewiesen
+        }, cancellationToken);
+        if (rows.Count != 1)
+            throw new ArgumentException("Die Sendung lässt sich nicht mehr aus der Tour nehmen: Die Tour ist schon unterwegs " +
+                                        "oder abgeschlossen. Bitte laden Sie die Liste neu.");
+
+        string tourId = Required(rows[0], 0);
+        string tournummer = Required(rows[0], 1);
+        long andereSendungen = long.Parse(Required(rows[0], 2), CultureInfo.InvariantCulture);
+        long uebrigeStopps = long.Parse(Required(rows[0], 3), CultureInfo.InvariantCulture);
+        var tour = new string?[] { firma, tourId };
+
+        if (uebrigeStopps > 0)
+        {
+            // Übrige Stopps wieder 1, 2, 3 … nummerieren. Erst weit nach hinten schieben, damit die eindeutige
+            // Reihenfolge je Tour unterwegs nie doppelt vorkommt.
+            await _client.Value.QueryAsync("""
+                UPDATE public.tourstopp s SET reihenfolge = s.reihenfolge + 100000
+                FROM public.tour t WHERE t.tour_id = s.tour_id AND t.tour_id = $2::bigint AND t.unternehmen_id = $1::bigint
+                """, tour, cancellationToken);
+            await _client.Value.QueryAsync("""
+                UPDATE public.tourstopp s SET reihenfolge = n.nr
+                FROM (SELECT x.stopp_id, row_number() OVER (ORDER BY x.reihenfolge) AS nr
+                      FROM public.tourstopp x JOIN public.tour t ON t.tour_id = x.tour_id
+                      WHERE x.tour_id = $2::bigint AND t.unternehmen_id = $1::bigint) n
+                WHERE s.stopp_id = n.stopp_id
+                """, tour, cancellationToken);
+            return (tournummer, false);
+        }
+        if (andereSendungen > 0)
+            return (tournummer, false);
+
+        // Leere Tour entfernen. Verweisen andere Daten auf sie (z. B. Protokoll, Nachrichten), wird sie storniert.
+        try
+        {
+            await _client.Value.QueryAsync("""
+                DELETE FROM public.tour t
+                WHERE t.tour_id = $2::bigint AND t.unternehmen_id = $1::bigint
+                  AND NOT EXISTS (SELECT 1 FROM public.tourstopp s WHERE s.tour_id = t.tour_id)
+                  AND NOT EXISTS (SELECT 1 FROM public.auftrag x WHERE x.tour_id = t.tour_id)
+                """, tour, cancellationToken);
+        }
+        catch (NeonSqlException exception) when (exception.Code == "23503")
+        {
+            await _client.Value.QueryAsync("""
+                UPDATE public.tour t SET status = 'Storniert', fahrer_id = NULL, fahrzeug_id = NULL
+                WHERE t.tour_id = $2::bigint AND t.unternehmen_id = $1::bigint
+                """, tour, cancellationToken);
+        }
+        return (tournummer, true);
     }
 
     // ── D06: Tour zuweisen ───────────────────────────────────────────────────────────

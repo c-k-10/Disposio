@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../services/api_client.dart';
+import '../services/push_dienst.dart';
 import '../texte.dart';
 import '../theme/disposio_theme.dart';
 import '../widgets/tour_bausteine.dart';
@@ -24,6 +25,14 @@ class _TourenSeiteState extends State<TourenSeite> {
   void initState() {
     super.initState();
     _laden();
+    // Push „Neue Tour“: Liste neu laden
+    PushDienst.tourenGeaendert.addListener(_laden);
+  }
+
+  @override
+  void dispose() {
+    PushDienst.tourenGeaendert.removeListener(_laden);
+    super.dispose();
   }
 
   Future<void> _laden() async {

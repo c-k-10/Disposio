@@ -36,10 +36,21 @@ public sealed class SendungRepository
                    to_char(a.abholdatum, 'YYYY-MM-DD'), to_char(a.lieferdatum, 'YYYY-MM-DD'),
                    to_char(a.lieferfenster_von, 'HH24:MI'), to_char(a.lieferfenster_bis, 'HH24:MI'),
                    a.gutart, a.anzahl, round(a.anzahl * a.laenge_m * a.breite_m / 2.4, 1),
-                   a.status, a.prioritaet, t.tournummer
+                   a.status, a.prioritaet, t.tournummer,
+                   NULLIF(trim(concat_ws(' ', fb.vorname, fb.nachname)), ''), fz.kennzeichen,
+                   t.tour_id, t.fahrer_id, t.fahrzeug_id,
+                   -- Nur Touren, die noch nicht losgefahren sind, lassen sich in D02 ändern oder auflösen.
+                   COALESCE(t.status IN ('Geplant', 'Zugewiesen')
+                            AND NOT EXISTS (SELECT 1 FROM public.tourstopp st WHERE st.tour_id = t.tour_id
+                                            AND (st.ist_ankunft IS NOT NULL OR st.ist_abfahrt IS NOT NULL)), false),
+                   t.status
             FROM public.auftrag a
             LEFT JOIN public.kunde k ON k.kunde_id = a.kunde_id AND k.unternehmen_id = a.unternehmen_id
             LEFT JOIN public.tour t ON t.tour_id = a.tour_id AND t.unternehmen_id = a.unternehmen_id
+            -- Fahrer und Fahrzeug der Tour für die Spalte „Fahrer / Fahrzeug“ in D02.
+            LEFT JOIN public.fahrer fa ON fa.fahrer_id = t.fahrer_id
+            LEFT JOIN public.benutzer fb ON fb.benutzer_id = fa.benutzer_id AND fb.unternehmen_id = a.unternehmen_id
+            LEFT JOIN public.fahrzeug fz ON fz.fahrzeug_id = t.fahrzeug_id AND fz.unternehmen_id = a.unternehmen_id
             WHERE a.unternehmen_id = $1::bigint
               AND a.abholdatum <= $2::date AND a.lieferdatum >= $2::date
             ORDER BY (a.tour_id IS NOT NULL), a.lieferdatum, a.lieferfenster_von, a.auftragsnummer
@@ -70,7 +81,16 @@ public sealed class SendungRepository
                 decimal.Parse(Required(row, 12), CultureInfo.InvariantCulture),
                 Required(row, 13),
                 Required(row, 14),
-                row[15]));
+                row[15])
+            {
+                Fahrer = row[16],
+                Kennzeichen = row[17],
+                TourId = row[18] is string tourId ? long.Parse(tourId, CultureInfo.InvariantCulture) : null,
+                FahrerId = row[19] is string fahrerId ? long.Parse(fahrerId, CultureInfo.InvariantCulture) : null,
+                FahrzeugId = row[20] is string fahrzeugId ? long.Parse(fahrzeugId, CultureInfo.InvariantCulture) : null,
+                TourBearbeitbar = row[21] == "t",
+                TourStatus = row[22]
+            });
         }
 
         return sendungen;
@@ -136,6 +156,44 @@ public sealed class SendungRepository
         }
 
         return new SendungFormularDaten(kunden, Required(nummern[0], 0), Required(nummern[0], 1), vorhanden, tournummer);
+    }
+
+    /// <summary>
+    /// Adressen eines Kunden für D03: seine Firmenadresse (aus public.kunde) und die zuletzt benutzten
+    /// Abhol- und Lieferadressen seiner Sendungen (ohne Doppelte, neueste zuerst, höchstens 8).
+    /// Nur Kunden der eigenen Firma; sonst kommt eine leere Liste.
+    /// </summary>
+    public async Task<KundenAdressen> AdressenLadenAsync(long kundeId, CancellationToken cancellationToken = default)
+    {
+        FirmenZugriff zugriff = await AuthService.FirmenZugriffPruefenAsync(Rolle, cancellationToken);
+        var rows = await _client.Value.QueryAsync("""
+            WITH k AS (
+                SELECT kunde_id, btrim(adresse) || ', ' || btrim(plz) || ' ' || btrim(ort) AS firmenadresse
+                FROM public.kunde WHERE kunde_id = $2::bigint AND unternehmen_id = $1::bigint
+            ), frueher AS (
+                SELECT DISTINCT ON (lower(btrim(x.adresse))) btrim(x.adresse) AS adresse, x.art, x.auftrag_id
+                FROM k
+                JOIN public.auftrag a ON a.kunde_id = k.kunde_id AND a.unternehmen_id = $1::bigint
+                CROSS JOIN LATERAL (VALUES (a.abholadresse, 'Abholung', a.auftrag_id),
+                                           (a.lieferadresse, 'Zustellung', a.auftrag_id)) AS x(adresse, art, auftrag_id)
+                WHERE btrim(x.adresse) <> '' AND lower(btrim(x.adresse)) <> lower(k.firmenadresse)
+                ORDER BY lower(btrim(x.adresse)), x.auftrag_id DESC
+            )
+            SELECT 'Firmenadresse', firmenadresse, 0 FROM k
+            UNION ALL
+            SELECT * FROM (SELECT art, adresse, auftrag_id FROM frueher ORDER BY auftrag_id DESC LIMIT 8) f
+            """, new string?[] { Text(zugriff.UnternehmenId), Text(kundeId) }, cancellationToken);
+
+        string? firmenadresse = null;
+        var fruehere = new List<FruehereAdresse>();
+        foreach (var row in rows)
+        {
+            if (Required(row, 0) == "Firmenadresse")
+                firmenadresse = Required(row, 1);
+            else
+                fruehere.Add(new FruehereAdresse(Required(row, 1), Required(row, 0)));
+        }
+        return new KundenAdressen(firmenadresse, fruehere);
     }
 
     /// <summary>

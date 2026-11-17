@@ -120,7 +120,7 @@ namespace Disposio.Views
             _rahmen.Background = B("SurfaceBrush");
             _rahmen.BorderBrush = B("BorderBrush");
             _rahmen.BorderThickness = new Thickness(1);
-            _rahmen.CornerRadius = new CornerRadius(18);
+            _rahmen.CornerRadius = new CornerRadius(4);
             _rahmen.Padding = new Thickness(26, 22, 26, 22);
             _rahmen.Child = inhalt;
             AutomationProperties.SetName(_rahmen, "Systemzustand");
@@ -230,7 +230,7 @@ namespace Disposio.Views
             Grid.SetColumn(texte, 1);
             zeile.Children.Add(texte);
 
-            var balken = new Border { Width = 5, Background = new SolidColorBrush(farbe), CornerRadius = new CornerRadius(12, 0, 0, 12) };
+            var balken = new Border { Width = 5, Background = new SolidColorBrush(farbe), CornerRadius = new CornerRadius(4, 0, 0, 4) };
             var innen = new Grid();
             innen.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
             innen.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
@@ -241,7 +241,7 @@ namespace Disposio.Views
             var kachel = new Border
             {
                 Child = innen,
-                CornerRadius = new CornerRadius(12),
+                CornerRadius = new CornerRadius(4),
                 BorderThickness = new Thickness(offen ? 2 : 1),
                 BorderBrush = offen ? new SolidColorBrush(farbe) : B("BorderBrush"),
                 Background = e.Stufe is Pruefstufe.Kritisch or Pruefstufe.Warnung ? Getoent(farbe, B("InputBrush")) : B("InputBrush"),
