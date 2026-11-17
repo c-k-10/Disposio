@@ -9,6 +9,7 @@ using Npgsql;
 // Phase 3: GPS-Positionen, ETA mit TomTom, Abschluss (M10, M12). Phase 4: Chat mit Uebersetzung (M08).
 // Phase 5: Ablieferung (M06/M07), Dokumente ueber Cloudinary, Tanken (M14), Schaden (M15).
 // v0.7: Push-Benachrichtigungen (neue Nachricht, neue Tour) ueber Firebase Cloud Messaging.
+// v0.7.1: Push mit eigenem Ton (Android-Kanal disposio_ton, res/raw/ton.wav in der App).
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -86,7 +87,7 @@ var app = builder.Build();
 app.UseAuthentication();
 app.UseAuthorization();
 
-app.MapGet("/", () => Results.Ok(new { name = "Disposio.Api", version = "0.7" }));
+app.MapGet("/", () => Results.Ok(new { name = "Disposio.Api", version = "0.7.1" }));
 
 app.MapGet("/health", async (NpgsqlDataSource db, PushDienst push) =>
 {

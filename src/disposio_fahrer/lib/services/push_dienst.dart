@@ -25,7 +25,12 @@ import 'sitzung.dart';
 class PushDienst {
   static const _schluesselAn = 'benachrichtigungen_an';
   static const _schluesselThema = 'push_thema';
-  static const _kanalId = 'disposio'; // wie PushDienst.KanalId in der API
+  // Kanal mit eigenem Ton (android/app/src/main/res/raw/ton.wav), wie PushDienst.KanalId in der API.
+  // Android kann den Ton eines bestehenden Kanals nicht aendern, darum neue ID statt 'disposio'.
+  static const _kanalId = 'disposio_ton';
+  static const _kanalName = 'Disposio Benachrichtigungen';
+  static const _alterKanalId = 'disposio';
+  static const _ton = RawResourceAndroidNotificationSound('ton');
 
   /// Navigator der App, zum Oeffnen von Chat oder Tour beim Antippen.
   static final navigatorKey = GlobalKey<NavigatorState>();
@@ -65,9 +70,12 @@ class PushDienst {
         } catch (_) {}
       },
     );
-    await _lokal
-        .resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>()
-        ?.createNotificationChannel(_kanal());
+    // Kanal schon beim App-Start anlegen, damit auch Pushs bei geschlossener App mit Ton kommen
+    final android = _lokal.resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>();
+    await android?.createNotificationChannel(_kanal());
+    try {
+      await android?.deleteNotificationChannel(channelId: _alterKanalId);
+    } catch (_) {}
 
     FirebaseMessaging.onMessage.listen(_imVordergrund);
     FirebaseMessaging.onMessageOpenedApp.listen((m) => _oeffnen(m.data));
@@ -93,10 +101,11 @@ class PushDienst {
 
   static AndroidNotificationChannel _kanal() => AndroidNotificationChannel(
         _kanalId,
-        'Disposio',
+        _kanalName,
         description: Texte.t('benachrichtigung_kanal'),
         importance: Importance.high,
         playSound: true,
+        sound: _ton,
       );
 
   /// Nach dem Login (StartSeite): Erlaubnis abfragen (Android 13+), Thema abonnieren und eine
@@ -197,11 +206,12 @@ class PushDienst {
       notificationDetails: NotificationDetails(
         android: AndroidNotificationDetails(
           _kanalId,
-          'Disposio',
+          _kanalName,
           channelDescription: Texte.t('benachrichtigung_kanal'),
           importance: Importance.high,
           priority: Priority.high,
           playSound: true,
+          sound: _ton,
         ),
       ),
       payload: jsonEncode(daten),

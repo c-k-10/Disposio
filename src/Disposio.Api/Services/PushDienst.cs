@@ -12,8 +12,12 @@ namespace Disposio.Api.Services;
 /// </summary>
 public sealed class PushDienst
 {
-    /// <summary>Kanal-ID wie in der App (Android-Benachrichtigungskanal "Disposio").</summary>
-    public const string KanalId = "disposio";
+    /// <summary>Kanal-ID wie in der App (Android-Kanal "Disposio Benachrichtigungen" mit eigenem Ton).
+    /// v0.7.1: neue ID, weil Android den Ton eines bestehenden Kanals nicht aendern kann.</summary>
+    public const string KanalId = "disposio_ton";
+
+    /// <summary>Name der Ton-Datei in der App (android/app/src/main/res/raw/ton.wav, ohne Endung).</summary>
+    public const string Ton = "ton";
 
     private readonly FirebaseMessaging? _messaging;
     private readonly ILogger<PushDienst> _log;
@@ -73,7 +77,8 @@ public sealed class PushDienst
                     Notification = new AndroidNotification
                     {
                         ChannelId = KanalId,
-                        Sound = "default",
+                        Sound = Ton,
+                        Priority = NotificationPriority.HIGH,
                     },
                 },
             }, abbruch);
