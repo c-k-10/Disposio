@@ -6,10 +6,13 @@ plugins {
 
 android {
     namespace = "de.disposio.disposio_fahrer"
-    compileSdk = flutter.compileSdkVersion
+    // flutter_local_notifications und androidx.core 1.19 verlangen compileSdk 37 (targetSdk bleibt)
+    compileSdk = 37
     ndkVersion = flutter.ndkVersion
 
     compileOptions {
+        // flutter_local_notifications braucht Desugaring
+        isCoreLibraryDesugaringEnabled = true
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
     }
@@ -46,4 +49,16 @@ kotlin {
 
 flutter {
     source = "../.."
+}
+
+dependencies {
+    coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.4")
+}
+
+// Push-Benachrichtigungen: google-services.json legt Pavi selbst ab (nicht im Repo, siehe .gitignore).
+// Ohne die Datei baut die App trotzdem, Push ist dann aus.
+if (file("google-services.json").exists()) {
+    apply(plugin = "com.google.gms.google-services")
+} else {
+    logger.warn("android/app/google-services.json fehlt - Push-Benachrichtigungen sind aus")
 }

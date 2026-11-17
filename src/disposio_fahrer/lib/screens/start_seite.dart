@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../services/api_client.dart';
 import '../services/chat_dienst.dart';
 import '../services/gps_dienst.dart';
+import '../services/push_dienst.dart';
 import '../services/warteschlange.dart';
 import '../texte.dart';
 import 'chat_seite.dart';
@@ -35,6 +36,8 @@ class _StartSeiteState extends State<StartSeite> {
     _gpsFortsetzen();
     ChatDienst.abfragen();
     Warteschlange.senden();
+    // Push: Erlaubnis abfragen, Thema fahrer_<benutzer_id> abonnieren
+    PushDienst.nachAnmeldung();
   }
 
   /// Nach einem Neustart der App: laeuft noch eine Tour, GPS wieder einschalten (ohne Rueckfrage).

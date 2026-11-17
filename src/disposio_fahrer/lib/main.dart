@@ -4,6 +4,7 @@ import 'screens/login_seite.dart';
 import 'screens/start_seite.dart';
 import 'services/chat_dienst.dart';
 import 'services/gps_dienst.dart';
+import 'services/push_dienst.dart';
 import 'services/sitzung.dart';
 import 'services/vorlese_dienst.dart';
 import 'services/warteschlange.dart';
@@ -23,6 +24,8 @@ Future<void> main() async {
   await ChatDienst.init();
   // Nachweise, Fotos, Tankvorgaenge und Schaeden: lokal speichern, bei Netz senden (Phase 5, M11)
   await Warteschlange.init();
+  // Push-Benachrichtigungen (neue Nachricht, neue Tour). Ohne google-services.json still aus.
+  await PushDienst.init();
   runApp(const DisposioFahrerApp());
 }
 
@@ -36,6 +39,8 @@ class DisposioFahrerApp extends StatelessWidget {
       valueListenable: Texte.sprache,
       builder: (context, sprache, _) => MaterialApp(
         title: 'Disposio Fahrer',
+        // Push: Antippen einer Benachrichtigung oeffnet Chat oder Tour
+        navigatorKey: PushDienst.navigatorKey,
         debugShowCheckedModeBanner: false,
         theme: DisposioTheme.hell,
         // Bei Abmelden (auch nach 401) wechselt die Anzeige automatisch zum Login

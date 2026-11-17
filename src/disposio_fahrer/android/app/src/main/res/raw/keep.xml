@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Push-Ton: Der Ton wird nur ueber seinen Namen ("ton") benutzt, nicht ueber R.raw.ton.
+     Ohne diese Datei koennte das Resource Shrinking im Release-Build ihn entfernen. -->
+<resources xmlns:tools="http://schemas.android.com/tools"
+    tools:keep="@raw/ton" />
