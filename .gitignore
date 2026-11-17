@@ -16,3 +16,12 @@
 
 # Neon Function: npm-Pakete
 node_modules/
+
+# Push-Benachrichtigungen (Firebase): Konfiguration und Dienstkonto nie committen
+google-services.json
+GoogleService-Info.plist
+*firebase-adminsdk*.json
+firebase.json
+
+# Testdaten fuer Push (nur lokal, Pavi fuehrt sie aus)
+testdaten_push*.sql
