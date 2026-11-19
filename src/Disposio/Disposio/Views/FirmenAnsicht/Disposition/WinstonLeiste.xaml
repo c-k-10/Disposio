@@ -1,0 +1,77 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Seitenleiste „Winston“ (KI-Co-Disponent, FA-15) am rechten Rand der Firmenansicht: Der Disponent stellt Fragen,
+     Winston (Claude) antwortet mit den echten Firmendaten. Neue Verspätungen erscheinen hier als Hinweis mit Knopf
+     zur Kundenkommunikation (D10). Winston duzt den Disponenten; er sendet und ändert nichts. -->
+<UserControl
+    x:Class="Disposio.Views.WinstonLeiste"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+    <Border Width="380" Background="{StaticResource SurfaceBrush}" BorderBrush="{StaticResource BorderBrush}"
+            BorderThickness="1,0,0,0" Padding="18,16,18,14">
+        <Grid RowSpacing="10">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="*" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+            </Grid.RowDefinitions>
+
+            <!-- Kopf: Name, „Neues Gespräch“, Schließen -->
+            <Grid ColumnSpacing="10">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <StackPanel>
+                    <TextBlock Text="WINSTON" FontSize="12" FontWeight="SemiBold" CharacterSpacing="80"
+                               Foreground="{StaticResource AccentBrush}" />
+                    <TextBlock Text="KI-Co-Disponent" Style="{StaticResource UeberschriftText}" FontSize="18" />
+                    <!-- Wann zuletzt nach Verspätungen gesucht wurde (Hintergrundprüfung alle 2 Minuten). -->
+                    <TextBlock x:Name="PruefStand" Text="Noch keine Prüfung auf Verspätungen" Style="{StaticResource HinweisText}"
+                               FontSize="12" />
+                </StackPanel>
+                <HyperlinkButton Grid.Column="1" Content="Neues Gespräch" Padding="0" FontSize="13" VerticalAlignment="Top"
+                                 Foreground="{StaticResource MutedTextBrush}" Click="NeuesGespraech_Click" />
+                <Button Grid.Column="2" Style="{StaticResource DashboardButton}" Width="32" Height="32" MinHeight="0"
+                        Padding="0" VerticalAlignment="Top" Click="Schliessen_Click"
+                        ToolTipService.ToolTip="Winston schließen" AutomationProperties.Name="Winston schließen">
+                    <FontIcon Glyph="&#xE711;" FontSize="12" />
+                </Button>
+            </Grid>
+
+            <!-- Erscheint, wenn der API-Schlüssel fehlt oder in der Vorschau ohne Anmeldung -->
+            <Border x:Name="EinrichtungHinweis" Grid.Row="1" Style="{StaticResource WarnZeile}" Visibility="Collapsed">
+                <TextBlock x:Name="EinrichtungText" Style="{StaticResource HinweisText}" Foreground="{StaticResource TextBrush}" />
+            </Border>
+
+            <!-- Gespräch: Fragen rechts, Antworten und Hinweise links -->
+            <ScrollViewer x:Name="Verlauf" Grid.Row="2" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                <StackPanel x:Name="Nachrichten" Spacing="10" Padding="0,0,8,0" />
+            </ScrollViewer>
+
+            <StackPanel x:Name="Arbeitet" Grid.Row="3" Orientation="Horizontal" Spacing="8" Visibility="Collapsed">
+                <ProgressRing Width="16" Height="16" IsActive="True" />
+                <TextBlock Text="Winston schaut nach …" Style="{StaticResource HinweisText}" VerticalAlignment="Center" />
+            </StackPanel>
+
+            <Grid Grid.Row="4" ColumnSpacing="8">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <TextBox x:Name="Eingabe" Style="{StaticResource FormTextBox}" PlaceholderText="Frag Winston …"
+                         TextWrapping="Wrap" MaxLength="1000" KeyDown="Eingabe_KeyDown"
+                         AutomationProperties.Name="Frage an Winston" />
+                <Button x:Name="FragenKnopf" Grid.Column="1" Content="Fragen" Style="{StaticResource PrimaryButton}"
+                        VerticalAlignment="Bottom" Click="Fragen_Click" />
+            </Grid>
+
+            <TextBlock Grid.Row="5" Style="{StaticResource HinweisText}" FontSize="12"
+                       Text="Antworten kommen von Claude (Anthropic) und können Fehler enthalten. Dafür gehen die abgefragten Firmendaten an Anthropic. Winston sendet und ändert nichts selbst." />
+        </Grid>
+    </Border>
+</UserControl>
