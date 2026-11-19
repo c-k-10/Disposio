@@ -42,10 +42,12 @@
         <Grid.ColumnDefinitions>
             <ColumnDefinition x:Name="RailColumn" Width="140" />
             <ColumnDefinition Width="*" />
+            <!-- Seitenleiste „Winston“ (nur Disponenten): eingeklappt 0 breit, sonst so breit wie die Leiste. -->
+            <ColumnDefinition Width="Auto" />
         </Grid.ColumnDefinitions>
 
         <!-- Obere Leiste: Logo, Firma, rechts Konto mit Kürzel und Abmelden -->
-        <Border Grid.ColumnSpan="2" Background="{StaticResource SurfaceBrush}"
+        <Border Grid.ColumnSpan="3" Background="{StaticResource SurfaceBrush}"
                 BorderBrush="{StaticResource BorderBrush}" BorderThickness="0,0,0,1" Padding="24,0">
             <Grid ColumnSpacing="20">
                 <Grid.ColumnDefinitions>
@@ -78,6 +80,26 @@
                 </Border>
 
                 <StackPanel Grid.Column="4" Orientation="Horizontal" Spacing="14" VerticalAlignment="Center">
+                    <!-- Winston, der KI-Co-Disponent (FA-15): öffnet die Seitenleiste rechts. Nur für Disponenten sichtbar.
+                         Die rote Zahl zeigt offene Verspätungsvorschläge. Code: FirmenAnsicht.Winston.cs -->
+                    <Button x:Name="WinstonButton" Style="{StaticResource DashboardButton}" Height="40" MinHeight="0"
+                            Padding="12,0" Visibility="Collapsed" Click="Winston_Click"
+                            ToolTipService.ToolTip="Winston fragen (KI-Co-Disponent)"
+                            AutomationProperties.Name="Winston fragen">
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                            <FontIcon Glyph="&#xE99A;" FontSize="16" />
+                            <TextBlock Text="Winston" FontSize="14" VerticalAlignment="Center" />
+                            <Border x:Name="WinstonZahl" Visibility="Collapsed" MinWidth="20" Height="20" CornerRadius="10"
+                                    Padding="6,0" VerticalAlignment="Center" Background="{StaticResource LateBrush}">
+                                <TextBlock x:Name="WinstonZahlText" FontSize="12" FontWeight="SemiBold" Foreground="White"
+                                           HorizontalAlignment="Center" VerticalAlignment="Center" />
+                            </Border>
+                        </StackPanel>
+                    </Button>
+                    <!-- Meldet eine neu erkannte Verspätung, auch wenn die Seitenleiste zu ist. -->
+                    <TeachingTip x:Name="WinstonTipp" Target="{x:Bind WinstonButton}" Title="Winston"
+                                 PreferredPlacement="Bottom" ActionButtonContent="Vorschlag ansehen"
+                                 CloseButtonContent="Später" ActionButtonClick="WinstonTipp_Ansehen" />
                     <!-- Nur beim Admin-Zugang sichtbar: zurück in die Kundenverwaltung. -->
                     <HyperlinkButton x:Name="BackToDashboardLink" Content="Admin-Dashboard"
                                      Click="BackToDashboard_Click" Padding="0" VerticalAlignment="Center"
@@ -163,5 +185,8 @@
                 <Border x:Name="ViewHost" />
             </StackPanel>
         </ScrollViewer>
+
+        <!-- Hier sitzt die Seitenleiste „Winston“ (Views/FirmenAnsicht/Disposition/WinstonLeiste.xaml). -->
+        <Border x:Name="WinstonHost" Grid.Row="1" Grid.Column="2" Visibility="Collapsed" />
     </Grid>
 </Page>

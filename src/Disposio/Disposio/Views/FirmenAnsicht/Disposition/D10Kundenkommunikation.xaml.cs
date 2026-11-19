@@ -9,7 +9,9 @@ using Microsoft.UI.Xaml.Controls;
 
 namespace Disposio.Views
 {
-    // D10 lädt beim Öffnen und jede Minute: Winston erzeugt dabei neue Vorschläge (KundenkommunikationRepository).
+    // D10 lädt beim Öffnen und jede Minute: Winston erzeugt dabei neue Vorschläge (KundenkommunikationRepository)
+    // und lässt sie von der KI ausarbeiten. „Mit Winston neu formulieren“ holt für den gewählten Vorschlag eine
+    // neue KI-Fassung mit der Verkehrslage von jetzt.
     // Bearbeitete Felder werden beim automatischen Neuladen nicht überschrieben. Startwert: optional eine Tour-Id
     // (aus D07 „Kundeninformation“ oder D01), dann wird deren erster Vorschlag gewählt.
     public sealed partial class D10Kundenkommunikation : UserControl
@@ -75,12 +77,13 @@ namespace Disposio.Views
             {
                 LadeAnzeige.IsActive = true;
                 LadeAnzeige.Visibility = Visibility.Visible;
-                StatusText.Text = "Winston prüft die ETAs …";
+                StatusText.Text = "Winston prüft die ETAs und die Verkehrslage …";
             }
             try
             {
                 _vorschlaege = await _repository.AktualisierenUndLadenAsync();
                 ListeAnzeigen();
+                KiHinweisAnzeigen();
             }
             catch (UnauthorizedAccessException)
             {
@@ -133,6 +136,14 @@ namespace Disposio.Views
                 KopfAnzeigen(ziel);
             else
                 _aktuell = null;
+        }
+
+        // Arbeitet die KI gerade nicht, sagt die Zeile warum. Die Vorschläge entstehen dann aus der Textvorlage.
+        private void KiHinweisAnzeigen()
+        {
+            string? grund = KundenkommunikationRepository.KiHinweis;
+            KiHinweisText.Text = grund is null ? "" : "Vorschläge kommen gerade aus der Textvorlage statt von der KI. " + grund;
+            KiHinweis.Visibility = grund is null ? Visibility.Collapsed : Visibility.Visible;
         }
 
         private static string Beschriftung(Verspaetungsvorschlag v) =>
@@ -267,6 +278,54 @@ namespace Disposio.Views
             {
                 _arbeitet = false;
                 NeuUebersetzenKnopf.IsEnabled = true;
+            }
+        }
+
+        // Die KI schreibt Begründung, Kundentext und Fahrertext neu und speichert sie. Danach neu laden und anzeigen.
+        private async void WinstonFormulieren_Click(object sender, RoutedEventArgs e)
+        {
+            if (_aktuell is not { } v || _arbeitet)
+                return;
+            _arbeitet = true;
+            WinstonKnopf.IsEnabled = false;
+            FehlerText.Text = "";
+            LadeAnzeige.IsActive = true;
+            LadeAnzeige.Visibility = Visibility.Visible;
+            StatusText.Text = "Winston prüft die Verkehrslage und formuliert neu …";
+            try
+            {
+                await _repository.MitWinstonFormulierenAsync(v.Id, _textversion);
+                _geaendert = false; // Die Felder zeigen gleich die neue Fassung.
+                _arbeitet = false;
+                await LadenAsync(still: true);
+                StatusText.Text = "Winston hat den Vorschlag neu formuliert. Bitte vor der Freigabe prüfen. · " + StatusText.Text;
+            }
+            catch (WinstonException fehler)
+            {
+                FehlerText.Text = fehler.Message;
+                ListeAnzeigen();
+            }
+            catch (ArgumentException fehler)
+            {
+                FehlerText.Text = fehler.Message;
+                ListeAnzeigen();
+            }
+            catch (UnauthorizedAccessException)
+            {
+                _kontext.ZugriffBeenden();
+            }
+            catch (Exception)
+            {
+                FehlerText.Text = "Winston konnte den Vorschlag nicht neu formulieren. Bitte erneut versuchen.";
+                ListeAnzeigen();
+            }
+            finally
+            {
+                _arbeitet = false;
+                WinstonKnopf.IsEnabled = true;
+                LadeAnzeige.IsActive = false;
+                LadeAnzeige.Visibility = Visibility.Collapsed;
+                KiHinweisAnzeigen();
             }
         }
 
