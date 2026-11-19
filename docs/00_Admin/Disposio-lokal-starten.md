@@ -37,6 +37,34 @@ Visual Studio nach dem Setzen neu starten, damit es die Variable an die Anwendun
 Ohne die Variable öffnet die Anwendung ihre Oberfläche, Datenbankoperationen schlagen jedoch
 mit einer sicheren Fehlermeldung fehl. Es gibt keine eingebauten Ersatz-Zugangsdaten.
 
+## Winston (KI-Co-Disponent) einrichten
+
+Winston beantwortet in der Firmenansicht (Knopf „Winston“ oben rechts, nur für Disponenten) Fragen mit den
+echten Firmendaten und arbeitet Verspätungsvorschläge in der Kundenkommunikation (D10) aus. Dafür ruft die
+App Claude über die Anthropic-API auf (Modell `claude-haiku-5-5`, schnell und günstig; einstellbar in
+`Services/WinstonKi.cs`). Die Verkehrslage (Staus, Baustellen,
+Sperrungen auf der Reststrecke) kommt von TomTom, mit demselben Schlüssel wie die Live-Karte (D08).
+
+Der API-Schlüssel kommt aus der [Claude Console](https://platform.claude.com) (Konto mit Guthaben) und wird
+wie die Datenbankverbindung als Windows-Benutzervariable hinterlegt, nie im Code oder im Repository:
+
+```powershell
+setx ANTHROPIC_API_KEY "DEIN-SCHLÜSSEL"
+```
+
+Danach Visual Studio bzw. die App neu starten. Ohne Schlüssel läuft alles weiter: Winston zeigt einen
+Hinweis, und Verspätungsvorschläge entstehen aus der festen Textvorlage.
+
+- **Was Winston selbst tut:** alle 2 Minuten nach Verspätungen suchen (ETA mehr als 15 Minuten nach
+  Fensterende), neue Vorschläge mit Begründung, Kunden- und Fahrertext ausarbeiten und melden.
+  Gesendet wird nur nach „Freigeben & senden“ in D10.
+- **Kosten (Haiku 5.5):** grob 0,2–0,5 Cent pro Frage an Winston und etwa 0,1 Cent pro ausgearbeitetem
+  Vorschlag. Je Durchlauf arbeitet die KI höchstens 5 neue Vorschläge aus; „Mit Winston neu formulieren“
+  kostet je Klick einen Aufruf. Mit Opus 5.5 wäre es etwa 40-mal so viel (5–10 Cent pro Frage).
+- **Datenschutz:** Die Daten, die Winston für eine Antwort abfragt (Touren, Kunden, Fahrernamen,
+  Nachrichten), gehen an Anthropic. Im fertigen Produkt gehört der Aufruf in ein Backend, damit der
+  Schlüssel nicht auf jedem PC liegt.
+
 ## Datenbank und Anmeldung
 
 Die Anwendung migriert das Datenbankschema nicht automatisch. Prüfe zunächst, welche Migrationen

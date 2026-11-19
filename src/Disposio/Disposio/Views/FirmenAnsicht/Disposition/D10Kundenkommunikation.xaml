@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- D10 „Kundenkommunikation“: Verspätungsvorschläge von Winston (winston_vorschlag) prüfen, bearbeiten,
      „Freigeben & senden“ oder mit Grund verwerfen. Ohne Freigabe wird nichts gesendet.
+     Begründung und Texte schreibt die KI (Claude) mit der Verkehrslage von TomTom; ohne KI gilt eine Textvorlage.
      Kunde: E-Mail-Versand wird simuliert (Aktionsprotokoll). Fahrer: Chat-Nachricht (D09 / Fahrer-App). -->
 <UserControl
     x:Class="Disposio.Views.D10Kundenkommunikation"
@@ -24,6 +25,11 @@
                       AutomationProperties.Name="Offenen Vorschlag wählen" />
             <Button Grid.Column="2" Content="Aktualisieren" Style="{StaticResource DashboardButton}" Click="Aktualisieren_Click" />
         </Grid>
+
+        <!-- Nur sichtbar, wenn die KI gerade nicht arbeitet (Schlüssel fehlt, keine Verbindung). -->
+        <Border x:Name="KiHinweis" Style="{StaticResource WarnZeile}" Visibility="Collapsed">
+            <TextBlock x:Name="KiHinweisText" Style="{StaticResource HinweisText}" Foreground="{StaticResource TextBrush}" />
+        </Border>
 
         <TextBlock x:Name="LeerText" Visibility="Collapsed" Style="{StaticResource HinweisText}"
                    Text="Keine offenen Vorschläge. Winston meldet sich, sobald eine ETA mehr als 15 Minuten nach dem Ende eines Lieferfensters liegt." />
@@ -125,7 +131,17 @@
                 </Border>
             </Grid>
 
-            <TextBlock x:Name="BerechnungText" Style="{StaticResource HinweisText}" />
+            <Grid ColumnSpacing="12">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <TextBlock x:Name="BerechnungText" Style="{StaticResource HinweisText}" VerticalAlignment="Center" />
+                <!-- Die KI schreibt Begründung und beide Nachrichten neu, mit der Verkehrslage von jetzt. -->
+                <Button x:Name="WinstonKnopf" Grid.Column="1" Content="Mit Winston neu formulieren"
+                        Style="{StaticResource DashboardButton}" Click="WinstonFormulieren_Click"
+                        ToolTipService.ToolTip="Winston (KI) schreibt Begründung und beide Nachrichten mit der aktuellen Verkehrslage neu. Ihre Änderungen an den Texten werden dabei ersetzt." />
+            </Grid>
             <TextBlock x:Name="EtaWarnung" Style="{StaticResource FehlerText}" Visibility="Collapsed" />
 
             <Grid ColumnSpacing="12">

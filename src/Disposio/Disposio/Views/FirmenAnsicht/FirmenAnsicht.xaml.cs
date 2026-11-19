@@ -101,6 +101,7 @@ namespace Disposio.Views
             }
 
             UpdateAccountDisplay();
+            WinstonEinrichten();
             Open(StartId());
         }
 
@@ -170,6 +171,7 @@ namespace Disposio.Views
         private void ReturnToLogin(string? message = null)
         {
             _returningToLogin = true;
+            WinstonBeenden();
             BenutzerSitzung.Abmelden();
             MenuPanel.Children.Clear();
             ViewHost.Child = null;
@@ -193,6 +195,7 @@ namespace Disposio.Views
         {
             BenutzerSitzung.FirmenzugangBeenden();
             _returningToLogin = true;
+            WinstonBeenden();
             var appearance = new DashboardAppearance { AccentHex = _accentHex, IsLight = _isLight };
             if (Frame is Frame frame && ReferenceEquals(frame.Content, this) && frame.Navigate(typeof(DashboardAnsicht), appearance))
                 frame.BackStack.Clear();

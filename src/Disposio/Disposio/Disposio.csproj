@@ -50,6 +50,8 @@
     <ProjectCapability Include="Msix" />
   </ItemGroup>
   <ItemGroup>
+    <!-- Winston (KI-Co-Disponent): offizielles Anthropic-SDK für den Aufruf von Claude -->
+    <PackageReference Include="Anthropic" Version="13.9.0" />
     <PackageReference Include="BCrypt.Net-Next" Version="4.2.0" />
     <PackageReference Include="CommunityToolkit.WinUI.UI.Controls.DataGrid" Version="7.1.2" />
     <PackageReference Include="Microsoft.Windows.SDK.BuildTools" Version="10.0.28000.2705" />
