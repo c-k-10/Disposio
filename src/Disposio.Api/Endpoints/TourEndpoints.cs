@@ -4,7 +4,8 @@ using Npgsql;
 
 namespace Disposio.Api.Endpoints;
 
-public sealed record TourStatusAnfrage(string? Aktion, string? Bemerkung, bool? Erzwingen);
+/// <summary>Kilometerstand nur bei „starten“ und „beenden“ (#171). Optional, damit aeltere App-Versionen weiterlaufen.</summary>
+public sealed record TourStatusAnfrage(string? Aktion, string? Bemerkung, bool? Erzwingen, int? Kilometerstand = null);
 public sealed record StoppStatusAnfrage(string? Aktion);
 public sealed record ProblemAnfrage(long? StoppId, string? Art, string? Beschreibung, int? DauerMinuten);
 
@@ -26,6 +27,9 @@ public static class TourEndpoints
     public const string StoppAngekommen = "Angekommen";
     public const string StoppEntladen = "Entladen";
     public const string StoppErledigt = "Erledigt";
+
+    /// <summary>Obergrenze fuer Kilometerstaende, wie beim Tanken.</summary>
+    public const int KilometerMaximal = 5_000_000;
 
     // Arten fuer M05. Werden so in statusmeldung.status gespeichert.
     public static readonly string[] ProblemArten = { "Stau", "Panne", "Kunde nicht da", "Adresse falsch", "Ware beschädigt", "Sonstiges" };
@@ -109,7 +113,9 @@ public static class TourEndpoints
         await using (var befehl = new NpgsqlCommand("""
             SELECT t.tournummer, t.startzeit, t.endzeit, t.startort, t.zielort, t.status, fz.kennzeichen, fz.fahrzeugtyp,
                    (SELECT max(m.zeitstempel) FROM public.statusmeldung m
-                    WHERE m.tour_id = t.tour_id AND m.stopp_id IS NULL AND m.status = 'Pause')
+                    WHERE m.tour_id = t.tour_id AND m.stopp_id IS NULL AND m.status = 'Pause'),
+                   GREATEST(fz.kilometerstand, COALESCE((SELECT max(k.kilometerstand) FROM public.kilometerstand k WHERE k.fahrzeug_id = fz.fahrzeug_id), 0)),
+                   (to_jsonb(t) ->> 'start_kilometerstand')::integer, (to_jsonb(t) ->> 'end_kilometerstand')::integer
             FROM public.tour t
             LEFT JOIN public.fahrzeug fz ON fz.fahrzeug_id = t.fahrzeug_id
             WHERE t.tour_id = $1 AND t.fahrer_id = $2 AND t.unternehmen_id = $3
@@ -131,7 +137,10 @@ public static class TourEndpoints
                 startort = leser.GetString(3),
                 zielort = leser.GetString(4),
                 status = leser.GetString(5),
-                fahrzeug = leser.IsDBNull(6) ? null : new { kennzeichen = leser.GetString(6), typ = leser.GetString(7) },
+                // #171: letzter bekannter Kilometerstand als Vorschlag bei „Fahrt starten“
+                fahrzeug = leser.IsDBNull(6) ? null : new { kennzeichen = leser.GetString(6), typ = leser.GetString(7), kilometerstand = leser.GetInt32(9) },
+                startKilometerstand = leser.IsDBNull(10) ? (int?)null : leser.GetInt32(10),
+                endKilometerstand = leser.IsDBNull(11) ? (int?)null : leser.GetInt32(11),
                 // M10: Beginn der aktuellen Pause (letzte Meldung "Pause")
                 pauseSeit = leser.GetString(5) == TourPausiert && !leser.IsDBNull(8) ? leser.GetDateTime(8) : (DateTime?)null,
             };
@@ -237,6 +246,11 @@ public static class TourEndpoints
         {
             return Fehler("eingabe_ungueltig", 400);
         }
+        var km = anfrage.Kilometerstand;
+        if (km is not null and not (>= 0 and <= KilometerMaximal))
+        {
+            return Fehler("km_ungueltig", 400);
+        }
 
         await using var verbindung = await db.OpenConnectionAsync();
         await using var tx = await verbindung.BeginTransactionAsync();
@@ -249,10 +263,18 @@ public static class TourEndpoints
 
         string status;
         bool hatFahrzeug;
+        long? fahrzeugId;
+        int? startKm;
+        int? fahrzeugKm;
+        // Start-Kilometerstand ueber to_jsonb, damit die Abfrage auch vor Migration 019 funktioniert
         await using (var befehl = new NpgsqlCommand("""
-            SELECT status, fahrzeug_id IS NOT NULL FROM public.tour
-            WHERE tour_id = $1 AND fahrer_id = $2 AND unternehmen_id = $3
-            FOR UPDATE
+            SELECT t.status, t.fahrzeug_id IS NOT NULL, t.fahrzeug_id,
+                   (to_jsonb(t) ->> 'start_kilometerstand')::integer,
+                   GREATEST(fz.kilometerstand, COALESCE((SELECT max(k.kilometerstand) FROM public.kilometerstand k WHERE k.fahrzeug_id = fz.fahrzeug_id), 0))
+            FROM public.tour t
+            LEFT JOIN public.fahrzeug fz ON fz.fahrzeug_id = t.fahrzeug_id
+            WHERE t.tour_id = $1 AND t.fahrer_id = $2 AND t.unternehmen_id = $3
+            FOR UPDATE OF t
             """, verbindung, tx))
         {
             befehl.Parameters.Add(new() { Value = id });
@@ -265,6 +287,9 @@ public static class TourEndpoints
             }
             status = leser.GetString(0);
             hatFahrzeug = leser.GetBoolean(1);
+            fahrzeugId = leser.IsDBNull(2) ? null : leser.GetInt64(2);
+            startKm = leser.IsDBNull(3) ? null : leser.GetInt32(3);
+            fahrzeugKm = fahrzeugId is null ? null : leser.GetInt32(4);
         }
 
         string neuerStatus;
@@ -328,6 +353,11 @@ public static class TourEndpoints
                         return Results.Json(new { fehler = "offene_stopps", stopps = offene }, statusCode: 409);
                     }
                 }
+                // #173: am Ende nie weniger als bei Abfahrt
+                if (km is int ende && startKm is int start && ende < start)
+                {
+                    return Results.Json(new { fehler = "km_kleiner_start", start }, statusCode: 400);
+                }
                 (neuerStatus, meldung) = (TourAbgeschlossen, "Tour beendet");
                 break;
 
@@ -340,6 +370,10 @@ public static class TourEndpoints
             befehl.Parameters.Add(new() { Value = neuerStatus });
             befehl.Parameters.Add(new() { Value = id });
             await befehl.ExecuteNonQueryAsync();
+        }
+        if (km is int stand && fahrzeugId is long fahrzeug && (aktion is "starten" or "beenden"))
+        {
+            await KilometerstandSpeichernAsync(verbindung, tx, id, fahrzeug, fahrzeugKm ?? 0, stand, aktion == "starten");
         }
         await MeldungAsync(verbindung, tx, ids.FahrerId, id, null, meldung, bemerkung);
         await tx.CommitAsync();
@@ -359,18 +393,27 @@ public static class TourEndpoints
         }
 
         string status;
+        int? startKm;
+        int? fahrzeugKm;
         await using (var befehl = new NpgsqlCommand("""
-            SELECT status FROM public.tour WHERE tour_id = $1 AND fahrer_id = $2 AND unternehmen_id = $3
+            SELECT t.status, (to_jsonb(t) ->> 'start_kilometerstand')::integer,
+                   CASE WHEN fz.fahrzeug_id IS NULL THEN NULL ELSE GREATEST(fz.kilometerstand, COALESCE((SELECT max(k.kilometerstand) FROM public.kilometerstand k WHERE k.fahrzeug_id = fz.fahrzeug_id), 0)) END
+            FROM public.tour t
+            LEFT JOIN public.fahrzeug fz ON fz.fahrzeug_id = t.fahrzeug_id
+            WHERE t.tour_id = $1 AND t.fahrer_id = $2 AND t.unternehmen_id = $3
             """, verbindung, tx))
         {
             befehl.Parameters.Add(new() { Value = id });
             befehl.Parameters.Add(new() { Value = ids.FahrerId });
             befehl.Parameters.Add(new() { Value = ids.UnternehmenId });
-            if (await befehl.ExecuteScalarAsync() is not string gelesen)
+            await using var leser = await befehl.ExecuteReaderAsync();
+            if (!await leser.ReadAsync())
             {
                 return TourFehlt();
             }
-            status = gelesen;
+            status = leser.GetString(0);
+            startKm = leser.IsDBNull(1) ? null : leser.GetInt32(1);
+            fahrzeugKm = leser.IsDBNull(2) ? null : leser.GetInt32(2);
         }
 
         var offene = await OffeneStoppsAsync(verbindung, tx, id);
@@ -381,6 +424,9 @@ public static class TourEndpoints
             darfBeenden = status is TourUnterwegs or TourPausiert,
             // Bei offenen Stopps beendet die App mit erzwingen: true
             offeneStopps = offene,
+            // #173: Vorschlag und Untergrenze fuer den Kilometerstand bei Tourende
+            startKilometerstand = startKm,
+            fahrzeugKilometerstand = fahrzeugKm,
         });
     }
 
@@ -513,6 +559,49 @@ public static class TourEndpoints
         await tx.CommitAsync();
 
         return Results.Created($"/touren/{id}", new { gemeldet = true });
+    }
+
+    /// <summary>
+    /// #171/#174: Kilometerstand an der Tour speichern (Start oder Ende) und beim Fahrzeug eintragen, wenn er hoeher ist
+    /// als der letzte bekannte (wie beim Tanken: Tippfehler nach unten aendern den Fahrzeugstand nicht).
+    /// Ohne Migration 019 fehlen die Spalten an der Tour; dann wird nur der Fahrzeugstand gepflegt.
+    /// </summary>
+    private static async Task KilometerstandSpeichernAsync(NpgsqlConnection verbindung, NpgsqlTransaction tx, long tourId,
+        long fahrzeugId, int bisher, int stand, bool start)
+    {
+        bool spaltenDa;
+        await using (var pruefen = new NpgsqlCommand("""
+            SELECT 1 FROM information_schema.columns
+            WHERE table_schema = 'public' AND table_name = 'tour' AND column_name = 'start_kilometerstand'
+            """, verbindung, tx))
+        {
+            spaltenDa = await pruefen.ExecuteScalarAsync() is not null;
+        }
+        if (spaltenDa)
+        {
+            var spalte = start ? "start_kilometerstand" : "end_kilometerstand";
+            await using var befehl = new NpgsqlCommand($"UPDATE public.tour SET {spalte} = $1 WHERE tour_id = $2", verbindung, tx);
+            befehl.Parameters.Add(new() { Value = stand });
+            befehl.Parameters.Add(new() { Value = tourId });
+            await befehl.ExecuteNonQueryAsync();
+        }
+
+        if (stand > bisher)
+        {
+            await using var batch = new NpgsqlBatch(verbindung, tx);
+            var neu = new NpgsqlBatchCommand(
+                "INSERT INTO public.kilometerstand (datum, kilometerstand, fahrzeug_id) VALUES ($1, $2, $3)");
+            neu.Parameters.Add(new() { Value = DateOnly.FromDateTime(DateTime.UtcNow) });
+            neu.Parameters.Add(new() { Value = stand });
+            neu.Parameters.Add(new() { Value = fahrzeugId });
+            batch.BatchCommands.Add(neu);
+            var fahrzeug = new NpgsqlBatchCommand(
+                "UPDATE public.fahrzeug SET kilometerstand = $1 WHERE fahrzeug_id = $2 AND kilometerstand < $1");
+            fahrzeug.Parameters.Add(new() { Value = stand });
+            fahrzeug.Parameters.Add(new() { Value = fahrzeugId });
+            batch.BatchCommands.Add(fahrzeug);
+            await batch.ExecuteNonQueryAsync();
+        }
     }
 
     private static async Task<List<object>> OffeneStoppsAsync(NpgsqlConnection verbindung, NpgsqlTransaction tx, long tourId)
