@@ -25,3 +25,7 @@ firebase.json
 
 # Testdaten fuer Push (nur lokal, Pavi fuehrt sie aus)
 testdaten_push*.sql
+
+# Desktop-App: gebaute MSIX-Pakete und Update-Dateien (tools/DesktopPaketBauen.ps1)
+AppPackages/
+BundleArtifacts/

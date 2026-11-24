@@ -31,7 +31,7 @@ namespace Disposio.Views
         // Felder, die beim letzten Speichern rot markiert wurden.
         private readonly HashSet<Control> _markiert = new();
 
-        // Die vier Schritte des Assistenten: Karten im Formular, Knopf links und die Felder, die dazugehören.
+        // Die fünf Schritte des Assistenten: Karten im Formular, Knopf links und die Felder, die dazugehören.
         private sealed record Schritt(string Titel, string Hinweis, Border[] Karten, Button Knopf, Rectangle Balken,
                                       Ellipse Punkt, TextBlock Symbol, string Nummer, Control[] Felder);
 
@@ -70,6 +70,15 @@ namespace Disposio.Views
             BreiteBox.TextChanged += (_, _) => LademeterAnzeigen();
             LademeterAnzeigen();
             TemperaturHinweisAnzeigen();
+            // Dokumente: bei einer bestehenden Sendung sofort hochladen, bei einer neuen nur vormerken.
+            DokumenteBereich.NurAnsicht = kontext.IstVorschau;
+            DokumenteBereich.AuftragId = _id;
+            DokumenteBereich.Geaendert += (_, _) =>
+            {
+                if (_aktuell == _schritte.Length - 1)
+                    ZusammenfassungAufbauen();
+            };
+
             SchritteAnlegen();
             MarkierungZuruecksetzenBeiEingabe();
             SchrittZeigen(0);
@@ -93,6 +102,9 @@ namespace Disposio.Views
                 LadeFertig("In der Vorschau ohne Anmeldung werden keine Firmendaten geladen und keine Sendungen gespeichert.");
                 return;
             }
+
+            if (_id is not null)
+                _ = DokumenteBereich.LadenAsync();   // fängt Fehler selbst ab und zeigt sie an
 
             var abbruch = new CancellationTokenSource();
             _abbruch = abbruch;
@@ -119,7 +131,8 @@ namespace Disposio.Views
                         // Verplante Sendungen nur anzeigen: Ihre Stopps hängen schon an der Tour.
                         _gesperrt = true;
                         Sperren(FormularBereich);
-                        LadeFertig($"Diese Sendung ist in Tour {tour} verplant und kann hier nicht mehr geändert werden.");
+                        LadeFertig($"Diese Sendung ist in Tour {tour} verplant und kann hier nicht mehr geändert werden. " +
+                                   "Dokumente können Sie trotzdem hinzufügen (Schritt 4).");
                         return;
                     }
                 }
@@ -206,6 +219,9 @@ namespace Disposio.Views
         // Alle Eingabefelder unterhalb des Elements sperren (verplante Sendung).
         private static void Sperren(DependencyObject element)
         {
+            // Dokumente dürfen auch bei verplanten Sendungen noch ergänzt werden.
+            if (element is DokumentBereich)
+                return;
             if (element is Control control)
                 control.IsEnabled = false;
             for (int i = 0; i < VisualTreeHelper.GetChildrenCount(element); i++)
@@ -406,10 +422,24 @@ namespace Disposio.Views
             SpeichernButton.Content = "Wird gespeichert …";
             try
             {
-                await _repository.SpeichernAsync(entwurf, _id);
+                long auftragId = await _repository.SpeichernAsync(entwurf, _id);
                 string meldung = _id is null
                     ? $"Sendung {entwurf.Auftragsnummer} wurde angelegt."
                     : $"Sendung {entwurf.Auftragsnummer} wurde gespeichert.";
+
+                // Neue Sendung: jetzt die vorgemerkten Dokumente hochladen. Scheitert eine Datei, ist die Sendung
+                // trotzdem gespeichert – die Meldung nennt die Datei, sie kann in D02 oder D03 nachgereicht werden.
+                if (_id is null && DokumenteBereich.Vorgemerkt.Count > 0)
+                {
+                    int anzahl = DokumenteBereich.Vorgemerkt.Count;
+                    SpeichernButton.Content = "Dokumente werden hochgeladen …";
+                    IReadOnlyList<string> fehlgeschlagen = await DokumenteBereich.VorgemerkteHochladenAsync(auftragId);
+                    int hochgeladen = anzahl - fehlgeschlagen.Count;
+                    if (hochgeladen > 0)
+                        meldung += hochgeladen == 1 ? " 1 Dokument wurde hochgeladen." : $" {hochgeladen} Dokumente wurden hochgeladen.";
+                    if (fehlgeschlagen.Count > 0)
+                        meldung += $" Nicht hochgeladen: {string.Join(", ", fehlgeschlagen)} – bitte in der Sendung erneut versuchen.";
+                }
                 // Zur Sendungsliste, auf den Abholtag, mit einer Erfolgsmeldung.
                 _kontext.Oeffnen("D02", new SendungGespeichert(entwurf.Abholdatum, meldung));
             }
@@ -723,8 +753,13 @@ namespace Disposio.Views
                         GutartBox, VerpackungBox, AnzahlBox, GewichtBox, LaengeBox, BreiteBox, HoeheBox,
                         WarenwertBox, TempMinBox, TempMaxBox
                     }),
+                new Schritt("Dokumente", _id is null
+                        ? "Optional: Lieferschein, Frachtbrief & Co. auswählen – sie werden beim Speichern der Sendung hochgeladen."
+                        : "Optional: Lieferschein, Frachtbrief & Co. zur Sendung hochladen. Wird sofort gespeichert.",
+                    new[] { DokumenteKarte }, NavSchrittDok, NavSchrittDokBalken, NavSchrittDokPunkt, NavSchrittDokSymbol, "4",
+                    Array.Empty<Control>()),
                 new Schritt("Prüfen & speichern", "Bitte alles noch einmal prüfen. Mit „Ändern“ springen Sie zum passenden Schritt.",
-                    new[] { ZusammenfassungKarte }, NavSchritt4, NavSchritt4Balken, NavSchritt4Punkt, NavSchritt4Symbol, "4",
+                    new[] { ZusammenfassungKarte }, NavSchritt4, NavSchritt4Balken, NavSchritt4Punkt, NavSchritt4Symbol, "5",
                     Array.Empty<Control>())
             };
         }
@@ -848,7 +883,7 @@ namespace Disposio.Views
 
         private static Brush Ressource(string schluessel) => (Brush)Application.Current.Resources[schluessel];
 
-        // ---- Schritt 4: Zusammenfassung ----
+        // ---- Schritt 5: Zusammenfassung ----
 
         private void ZusammenfassungAufbauen()
         {
@@ -903,6 +938,11 @@ namespace Disposio.Views
             }.Where(o => o.Box.IsChecked == true).Select(o => o.Name).ToList();
             ladegut.Add(("Besonderheiten", optionen.Count == 0 ? "keine" : string.Join(", ", optionen)));
             Bereich("Ladegut", 2, ladegut);
+
+            var dokumente = DokumenteBereich.Zusammenfassung().Select(text => ("Dokument", text)).ToList();
+            if (dokumente.Count == 0)
+                dokumente.Add(("Dokumente", "keine"));
+            Bereich("Dokumente", 3, dokumente);
         }
 
         // Ein Bereich der Zusammenfassung: Überschrift mit „Ändern“ und darunter Beschriftung / Wert.

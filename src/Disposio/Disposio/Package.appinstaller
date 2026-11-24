@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Disposio-Update-Datei. Erzeugt von tools\DesktopPaketBauen.ps1 aus src\Disposio\Disposio\Package.appinstaller.
+  OnLaunch: Bei jedem Start prüft Windows, ob es eine neue Version gibt.
+  ShowPrompt: Der Nutzer sieht einen Update-Hinweis.
+  UpdateBlocksActivation: Die App startet erst nach dem Update (Pflicht-Update).
+-->
+<AppInstaller Uri="{AppInstallerUri}"
+              Version="{Version}"
+              xmlns="http://schemas.microsoft.com/appx/appinstaller/2021">
+
+  <MainBundle Name="{Name}"
+              Version="{Version}"
+              Publisher="{Publisher}"
+              Uri="{MainPackageUri}"/>
+
+  <UpdateSettings>
+    <OnLaunch HoursBetweenUpdateChecks="0" ShowPrompt="true" UpdateBlocksActivation="true"/>
+    <AutomaticBackgroundTask/>
+  </UpdateSettings>
+
+</AppInstaller>

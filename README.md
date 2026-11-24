@@ -53,6 +53,7 @@ Disposio/
 ```
 
 Wie man die App lokal startet, steht in [`docs/00_Admin/Disposio-lokal-starten.md`](docs/00_Admin/Disposio-lokal-starten.md).
+Wie man sie als Paket mit automatischen Updates verteilt, steht in [`docs/00_Admin/Desktop-App-verteilen.md`](docs/00_Admin/Desktop-App-verteilen.md).
 
 ## Team
 
