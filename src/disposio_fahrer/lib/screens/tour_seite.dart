@@ -142,7 +142,7 @@ class _TourSeiteState extends State<TourSeite> {
   }
 
   String _fehlerText(ApiFehler e) =>
-      e.code == 'andere_tour_aktiv' ? '${e.text} (${e.daten['tournummer']})' : e.text;
+      e.code == 'andere_tour_aktiv' || e.code == 'fahrzeug_belegt' ?'${e.text} (${e.daten['tournummer']})' : e.text;
 
   Future<void> _stoppStatus(Stopp stopp, String aktion) =>
       _aktion(() async {

@@ -248,9 +248,9 @@ public static class TourEndpoints
         await AusfuehrenAsync(verbindung, tx, "SELECT 1 FROM public.fahrer WHERE fahrer_id = $1 FOR UPDATE", ids.FahrerId);
 
         string status;
-        bool hatFahrzeug;
+        long? fahrzeugId;
         await using (var befehl = new NpgsqlCommand("""
-            SELECT status, fahrzeug_id IS NOT NULL FROM public.tour
+            SELECT status, fahrzeug_id FROM public.tour
             WHERE tour_id = $1 AND fahrer_id = $2 AND unternehmen_id = $3
             FOR UPDATE
             """, verbindung, tx))
@@ -264,7 +264,7 @@ public static class TourEndpoints
                 return TourFehlt();
             }
             status = leser.GetString(0);
-            hatFahrzeug = leser.GetBoolean(1);
+            fahrzeugId = leser.IsDBNull(1) ? null : leser.GetInt64(1);
         }
 
         string neuerStatus;
@@ -276,7 +276,7 @@ public static class TourEndpoints
                 {
                     return StatusUngueltig();
                 }
-                if (!hatFahrzeug)
+                if (fahrzeugId is not long tourFahrzeug)
                 {
                     return Fehler("kein_fahrzeug", 409);
                 }
@@ -294,6 +294,24 @@ public static class TourEndpoints
                     if (await befehl.ExecuteScalarAsync() is string andere)
                     {
                         return Results.Json(new { fehler = "andere_tour_aktiv", tournummer = andere }, statusCode: 409);
+                    }
+                }
+                // Fahrzeug sperren und pruefen, ob es noch auf einer anderen aktiven Tour ist (auch eines anderen Fahrers)
+                await AusfuehrenAsync(verbindung, tx, "SELECT 1 FROM public.fahrzeug WHERE fahrzeug_id = $1 FOR UPDATE", tourFahrzeug);
+                await using (var befehl = new NpgsqlCommand("""
+                    SELECT tournummer FROM public.tour
+                    WHERE fahrzeug_id = $1 AND unternehmen_id = $2 AND tour_id <> $3 AND status IN ($4, $5)
+                    LIMIT 1
+                    """, verbindung, tx))
+                {
+                    befehl.Parameters.Add(new() { Value = tourFahrzeug });
+                    befehl.Parameters.Add(new() { Value = ids.UnternehmenId });
+                    befehl.Parameters.Add(new() { Value = id });
+                    befehl.Parameters.Add(new() { Value = TourUnterwegs });
+                    befehl.Parameters.Add(new() { Value = TourPausiert });
+                    if (await befehl.ExecuteScalarAsync() is string belegt)
+                    {
+                        return Results.Json(new { fehler = "fahrzeug_belegt", tournummer = belegt }, statusCode: 409);
                     }
                 }
                 (neuerStatus, meldung) = (TourUnterwegs, "Fahrt gestartet");
