@@ -1,7 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- F01 „Fuhrparkübersicht“: alle Fahrzeuge des eigenen Unternehmens, der Weg zu „Fahrzeug anlegen / bearbeiten“ (F02)
      und „Inaktiv setzen“. Inaktive (ausgemusterte) Fahrzeuge sind zuerst ausgeblendet.
-     Je Fahrzeug stehen auch der aktuelle Fahrer (F03) und der Wartungsstatus (F04) dabei. -->
+     Je Fahrzeug stehen auch der aktuelle Fahrer (F03) und der Wartungsstatus (F04) dabei.
+     „Tankvorgänge“ öffnet F06 für das Fahrzeug. -->
 <UserControl
     x:Class="Disposio.Views.F01Fuhrpark"
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
@@ -39,7 +40,7 @@
                     <Grid ColumnSpacing="16">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="*" />
-                            <ColumnDefinition Width="230" />
+                            <ColumnDefinition Width="340" />
                         </Grid.ColumnDefinitions>
                         <Grid ColumnSpacing="16">
                             <Grid.ColumnDefinitions>
@@ -70,7 +71,7 @@
                                 <Grid ColumnSpacing="16">
                                     <Grid.ColumnDefinitions>
                                         <ColumnDefinition Width="*" />
-                                        <ColumnDefinition Width="230" />
+                                        <ColumnDefinition Width="340" />
                                     </Grid.ColumnDefinitions>
                                     <!-- Inaktive Fahrzeuge erscheinen blasser. Die Knöpfe rechts bleiben gut lesbar. -->
                                     <Grid ColumnSpacing="16" Opacity="{x:Bind Deckkraft}">
@@ -116,6 +117,9 @@
                                         <Button Content="Bearbeiten" Style="{StaticResource DashboardButton}"
                                                 MinHeight="34" Padding="12,4" FontSize="13" Click="Bearbeiten_Click"
                                                 AutomationProperties.Name="{x:Bind BearbeitenBeschreibung}" />
+                                        <Button Content="Tankvorgänge" Style="{StaticResource DashboardButton}"
+                                                MinHeight="34" Padding="12,4" FontSize="13" Click="Tankvorgaenge_Click"
+                                                AutomationProperties.Name="{x:Bind TankvorgaengeBeschreibung}" />
                                         <Button Content="{x:Bind AktivUmschaltenText}" Style="{StaticResource DashboardButton}"
                                                 MinHeight="34" Padding="12,4" FontSize="13" Click="AktivUmschalten_Click"
                                                 AutomationProperties.Name="{x:Bind AktivUmschaltenBeschreibung}" />

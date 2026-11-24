@@ -44,6 +44,7 @@ public static class AnsichtenKatalog
         new("F03", "Fahrerzuordnung", "Fahrer – Fahrzeug zuweisen", "Fahrer verfügbaren Fahrzeugen zuordnen, wechseln oder beenden; Doppelbelegungen sind ausgeschlossen.", FirmenRolle.Fuhrparkmanager),
         new("F04", "Wartung", "Wartung", "Fällige Wartungen farblich erkennen und die Wartungshistorie je Fahrzeug einsehen.", FirmenRolle.Fuhrparkmanager),
         new("F05", null, "Wartung erfassen", "Termin planen oder durchgeführte Wartung mit Datum, Kilometerstand und Bemerkung festhalten.", FirmenRolle.Fuhrparkmanager, "F04"),
+        new("F06", null, "Tankvorgänge", "Tankvorgänge je Fahrzeug mit Menge, Kosten, Preis pro Liter und Verbrauch einsehen.", FirmenRolle.Fuhrparkmanager, "F01"),
 
         // Disponent
         new("D01", "Tagesübersicht", "Tagesübersicht", "Schichtbeginn: Nachtgeschehen und Handlungsbedarf erfassen.", FirmenRolle.Disponent),

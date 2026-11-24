@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
 using System.Linq;
+using System.Runtime.InteropServices.WindowsRuntime;
 using System.Threading.Tasks;
 using Disposio.Models;
 using Disposio.Services;
@@ -13,12 +14,15 @@ using Microsoft.UI.Xaml.Input;
 using Microsoft.UI.Xaml.Media;
 using Microsoft.UI.Xaml.Media.Imaging;
 using Windows.Storage.Pickers;
+using Windows.Storage.Streams;
 using Windows.System;
+using WinPdf = Windows.Data.Pdf;
 
 namespace Disposio.Views
 {
     // D11: Sendungen laden (Tag, Suche oder Tour), eine wählen, deren Dokumente und Abliefernachweise zeigen.
-    // „Vorschau“ zeigt Bilder und die erste PDF-Seite (über Cloudinary), „Original öffnen“ den Browser.
+    // „Vorschau“ zeigt Bilder und die erste PDF-Seite (über Cloudinary; klappt das nicht, zeichnet die App die
+    // erste PDF-Seite selbst). „Herunterladen“ speichert die Datei, „Original öffnen“ zeigt sie im Browser.
     // „Dokument zuordnen“ lädt eine Datei zu Cloudinary hoch und verknüpft sie mit der Sendung.
     public sealed partial class D11Frachtdokumente : UserControl
     {
@@ -30,6 +34,9 @@ namespace Disposio.Views
         private IReadOnlyList<DokumentSendung> _sendungen = Array.Empty<DokumentSendung>();
         private DokumentSendung? _aktuell;
         private string? _originalAdresse;
+        private Frachtdokument? _vorschauDokument;
+        private int _vorschauNummer;   // nur die zuletzt angeklickte Vorschau wird angezeigt
+        private const string KeineDokumenteText = "Zu dieser Sendung gibt es noch keine Dokumente und keinen Abliefernachweis.";
         private (string Name, byte[] Inhalt)? _datei;
         private bool _auswahlIgnorieren;
         private bool _arbeitet;
@@ -131,6 +138,9 @@ namespace Disposio.Views
             if (neu)
                 ReferenzBox.Text = s.Referenz;
             SendungsvorschauZeigen(s);
+            // Alte Liste weg, damit beim Wechsel (oder bei einem Ladefehler) keine Dokumente der vorigen Sendung stehen bleiben.
+            EintragListe.ItemsSource = null;
+            KeineDokumente.Visibility = Visibility.Collapsed;
             try
             {
                 SendungDokumente daten = await _repository.DokumenteLadenAsync(s.Id);
@@ -141,6 +151,7 @@ namespace Disposio.Views
                     .OrderBy(e => e.Zeit)
                     .ToList();
                 EintragListe.ItemsSource = eintraege;
+                KeineDokumente.Text = KeineDokumenteText;
                 KeineDokumente.Visibility = eintraege.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
             }
             catch (UnauthorizedAccessException)
@@ -159,7 +170,11 @@ namespace Disposio.Views
         // Ohne gewähltes Dokument: Eckdaten der Sendung (wie der Platzhalter im Wireframe).
         private void SendungsvorschauZeigen(DokumentSendung s)
         {
+            _vorschauNummer++;
             VorschauTitel.Text = "Vorschau · Sendung";
+            _vorschauDokument = null;
+            HerunterladenKnopf.Visibility = Visibility.Collapsed;
+            HerunterladenText.Visibility = Visibility.Collapsed;
             VorschauBild.Source = null;
             VorschauBild.Visibility = Visibility.Collapsed;
             BildLadeAnzeige.IsActive = false;
@@ -178,56 +193,156 @@ namespace Disposio.Views
             });
         }
 
-        private void Vorschau_Click(object sender, RoutedEventArgs e)
+        private async void Vorschau_Click(object sender, RoutedEventArgs e)
         {
             if (sender is not Button { Tag: DokumentEintragZeile zeile })
                 return;
 
+            int nummer = ++_vorschauNummer;
             VorschauTitel.Text = $"Vorschau · {zeile.Art}";
-            if (zeile.Dokument is { } d)
-            {
-                _originalAdresse = d.Adresse;
-                OriginalKnopf.Visibility = Uri.TryCreate(d.Adresse, UriKind.Absolute, out _) ? Visibility.Visible : Visibility.Collapsed;
-                if (Uri.TryCreate(CloudinarySpeicher.VorschauAdresse(d.Adresse, d.MimeTyp), UriKind.Absolute, out Uri? bild))
-                {
-                    VorschauText.Visibility = Visibility.Collapsed;
-                    BildLadeAnzeige.IsActive = true;
-                    BildLadeAnzeige.Visibility = Visibility.Visible;
-                    var quelle = new BitmapImage(bild);
-                    quelle.ImageOpened += (_, _) =>
-                    {
-                        BildLadeAnzeige.IsActive = false;
-                        BildLadeAnzeige.Visibility = Visibility.Collapsed;
-                    };
-                    VorschauBild.Source = quelle;
-                    VorschauBild.Visibility = Visibility.Visible;
-                }
-                else
-                {
-                    VorschauFehlt();
-                }
-            }
-            else
+            HerunterladenText.Visibility = Visibility.Collapsed;
+            VorschauBild.Source = null;
+            VorschauBild.Visibility = Visibility.Collapsed;
+
+            if (zeile.Dokument is not { } d)
             {
                 // Abliefernachweis: alle Angaben als Text.
                 _originalAdresse = null;
-                OriginalKnopf.Visibility = Visibility.Collapsed;
-                VorschauBild.Source = null;
-                VorschauBild.Visibility = Visibility.Collapsed;
+                _vorschauDokument = null;
+                OriginalKnopf.Visibility = HerunterladenKnopf.Visibility = Visibility.Collapsed;
+                BildLadeAnzeige.IsActive = false;
+                BildLadeAnzeige.Visibility = Visibility.Collapsed;
                 VorschauText.Visibility = Visibility.Visible;
                 VorschauText.Text = zeile.Details;
+                return;
             }
+
+            _originalAdresse = d.Adresse;
+            _vorschauDokument = d;
+            Visibility knoepfe = Uri.TryCreate(d.Adresse, UriKind.Absolute, out _) ? Visibility.Visible : Visibility.Collapsed;
+            OriginalKnopf.Visibility = HerunterladenKnopf.Visibility = knoepfe;
+            VorschauText.Visibility = Visibility.Collapsed;
+            BildLadeAnzeige.IsActive = true;
+            BildLadeAnzeige.Visibility = Visibility.Visible;
+
+            // Die App lädt selbst (statt <Image Source="https://…">), damit sie bei einem Fehler den Grund kennt.
+            // 1. Vorschau von Cloudinary (verkleinertes Bild bzw. erste PDF-Seite als JPG),
+            // 2. sonst das Original: Bild direkt, PDF zeichnet Windows selbst (erste Seite).
+            string? grund = null;
+            BitmapImage? bild = null;
+            try
+            {
+                bild = await BildAusBytesAsync(await CloudinarySpeicher.DateiLadenAsync(
+                    CloudinarySpeicher.VorschauAdresse(d.Adresse, d.MimeTyp)));
+            }
+            catch (DokumentAbrufException fehler)
+            {
+                grund = fehler.Message;
+            }
+            catch (Exception)
+            {
+                // kein gültiges Bild – Original versuchen
+            }
+
+            if (bild is null)
+            {
+                try
+                {
+                    byte[] original = await CloudinarySpeicher.DateiLadenAsync(d.Adresse);
+                    bild = IstPdf(d) ? await PdfSeiteAsync(original) : await BildAusBytesAsync(original);
+                }
+                catch (DokumentAbrufException fehler)
+                {
+                    grund = fehler.Message;
+                }
+                catch (Exception)
+                {
+                    // Datei geladen, aber nicht darstellbar
+                }
+            }
+
+            if (nummer != _vorschauNummer)
+                return; // inzwischen wurde etwas anderes angeklickt
+
+            if (bild is null)
+            {
+                VorschauFehlt(grund);
+                return;
+            }
+            BildLadeAnzeige.IsActive = false;
+            BildLadeAnzeige.Visibility = Visibility.Collapsed;
+            VorschauBild.Source = bild;
+            VorschauBild.Visibility = Visibility.Visible;
         }
 
-        private void VorschauBild_ImageFailed(object sender, ExceptionRoutedEventArgs e) => VorschauFehlt();
+        private static bool IstPdf(Frachtdokument d) =>
+            d.MimeTyp == "application/pdf" || d.Adresse.EndsWith(".pdf", StringComparison.OrdinalIgnoreCase);
 
-        private void VorschauFehlt()
+        private static async Task<BitmapImage> BildAusBytesAsync(byte[] inhalt)
+        {
+            using var strom = new InMemoryRandomAccessStream();
+            await strom.WriteAsync(inhalt.AsBuffer());
+            strom.Seek(0);
+            var quelle = new BitmapImage();
+            await quelle.SetSourceAsync(strom);
+            return quelle;
+        }
+
+        // Erste Seite einer PDF als Bild (Windows.Data.Pdf, ohne Cloudinary).
+        private static async Task<BitmapImage> PdfSeiteAsync(byte[] inhalt)
+        {
+            using var strom = new InMemoryRandomAccessStream();
+            await strom.WriteAsync(inhalt.AsBuffer());
+            strom.Seek(0);
+            WinPdf.PdfDocument pdf = await WinPdf.PdfDocument.LoadFromStreamAsync(strom);
+            using WinPdf.PdfPage seite = pdf.GetPage(0);
+            using var bild = new InMemoryRandomAccessStream();
+            await seite.RenderToStreamAsync(bild, new WinPdf.PdfPageRenderOptions { DestinationWidth = 1200 });
+            bild.Seek(0);
+            var quelle = new BitmapImage();
+            await quelle.SetSourceAsync(bild);
+            return quelle;
+        }
+
+        private void VorschauBild_ImageFailed(object sender, ExceptionRoutedEventArgs e) => VorschauFehlt(null);
+
+        private void VorschauFehlt(string? grund)
         {
             BildLadeAnzeige.IsActive = false;
             BildLadeAnzeige.Visibility = Visibility.Collapsed;
             VorschauBild.Visibility = Visibility.Collapsed;
             VorschauText.Visibility = Visibility.Visible;
-            VorschauText.Text = "Für diese Datei gibt es keine Vorschau.\n„Original öffnen“ zeigt sie im Browser.";
+            VorschauText.Text = grund ?? "Für diese Datei gibt es keine Vorschau.\n„Herunterladen“ speichert sie, „Original öffnen“ zeigt sie im Browser.";
+        }
+
+        private async void Herunterladen_Click(object sender, RoutedEventArgs e)
+        {
+            if (_vorschauDokument is not { } d || _arbeitet)
+                return;
+            _arbeitet = true;
+            HerunterladenKnopf.IsEnabled = false;
+            HerunterladenText.Foreground = (Brush)Application.Current.Resources["MutedTextBrush"];
+            HerunterladenText.Text = "Datei wird geladen …";
+            HerunterladenText.Visibility = Visibility.Visible;
+            try
+            {
+                // global::, weil das Grid in D11 ebenfalls „DokumentBereich“ heißt
+                var ergebnis = await global::Disposio.Views.DokumentBereich.SpeichernUnterAsync(this, d);
+                if (ergebnis is { } r)
+                {
+                    HerunterladenText.Text = r.Text;
+                    HerunterladenText.Foreground = (Brush)Application.Current.Resources[r.Fehler ? "ErrorBrush" : "MutedTextBrush"];
+                }
+                else
+                {
+                    HerunterladenText.Visibility = Visibility.Collapsed;
+                }
+            }
+            finally
+            {
+                _arbeitet = false;
+                HerunterladenKnopf.IsEnabled = true;
+            }
         }
 
         private async void OriginalOeffnen_Click(object sender, RoutedEventArgs e)

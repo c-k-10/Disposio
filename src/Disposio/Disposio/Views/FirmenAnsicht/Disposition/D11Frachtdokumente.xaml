@@ -123,8 +123,14 @@
                                        HorizontalAlignment="Center" VerticalAlignment="Center" IsTextSelectionEnabled="True" />
                         </Grid>
                     </Border>
-                    <Button x:Name="OriginalKnopf" Content="Original öffnen" Style="{StaticResource DashboardButton}"
-                            HorizontalAlignment="Left" Visibility="Collapsed" Click="OriginalOeffnen_Click" />
+                    <StackPanel Orientation="Horizontal" Spacing="10">
+                        <Button x:Name="HerunterladenKnopf" Content="Herunterladen" Style="{StaticResource DashboardButton}"
+                                Visibility="Collapsed" Click="Herunterladen_Click" />
+                        <Button x:Name="OriginalKnopf" Content="Original öffnen" Style="{StaticResource DashboardButton}"
+                                Visibility="Collapsed" Click="OriginalOeffnen_Click" />
+                    </StackPanel>
+                    <TextBlock x:Name="HerunterladenText" Style="{StaticResource HinweisText}" TextWrapping="Wrap"
+                               Visibility="Collapsed" />
                 </StackPanel>
             </Border>
         </Grid>

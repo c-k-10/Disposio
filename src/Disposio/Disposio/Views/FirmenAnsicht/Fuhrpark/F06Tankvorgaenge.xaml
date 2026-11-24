@@ -1,0 +1,160 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- F06 „Tankvorgänge“: Tankvorgänge der Fahrer-App je Fahrzeug (aus F01 „Tankvorgänge“ oder für alle Fahrzeuge).
+     Nur lesen: Summen, Preis pro Liter und Verbrauch. Bearbeitet werden Tankmeldungen in D15 „Meldungen“. -->
+<UserControl
+    x:Class="Disposio.Views.F06Tankvorgaenge"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:local="using:Disposio.Views">
+
+    <StackPanel Spacing="18">
+        <!-- Filter -->
+        <Grid ColumnSpacing="16">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="1.4*" MinWidth="200" />
+                <ColumnDefinition Width="*" MinWidth="170" />
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+            <StackPanel>
+                <TextBlock Text="Fahrzeug" Style="{StaticResource FeldLabel}" />
+                <ComboBox x:Name="FahrzeugBox" Style="{StaticResource FormComboBox}" HorizontalAlignment="Stretch"
+                          SelectionChanged="Filter_SelectionChanged" AutomationProperties.Name="Fahrzeug" />
+            </StackPanel>
+            <StackPanel Grid.Column="1">
+                <TextBlock Text="Zeitraum" Style="{StaticResource FeldLabel}" />
+                <ComboBox x:Name="ZeitraumBox" Style="{StaticResource FormComboBox}" HorizontalAlignment="Stretch"
+                          SelectionChanged="Filter_SelectionChanged" AutomationProperties.Name="Zeitraum" />
+            </StackPanel>
+            <Button x:Name="NeuLadenButton" Grid.Column="2" Content="Erneut laden" Style="{StaticResource DashboardButton}"
+                    VerticalAlignment="Bottom" Click="NeuLaden_Click" />
+            <Button Grid.Column="3" Content="Zur Fuhrparkübersicht" Style="{StaticResource DashboardButton}"
+                    VerticalAlignment="Bottom" Click="Zurueck_Click" />
+        </Grid>
+
+        <StackPanel Orientation="Horizontal" Spacing="12">
+            <ProgressRing x:Name="LadeAnzeige" Width="18" Height="18" IsActive="False" Visibility="Collapsed" />
+            <TextBlock x:Name="StatusText" Style="{StaticResource HinweisText}" VerticalAlignment="Center" TextWrapping="Wrap" />
+        </StackPanel>
+
+        <!-- Kennzahlen für die Auswahl -->
+        <Grid x:Name="SummenBereich" ColumnSpacing="16" Visibility="Collapsed">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="*" />
+            </Grid.ColumnDefinitions>
+            <Border Style="{StaticResource KarteStyle}">
+                <StackPanel Spacing="4">
+                    <TextBlock Text="Tankvorgänge" Style="{StaticResource HinweisText}" />
+                    <TextBlock x:Name="AnzahlWert" Style="{StaticResource UeberschriftText}" />
+                </StackPanel>
+            </Border>
+            <Border Grid.Column="1" Style="{StaticResource KarteStyle}">
+                <StackPanel Spacing="4">
+                    <TextBlock Text="Getankte Menge" Style="{StaticResource HinweisText}" />
+                    <TextBlock x:Name="MengeWert" Style="{StaticResource UeberschriftText}" />
+                </StackPanel>
+            </Border>
+            <Border Grid.Column="2" Style="{StaticResource KarteStyle}">
+                <StackPanel Spacing="4">
+                    <TextBlock Text="Kosten gesamt" Style="{StaticResource HinweisText}" />
+                    <TextBlock x:Name="KostenWert" Style="{StaticResource UeberschriftText}" />
+                    <TextBlock x:Name="PreisWert" Style="{StaticResource HinweisText}" />
+                </StackPanel>
+            </Border>
+            <Border Grid.Column="3" Style="{StaticResource KarteStyle}">
+                <StackPanel Spacing="4">
+                    <TextBlock Text="Ø Verbrauch" Style="{StaticResource HinweisText}" />
+                    <TextBlock x:Name="VerbrauchWert" Style="{StaticResource UeberschriftText}" />
+                    <TextBlock x:Name="VerbrauchHinweis" Style="{StaticResource HinweisText}" TextWrapping="Wrap" />
+                </StackPanel>
+            </Border>
+        </Grid>
+
+        <Border Style="{StaticResource KarteStyle}">
+            <StackPanel Spacing="12">
+                <TextBlock x:Name="ListenTitel" Text="Tankvorgänge" Style="{StaticResource UeberschriftText}" />
+
+                <Border BorderBrush="{StaticResource BorderBrush}" BorderThickness="0,0,0,1" Padding="0,0,0,10">
+                    <Grid ColumnSpacing="16">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="0.9*" />
+                            <ColumnDefinition Width="1.2*" />
+                            <ColumnDefinition Width="0.9*" />
+                            <ColumnDefinition Width="0.9*" />
+                            <ColumnDefinition Width="0.8*" />
+                            <ColumnDefinition Width="1.1*" />
+                            <ColumnDefinition Width="1.4*" />
+                            <ColumnDefinition Width="1*" />
+                            <ColumnDefinition Width="0.6*" />
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Text="Datum" Style="{StaticResource HinweisText}" FontWeight="SemiBold" />
+                        <TextBlock Grid.Column="1" Text="Fahrzeug / Fahrer" Style="{StaticResource HinweisText}" FontWeight="SemiBold" />
+                        <TextBlock Grid.Column="2" Text="Menge" Style="{StaticResource HinweisText}" FontWeight="SemiBold" />
+                        <TextBlock Grid.Column="3" Text="Kosten" Style="{StaticResource HinweisText}" FontWeight="SemiBold" />
+                        <TextBlock Grid.Column="4" Text="Preis / l" Style="{StaticResource HinweisText}" FontWeight="SemiBold" />
+                        <TextBlock Grid.Column="5" Text="Kilometerstand" Style="{StaticResource HinweisText}" FontWeight="SemiBold" />
+                        <TextBlock Grid.Column="6" Text="Tankstelle / Kraftstoff" Style="{StaticResource HinweisText}" FontWeight="SemiBold" />
+                        <TextBlock Grid.Column="7" Text="Status" Style="{StaticResource HinweisText}" FontWeight="SemiBold" />
+                        <TextBlock Grid.Column="8" Text="Beleg" Style="{StaticResource HinweisText}" FontWeight="SemiBold" />
+                    </Grid>
+                </Border>
+
+                <ItemsControl x:Name="TankListe">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate x:DataType="local:TankZeile">
+                            <Border BorderBrush="{StaticResource BorderBrush}" BorderThickness="0,0,0,1" Padding="0,10">
+                                <Grid ColumnSpacing="16">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="0.9*" />
+                                        <ColumnDefinition Width="1.2*" />
+                                        <ColumnDefinition Width="0.9*" />
+                                        <ColumnDefinition Width="0.9*" />
+                                        <ColumnDefinition Width="0.8*" />
+                                        <ColumnDefinition Width="1.1*" />
+                                        <ColumnDefinition Width="1.4*" />
+                                        <ColumnDefinition Width="1*" />
+                                        <ColumnDefinition Width="0.6*" />
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Text="{x:Bind Datum}" Style="{StaticResource NormalText}" VerticalAlignment="Center" />
+                                    <StackPanel Grid.Column="1" Spacing="2" VerticalAlignment="Center">
+                                        <TextBlock Text="{x:Bind Kennzeichen}" Style="{StaticResource NormalText}" FontWeight="SemiBold" />
+                                        <TextBlock Text="{x:Bind Fahrer}" Style="{StaticResource HinweisText}" FontSize="12" />
+                                    </StackPanel>
+                                    <TextBlock Grid.Column="2" Text="{x:Bind Menge}" Style="{StaticResource NormalText}" VerticalAlignment="Center" />
+                                    <TextBlock Grid.Column="3" Text="{x:Bind Kosten}" Style="{StaticResource NormalText}" VerticalAlignment="Center" />
+                                    <TextBlock Grid.Column="4" Text="{x:Bind Preis}" Style="{StaticResource NormalText}" VerticalAlignment="Center" />
+                                    <StackPanel Grid.Column="5" Spacing="2" VerticalAlignment="Center">
+                                        <TextBlock Text="{x:Bind Kilometerstand}" Style="{StaticResource NormalText}" />
+                                        <TextBlock Text="{x:Bind Verbrauch}" Style="{StaticResource HinweisText}" FontSize="12" />
+                                    </StackPanel>
+                                    <StackPanel Grid.Column="6" Spacing="2" VerticalAlignment="Center">
+                                        <TextBlock Text="{x:Bind Tankstelle}" Style="{StaticResource NormalText}" TextTrimming="CharacterEllipsis" />
+                                        <TextBlock Text="{x:Bind Kraftstoff}" Style="{StaticResource HinweisText}" FontSize="12" />
+                                    </StackPanel>
+                                    <StackPanel Grid.Column="7" Spacing="2" VerticalAlignment="Center">
+                                        <TextBlock Text="{x:Bind Status}" Style="{StaticResource NormalText}" />
+                                        <TextBlock Text="{x:Bind Notiz}" Style="{StaticResource HinweisText}" FontSize="12"
+                                                   TextWrapping="Wrap" Visibility="{x:Bind NotizSichtbarkeit}" />
+                                    </StackPanel>
+                                    <HyperlinkButton Grid.Column="8" Content="{x:Bind BelegText}" NavigateUri="{x:Bind BelegAdresse}"
+                                                     Visibility="{x:Bind BelegSichtbarkeit}" Padding="0" VerticalAlignment="Center"
+                                                     ToolTipService.ToolTip="Beleg im Browser öffnen"
+                                                     AutomationProperties.Name="{x:Bind BelegBeschreibung}" />
+                                    <TextBlock Grid.Column="8" Text="–" Style="{StaticResource HinweisText}" VerticalAlignment="Center"
+                                               Visibility="{x:Bind OhneBelegSichtbarkeit}" />
+                                </Grid>
+                            </Border>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+
+                <TextBlock x:Name="LeerText" Visibility="Collapsed" Style="{StaticResource HinweisText}" />
+                <TextBlock Style="{StaticResource HinweisText}" FontSize="12" TextWrapping="Wrap"
+                           Text="Erfasst werden Tankvorgänge in der Fahrer-App. Prüfen und korrigieren kann sie der Disponent unter „Meldungen“." />
+            </StackPanel>
+        </Border>
+    </StackPanel>
+</UserControl>

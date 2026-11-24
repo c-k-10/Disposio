@@ -16,7 +16,7 @@ using Windows.Storage.Pickers;
 namespace Disposio.Views
 {
     /// <summary>
-    /// Dokumente einer Sendung: Liste (Name öffnet die Datei im Browser), „Datei hochladen …“ mit Dokumentart,
+    /// Dokumente einer Sendung: Liste (Name öffnet die Datei im Browser, ⤓ speichert sie), „Datei hochladen …“ mit Dokumentart,
     /// „Ersetzen“ (neue Version, die alte bleibt im Verlauf) und ✕ zum Entfernen. Entfernen geht nur bei im Büro
     /// hochgeladenen Dokumenten ohne Verlauf (nicht Fahrer-App / Abliefernachweis / ersetzte Versionen).
     /// Angezeigt wird je Dokument die aktuelle Version; „n frühere Versionen“ klappt den Verlauf auf.
@@ -279,6 +279,72 @@ namespace Disposio.Views
             }
         }
 
+        // ---- Herunterladen ----
+
+        private async Task HerunterladenAsync(Frachtdokument d)
+        {
+            if (_arbeitet)
+                return;
+            _arbeitet = true;
+            Melden($"„{Anzeigename(d)}“ wird geladen …", fehler: false);
+            try
+            {
+                var ergebnis = await SpeichernUnterAsync(this, d);
+                if (ergebnis is { } e)
+                    Melden(e.Text, e.Fehler);
+                else
+                    Melden("", fehler: false);
+            }
+            finally
+            {
+                _arbeitet = false;
+            }
+        }
+
+        /// <summary>
+        /// Lädt die Datei aus dem Dokumentenspeicher und fragt dann, wo sie gespeichert werden soll
+        /// (erst laden, damit bei einem Fehler keine leere Datei entsteht). Auch für D11.
+        /// </summary>
+        /// <returns>Text für die Anzeige und ob es ein Fehler war; null = Speichern abgebrochen.</returns>
+        internal static async Task<(string Text, bool Fehler)?> SpeichernUnterAsync(UIElement element, Frachtdokument d)
+        {
+            byte[] inhalt;
+            try
+            {
+                inhalt = await CloudinarySpeicher.DateiLadenAsync(d.Adresse);
+            }
+            catch (DokumentAbrufException fehler)
+            {
+                return (fehler.Message, true);
+            }
+
+            string name = Anzeigename(d);
+            string endung = Path.GetExtension(name).ToLowerInvariant();
+            if (endung.Length == 0)
+                endung = d.MimeTyp switch { "application/pdf" => ".pdf", "image/png" => ".png", _ => ".jpg" };
+            try
+            {
+                var picker = new FileSavePicker
+                {
+                    SuggestedStartLocation = PickerLocationId.Downloads,
+                    SuggestedFileName = Path.GetFileNameWithoutExtension(name)
+                };
+                picker.FileTypeChoices.Add(endung == ".pdf" ? "PDF-Dokument" : "Bild", new List<string> { endung });
+                IntPtr fenster = Win32Interop.GetWindowFromWindowId(element.XamlRoot.ContentIslandEnvironment.AppWindowId);
+                WinRT.Interop.InitializeWithWindow.Initialize(picker, fenster);
+
+                Windows.Storage.StorageFile? ziel = await picker.PickSaveFileAsync();
+                if (ziel is null)
+                    return null;
+                await Windows.Storage.FileIO.WriteBytesAsync(ziel, inhalt);
+                return ($"„{ziel.Name}“ wurde gespeichert.", false);
+            }
+            catch (Exception)
+            {
+                return ("Die Datei konnte nicht gespeichert werden.", true);
+            }
+        }
+
         private void Melden(string text, bool fehler)
         {
             StatusText.Text = text;
@@ -377,6 +443,7 @@ namespace Disposio.Views
                 Liste.Children.Add(Zeile(
                     GlyphFuer(Path.GetExtension(d.Dateiname).ToLowerInvariant() == ".pdf" ? "application/pdf" : "image"),
                     d.Dateiname, null, $"{d.Art} · {Groesse(d.Inhalt.LongLength)} · wird beim Speichern hochgeladen",
+                    herunterladen: null,
                     ersetzen: null,
                     entfernen: () =>
                     {
@@ -397,6 +464,7 @@ namespace Disposio.Views
             string version = verlauf.Count > 0 ? $"Version {verlauf.Count + 1} · " : "";
             Liste.Children.Add(Zeile(GlyphFuer(d.MimeTyp), Anzeigename(d), d.Adresse,
                 version + $"{d.Art} · {Groesse(d.Bytes)} · {Wann(d.HochgeladenAm)}" + Herkunft(d),
+                () => HerunterladenAsync(d),
                 d.Ersetzbar && CloudinarySpeicher.Verfuegbar ? () => ErsetzenAsync(d) : (Func<Task>?)null,
                 d.Entfernbar ? () => EntfernenAsync(d) : (Func<Task>?)null));
             if (verlauf.Count == 0)
@@ -420,6 +488,7 @@ namespace Disposio.Views
                     : "";
                 inhalt.Children.Add(Zeile(GlyphFuer(alt.MimeTyp), Anzeigename(alt), alt.Adresse,
                     $"Version {verlauf.Count - i} · {Groesse(alt.Bytes)} · hochgeladen {Wann(alt.HochgeladenAm)}{Herkunft(alt)}{ersetzt}",
+                    herunterladen: () => HerunterladenAsync(alt),
                     ersetzen: null, entfernen: null, gedimmt: true));
             }
 
@@ -452,13 +521,14 @@ namespace Disposio.Views
                 Liste.Children.Add(new Microsoft.UI.Xaml.Shapes.Rectangle { Height = 1, Fill = Ressource("BorderBrush") });
         }
 
-        // Eine Zeile: Symbol | Name (Link) + Angaben | „Ersetzen“ | ✕
-        private Grid Zeile(string glyph, string name, string? adresse, string angaben, Func<Task>? ersetzen,
-            Func<Task>? entfernen, bool gedimmt = false)
+        // Eine Zeile: Symbol | Name (Link) + Angaben | ⤓ Herunterladen | „Ersetzen“ | ✕
+        private Grid Zeile(string glyph, string name, string? adresse, string angaben, Func<Task>? herunterladen,
+            Func<Task>? ersetzen, Func<Task>? entfernen, bool gedimmt = false)
         {
             var zeile = new Grid { ColumnSpacing = 10, Padding = new Thickness(0, gedimmt ? 3 : 6, 0, gedimmt ? 3 : 6) };
             zeile.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
             zeile.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+            zeile.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
             zeile.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
             zeile.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
             if (gedimmt)
@@ -505,6 +575,23 @@ namespace Disposio.Views
             Grid.SetColumn(text, 1);
             zeile.Children.Add(text);
 
+            if (herunterladen is not null)
+            {
+                var knopf = new Button
+                {
+                    Content = new FontIcon { Glyph = "\uE896", FontSize = 13 },
+                    Padding = new Thickness(8, 6, 8, 6),
+                    Background = new SolidColorBrush(Colors.Transparent),
+                    BorderThickness = new Thickness(0),
+                    VerticalAlignment = VerticalAlignment.Center
+                };
+                ToolTipService.SetToolTip(knopf, "Herunterladen");
+                AutomationProperties.SetName(knopf, $"{name} herunterladen");
+                knopf.Click += async (_, _) => await herunterladen();
+                Grid.SetColumn(knopf, 2);
+                zeile.Children.Add(knopf);
+            }
+
             if (ersetzen is not null && !NurAnsicht)
             {
                 var knopf = new Button
@@ -525,7 +612,7 @@ namespace Disposio.Views
                 ToolTipService.SetToolTip(knopf, "Neue Version hochladen – die alte bleibt im Verlauf");
                 AutomationProperties.SetName(knopf, $"{name} ersetzen");
                 knopf.Click += async (_, _) => await ersetzen();
-                Grid.SetColumn(knopf, 2);
+                Grid.SetColumn(knopf, 3);
                 zeile.Children.Add(knopf);
             }
 
@@ -542,7 +629,7 @@ namespace Disposio.Views
                 ToolTipService.SetToolTip(knopf, "Dokument entfernen");
                 AutomationProperties.SetName(knopf, $"{name} entfernen");
                 knopf.Click += async (_, _) => await entfernen();
-                Grid.SetColumn(knopf, 3);
+                Grid.SetColumn(knopf, 4);
                 zeile.Children.Add(knopf);
             }
 

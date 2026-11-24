@@ -141,6 +141,48 @@ internal static class CloudinarySpeicher
         return pdf && neu.EndsWith(".pdf", StringComparison.OrdinalIgnoreCase) ? neu[..^4] + ".jpg" : neu;
     }
 
+    /// <summary>
+    /// Lädt eine Datei (Original oder Vorschau) für die Anzeige oder zum Speichern. Fehler kommen als
+    /// <see cref="DokumentAbrufException"/> mit verständlichem Text. Wichtigster Fall: Cloudinary liefert bei
+    /// kostenlosen Konten PDF-Originale nicht aus (HTTP 401, Kopfzeile x-cld-error „… untrusted“), bis im
+    /// Cloudinary-Dashboard unter Settings → Security „Allow delivery of PDF and ZIP files“ aktiviert ist.
+    /// </summary>
+    /// <exception cref="DokumentAbrufException">Mit einem Text für die Anzeige.</exception>
+    public static async Task<byte[]> DateiLadenAsync(string url, CancellationToken cancellationToken = default)
+    {
+        if (!Uri.TryCreate(url, UriKind.Absolute, out Uri? adresse)
+            || (adresse.Scheme != Uri.UriSchemeHttps && adresse.Scheme != Uri.UriSchemeHttp))
+            throw new DokumentAbrufException("Für dieses Dokument ist keine gültige Adresse gespeichert.");
+
+        HttpResponseMessage antwort;
+        try
+        {
+            antwort = await Http.GetAsync(adresse, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
+        }
+        catch (Exception fehler) when (fehler is HttpRequestException or TaskCanceledException)
+        {
+            throw new DokumentAbrufException("Die Datei konnte nicht geladen werden. Bitte prüfen Sie die Internetverbindung.");
+        }
+
+        using (antwort)
+        {
+            if (antwort.IsSuccessStatusCode)
+                return await antwort.Content.ReadAsByteArrayAsync(cancellationToken);
+
+            int code = (int)antwort.StatusCode;
+            string grund = antwort.Headers.TryGetValues("x-cld-error", out var werte) ? string.Join(" ", werte) : "";
+            bool pdf = adresse.AbsolutePath.EndsWith(".pdf", StringComparison.OrdinalIgnoreCase);
+            if (code == 401 && (pdf || grund.Contains("untrusted", StringComparison.OrdinalIgnoreCase)))
+                throw new DokumentAbrufException(
+                    "Cloudinary gibt PDF-Dateien noch nicht heraus (Schutz bei kostenlosen Konten). Einmalig im " +
+                    "Cloudinary-Dashboard unter Settings → Security „Allow delivery of PDF and ZIP files“ aktivieren und speichern.");
+            if (code == 404)
+                throw new DokumentAbrufException("Die Datei ist im Dokumentenspeicher nicht (mehr) vorhanden.");
+            throw new DokumentAbrufException(
+                $"Der Dokumentenspeicher hat die Datei nicht geliefert ({code}{(grund.Length > 0 ? ": " + grund : "")}).");
+        }
+    }
+
     private static (string Schluessel, string Geheimnis, string Cloud)? Lesen()
     {
         string? url = Environment.GetEnvironmentVariable(UmgebungsVariable);
@@ -151,4 +193,10 @@ internal static class CloudinarySpeicher
             return null;
         return (Uri.UnescapeDataString(teile[0]), Uri.UnescapeDataString(teile[1]), uri.Host);
     }
+}
+
+/// <summary>Eine Datei konnte nicht geladen werden. <see cref="Exception.Message"/> ist für die Anzeige gedacht.</summary>
+public sealed class DokumentAbrufException : Exception
+{
+    public DokumentAbrufException(string meldung) : base(meldung) { }
 }

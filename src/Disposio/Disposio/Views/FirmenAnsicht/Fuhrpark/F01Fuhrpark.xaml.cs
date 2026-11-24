@@ -55,6 +55,13 @@ namespace Disposio.Views
                 _kontext.Oeffnen("F02", zeile.Id);
         }
 
+        // F06 bekommt die Fahrzeug-Id als Startwert und zeigt dessen Tankvorgänge.
+        private void Tankvorgaenge_Click(object sender, RoutedEventArgs e)
+        {
+            if (!_schaltet && sender is Button { DataContext: FahrzeugZeile zeile })
+                _kontext.Oeffnen("F06", zeile.Id);
+        }
+
         private void InaktiveUmschalten_Click(object sender, RoutedEventArgs e)
         {
             _inaktiveAnzeigen = !_inaktiveAnzeigen;
@@ -260,6 +267,7 @@ namespace Disposio.Views
             Deckkraft = fahrzeug.Aktiv ? 1 : 0.55;
             AktivUmschaltenText = fahrzeug.Aktiv ? "Inaktiv setzen" : "Aktivieren";
             BearbeitenBeschreibung = $"Fahrzeug {fahrzeug.Kennzeichen} bearbeiten";
+            TankvorgaengeBeschreibung = $"Tankvorgänge von Fahrzeug {fahrzeug.Kennzeichen} anzeigen";
             AktivUmschaltenBeschreibung = fahrzeug.Aktiv
                 ? $"Fahrzeug {fahrzeug.Kennzeichen} inaktiv setzen"
                 : $"Fahrzeug {fahrzeug.Kennzeichen} aktivieren";
@@ -291,6 +299,7 @@ namespace Disposio.Views
         public string AktivUmschaltenText { get; }
         // Für Bildschirmleser: Welches Fahrzeug ein Knopf betrifft.
         public string BearbeitenBeschreibung { get; }
+        public string TankvorgaengeBeschreibung { get; }
         public string AktivUmschaltenBeschreibung { get; }
         public string Fahrer { get; }
         public Visibility FahrerSichtbarkeit { get; }
