@@ -92,7 +92,8 @@
   <PropertyGroup>
     <PublishReadyToRun Condition="'$(Configuration)' == 'Debug'">False</PublishReadyToRun>
     <PublishReadyToRun Condition="'$(Configuration)' != 'Debug'">True</PublishReadyToRun>
-    <PublishTrimmed Condition="'$(Configuration)' == 'Debug'">False</PublishTrimmed>
-    <PublishTrimmed Condition="'$(Configuration)' != 'Debug'">True</PublishTrimmed>
+    <!-- Kein Trimmen: Die App nutzt JSON (System.Text.Json, Anthropic-SDK) mit Reflection.
+         Getrimmt können zur Laufzeit Typen fehlen (der Build meldet dazu viele IL2026-Warnungen). -->
+    <PublishTrimmed>False</PublishTrimmed>
   </PropertyGroup>
 </Project>
