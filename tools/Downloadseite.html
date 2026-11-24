@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<!-- Download-Seite fuer https://disposio-download.netlify.app. tools\DesktopPaketBauen.ps1 kopiert sie als index.html
+     nach AppPackages und setzt {Version} ein. Kein ms-appinstaller:-Link: den hat Windows seit Ende 2023 abgeschaltet. -->
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Disposio herunterladen</title>
+<style>
+  :root { --bg:#f6f7f9; --karte:#ffffff; --text:#1d2433; --leise:#5b6475; --akzent:#1f3b63; --rand:#dfe3ea; }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg:#14171c; --karte:#1d2128; --text:#e6e9ee; --leise:#a2a9b6; --akzent:#8fb4ea; --rand:#2e343d; }
+  }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--text); font:16px/1.55 "Segoe UI", system-ui, sans-serif; }
+  main { max-width:720px; margin:0 auto; padding:40px 16px 64px; }
+  h1 { margin:0 0 4px; font-size:30px; }
+  .version { color:var(--leise); margin:0 0 32px; }
+  section { background:var(--karte); border:1px solid var(--rand); border-radius:10px; padding:20px 22px; margin-bottom:16px; }
+  h2 { margin:0 0 8px; font-size:19px; }
+  .knopf { display:inline-block; margin:8px 0 12px; padding:10px 18px; border-radius:6px; background:var(--akzent); color:var(--bg); text-decoration:none; font-weight:600; }
+  ol { margin:4px 0 0; padding-left:22px; }
+  li { margin:3px 0; }
+  code { font-family:Consolas, monospace; font-size:14px; }
+  .hinweis { color:var(--leise); font-size:14px; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Disposio herunterladen</h1>
+  <p class="version">Desktop-App für Windows 10/11 (x64) · Version {Version}</p>
+
+  <section>
+    <h2>1. Zertifikat installieren (einmalig je PC)</h2>
+    <p>Disposio ist mit einem eigenen Zertifikat signiert. Windows installiert die App erst, wenn es diesem Zertifikat vertraut.</p>
+    <a class="knopf" href="Disposio.cer" download>Zertifikat herunterladen</a>
+    <ol>
+      <li><code>Disposio.cer</code> doppelklicken → <b>Zertifikat installieren…</b></li>
+      <li>Speicherort: <b>Lokaler Computer</b> → Weiter (Administrator-Abfrage mit Ja bestätigen)</li>
+      <li><b>Alle Zertifikate in folgendem Speicher speichern</b> → Durchsuchen → <b>Vertrauenswürdige Personen</b> → OK</li>
+      <li>Weiter → Fertig stellen</li>
+    </ol>
+  </section>
+
+  <section>
+    <h2>2. App installieren</h2>
+    <a class="knopf" href="Disposio_x64.appinstaller" download>Disposio herunterladen</a>
+    <ol>
+      <li>Die heruntergeladene Datei <code>Disposio_x64.appinstaller</code> doppelklicken.</li>
+      <li>Im Fenster „App-Installer“ auf <b>Installieren</b> klicken.</li>
+    </ol>
+    <p class="hinweis">Updates kommen danach von selbst: Beim Start fragt Disposio nach einer neuen Version.</p>
+  </section>
+
+  <section>
+    <h2>3. Datenbank-Zugang einrichten</h2>
+    <p>Disposio braucht die Windows-Benutzervariable <code>DISPOSIO_CONNECTION_STRING</code>. Den Wert gibt es vom Team, nicht auf dieser Seite. Danach Disposio neu starten.</p>
+  </section>
+
+  <section>
+    <h2>Probleme?</h2>
+    <ol>
+      <li><b>„Das Zertifikat des Herausgebers konnte nicht überprüft werden“</b>: Schritt 1 fehlt oder das Zertifikat liegt im falschen Speicher. Wichtig sind „Lokaler Computer“ und „Vertrauenswürdige Personen“.</li>
+      <li><b>Der Browser warnt beim Herunterladen</b>: „Behalten“ wählen.</li>
+      <li><b>Das Fenster „App-Installer“ bleibt leer</b>: schließen und die Datei noch einmal öffnen.</li>
+    </ol>
+  </section>
+</main>
+</body>
+</html>
