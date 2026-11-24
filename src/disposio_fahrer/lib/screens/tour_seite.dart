@@ -6,6 +6,7 @@ import '../services/api_client.dart';
 import '../services/gps_dienst.dart';
 import '../texte.dart';
 import '../theme/disposio_theme.dart';
+import '../widgets/kilometer_dialog.dart';
 import '../widgets/tour_bausteine.dart';
 import 'abschluss_seite.dart';
 import 'chat_seite.dart';
@@ -92,8 +93,11 @@ class _TourSeiteState extends State<TourSeite> {
   }
 
   Future<void> _starten() => _aktion(() async {
+        // #172: Kilometerstand bei Abfahrt abfragen und pruefen (Vorschlag = letzter bekannter Stand)
+        final km = await kilometerstandAbfahrtAbfragen(context, letzter: _tour?.fahrzeugKilometerstand);
+        if (km == null) return null;
         await _berechtigungEinholen();
-        await _api.tourStatus(widget.tourId, 'starten');
+        await _api.tourStatus(widget.tourId, 'starten', kilometerstand: km);
         final gps = await GpsDienst.starten(widget.tourId);
         return Texte.t(gps ? 'gemeldet' : 'gps_nicht_gestartet');
       });
@@ -219,6 +223,8 @@ class _TourSeiteState extends State<TourSeite> {
         Text('${tagUndZeit(tour.startzeit)} – ${uhrzeit(tour.endzeit)}', style: leise),
         if (tour.kennzeichen != null)
           Text('${Texte.t('fahrzeug')}: ${tour.kennzeichen} (${tour.fahrzeugtyp})', style: leise),
+        if (tour.startKilometerstand != null)
+          Text('${Texte.t('km_abfahrt')}: ${kmText(tour.startKilometerstand!)}', style: leise),
         const SizedBox(height: 12),
         ValueListenableBuilder<bool>(
           valueListenable: GpsDienst.aktiv,

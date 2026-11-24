@@ -4,10 +4,12 @@ import '../services/api_client.dart';
 import '../services/gps_dienst.dart';
 import '../texte.dart';
 import '../theme/disposio_theme.dart';
+import '../widgets/kilometer_dialog.dart';
 import '../widgets/tour_bausteine.dart';
 
 /// Wireframe M12: Tour abschliessen. Offene Stopps mit Warnung, Abschlussbemerkung,
 /// ausstehende GPS-Uebertragungen. Beim Beenden: Puffer senden, Tour beenden, GPS stoppen.
+/// #173: Kilometerstand bei Tourende (Pflicht), nie kleiner als bei Abfahrt; die Strecke wird angezeigt.
 /// Gibt true zurueck, wenn die Tour beendet wurde.
 class AbschlussSeite extends StatefulWidget {
   const AbschlussSeite({super.key, required this.tourId, required this.tournummer});
@@ -22,6 +24,7 @@ class AbschlussSeite extends StatefulWidget {
 class _AbschlussSeiteState extends State<AbschlussSeite> {
   final _api = ApiClient();
   final _bemerkung = TextEditingController();
+  final _km = TextEditingController();
   TourAbschluss? _abschluss;
   String? _fehler;
   bool _arbeitet = false;
@@ -35,6 +38,7 @@ class _AbschlussSeiteState extends State<AbschlussSeite> {
   @override
   void dispose() {
     _bemerkung.dispose();
+    _km.dispose();
     super.dispose();
   }
 
@@ -42,7 +46,15 @@ class _AbschlussSeiteState extends State<AbschlussSeite> {
     setState(() => _fehler = null);
     try {
       final abschluss = await _api.abschluss(widget.tourId);
-      if (mounted) setState(() => _abschluss = abschluss);
+      if (!mounted) return;
+      setState(() {
+        _abschluss = abschluss;
+        // Vorschlag: der hoehere aus Abfahrt und letztem bekannten Stand (z. B. nach dem Tanken unterwegs)
+        if (_km.text.isEmpty) {
+          final vorschlag = [abschluss.startKilometerstand, abschluss.fahrzeugKilometerstand].whereType<int>();
+          if (vorschlag.isNotEmpty) _km.text = vorschlag.reduce((a, b) => a > b ? a : b).toString();
+        }
+      });
     } on ApiFehler catch (e) {
       if (mounted) setState(() => _fehler = e.text);
     }
@@ -58,6 +70,16 @@ class _AbschlussSeiteState extends State<AbschlussSeite> {
   }
 
   Future<void> _beenden(TourAbschluss abschluss) async {
+    final km = kmLesen(_km.text);
+    if (km == null) {
+      meldung(context, Texte.t('km_ungueltig'));
+      return;
+    }
+    if (!await kilometerstandBestaetigen(context, km,
+        letzter: abschluss.fahrzeugKilometerstand, mindestens: abschluss.startKilometerstand)) {
+      return;
+    }
+    if (!mounted) return;
     setState(() => _arbeitet = true);
     try {
       // Erst alle Punkte senden, sonst lehnt die API sie nach dem Beenden ab
@@ -68,7 +90,9 @@ class _AbschlussSeiteState extends State<AbschlussSeite> {
       }
       final bemerkung = _bemerkung.text.trim();
       await _api.tourStatus(widget.tourId, 'beenden',
-          erzwingen: abschluss.offeneStopps.isNotEmpty, bemerkung: bemerkung.isEmpty ? null : bemerkung);
+          erzwingen: abschluss.offeneStopps.isNotEmpty,
+          bemerkung: bemerkung.isEmpty ? null : bemerkung,
+          kilometerstand: km);
       if (GpsDienst.tourId == widget.tourId) await GpsDienst.stoppen();
       if (mounted) Navigator.pop(context, true);
     } on ApiFehler catch (e) {
@@ -79,6 +103,19 @@ class _AbschlussSeiteState extends State<AbschlussSeite> {
     } finally {
       if (mounted) setState(() => _arbeitet = false);
     }
+  }
+
+  /// „Abfahrt: 123.400 km · Strecke: 456 km“, so weit bekannt.
+  String? _kmHinweis(TourAbschluss abschluss) {
+    final start = abschluss.startKilometerstand;
+    final ende = kmLesen(_km.text);
+    final teile = <String>[
+      if (start != null) '${Texte.t('km_abfahrt')}: ${kmText(start)}',
+      if (start != null && ende != null && ende >= start) '${Texte.t('km_strecke')}: ${kmText(ende - start)}',
+      if (start == null && abschluss.fahrzeugKilometerstand != null)
+        '${Texte.t('letzter_stand')}: ${kmText(abschluss.fahrzeugKilometerstand!)}',
+    ];
+    return teile.isEmpty ? null : teile.join(' · ');
   }
 
   @override
@@ -136,6 +173,19 @@ class _AbschlussSeiteState extends State<AbschlussSeite> {
               ),
             ),
           ),
+        const SizedBox(height: 12),
+        // #173: Kilometerstand bei Tourende und gefahrene Strecke
+        TextField(
+          controller: _km,
+          keyboardType: TextInputType.number,
+          enabled: frei,
+          onChanged: (_) => setState(() {}),
+          decoration: InputDecoration(
+            labelText: Texte.t('km_ende'),
+            suffixText: 'km',
+            helperText: _kmHinweis(abschluss),
+          ),
+        ),
         const SizedBox(height: 12),
         TextField(
           controller: _bemerkung,
