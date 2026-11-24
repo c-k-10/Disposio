@@ -85,7 +85,11 @@ Export-Certificate -Cert $zertifikat -FilePath (Join-Path $ausgabe 'Disposio.cer
 $headers = "/Disposio_x64.appinstaller`n  Content-Type: application/appinstaller`n/*.msix`n  Content-Type: application/msix`n"
 [IO.File]::WriteAllText((Join-Path $ausgabe '_headers'), $headers)
 
-# 6. Nur die x64-Laufzeit wird gebraucht (steht so in der Update-Datei), Rest weg = kleinerer Upload
+# 6. Eigene deutsche Download-Seite statt der erzeugten (deren Knopf nutzt den gesperrten ms-appinstaller:-Link)
+$seite = [IO.File]::ReadAllText((Join-Path $PSScriptRoot 'Downloadseite.html')).Replace('{Version}', $Version)
+[IO.File]::WriteAllText((Join-Path $ausgabe 'index.html'), $seite, (New-Object Text.UTF8Encoding $false))
+
+# 7. Nur die x64-Laufzeit wird gebraucht (steht so in der Update-Datei), Rest weg = kleinerer Upload
 Get-ChildItem (Join-Path $ausgabe "Disposio_$($Version)_x64_Test\Dependencies") -Directory |
     Where-Object Name -ne 'x64' | Remove-Item -Recurse -Force
 

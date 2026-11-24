@@ -42,13 +42,21 @@ Im Repository-Ordner (Visual Studio muss installiert sein):
   `Package.appxmanifest` ein, diese Änderung mit committen. Beim ersten Mal kann `-Version` wegfallen (1.0.0.0).
 - Ergebnis in `src/Disposio/Disposio/AppPackages/` (nicht in Git):
   `Disposio_x64.appinstaller`, `Disposio_<Version>_x64_Test/` (Paket und Windows App Runtime),
-  `Disposio.cer`, `_headers` (richtige Dateitypen für Netlify) und `index.html`.
+  `Disposio.cer`, `_headers` (richtige Dateitypen für Netlify) und `index.html` (deutsche Download-Seite
+  aus `tools/Downloadseite.html`).
 
 ## Hochladen
 
-1. Bei Netlify anmelden → Projekt **disposio-download** → **Activity** → **Upload a new version**.
-2. Den **ganzen Ordner** `src/Disposio/Disposio/AppPackages` auswählen (nicht einen Unterordner).
-3. Prüfen: https://disposio-download.netlify.app/Disposio_x64.appinstaller zeigt die neue Versionsnummer.
+Mit dem Netlify-Werkzeug (einmalig `npx netlify-cli login`, dann im Browser „Authorize“):
+
+```powershell
+npx netlify-cli deploy --prod --no-build --dir src\Disposio\Disposio\AppPackages --site disposio-download
+```
+
+Oder im Browser: bei Netlify anmelden → Projekt **disposio-download** → **Activity** → **Upload a new version**
+→ den **ganzen Ordner** `src/Disposio/Disposio/AppPackages` auswählen (nicht einen Unterordner).
+
+Danach prüfen: https://disposio-download.netlify.app/Disposio_x64.appinstaller zeigt die neue Versionsnummer.
 
 Netlify ersetzt bei jedem Upload die ganze Seite. Deshalb immer den ganzen Ordner hochladen.
 Der Ordner liegt nur lokal bei der Person, die baut. Alte Versionen braucht niemand, die Update-Datei zeigt immer auf die neueste.
@@ -58,12 +66,14 @@ Updates). Bei `disposio-download` ist unter Manage → General → Visitor acces
 
 ## Auf einem neuen PC installieren
 
+Für Kollegen: einfach https://disposio-download.netlify.app öffnen, die Seite erklärt die Schritte.
+
 1. https://disposio-download.netlify.app/Disposio.cer herunterladen, Doppelklick → „Zertifikat installieren“ → **Lokaler Computer** →
    „Alle Zertifikate in folgendem Speicher speichern“ → **Vertrauenswürdige Personen**. Braucht einmal
    Admin-Rechte.
 2. https://disposio-download.netlify.app/Disposio_x64.appinstaller herunterladen und doppelklicken →
-   „Installieren“. (Der Knopf auf der Seite `index.html` nutzt einen Link, den Windows standardmäßig
-   sperrt. Deshalb die Datei herunterladen.)
+   „Installieren“. (Ein `ms-appinstaller:`-Link zum Direkt-Installieren funktioniert nicht, den hat
+   Windows seit Ende 2023 standardmäßig gesperrt. Deshalb die Datei herunterladen.)
    Wichtig: über diese Datei installieren, nicht über die `.msix`. Nur dann kommen Updates an.
 3. Die Benutzervariablen setzen wie in [Disposio-lokal-starten](Disposio-lokal-starten.md)
    (`DISPOSIO_CONNECTION_STRING`, bei Bedarf `ANTHROPIC_API_KEY` usw.). Ohne sie startet die App, aber
